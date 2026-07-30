@@ -28,12 +28,15 @@ const FIELDS: { key: keyof HotelProfile; label: string; textarea?: boolean }[] =
 
 export function HotelSettings() {
   const { data, loading } = useFetch<{ profile: HotelProfile | null }>("/api/settings/hotel");
-  const [form, setForm] = React.useState<Partial<HotelProfile>>({});
-  const [saving, setSaving] = React.useState(false);
 
-  React.useEffect(() => {
-    if (data?.profile) setForm(data.profile);
-  }, [data]);
+  if (loading) return <Skeleton className="h-96 w-full" />;
+
+  return <HotelSettingsForm initialProfile={data?.profile ?? null} />;
+}
+
+function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | null }) {
+  const [form, setForm] = React.useState<Partial<HotelProfile>>(initialProfile ?? {});
+  const [saving, setSaving] = React.useState(false);
 
   async function save() {
     setSaving(true);
@@ -46,8 +49,6 @@ export function HotelSettings() {
       setSaving(false);
     }
   }
-
-  if (loading) return <Skeleton className="h-96 w-full" />;
 
   return (
     <div className="flex flex-col gap-4">

@@ -44,18 +44,7 @@ export function ContactDetail({ contactId, onChanged }: { contactId: string | nu
     contactId ? `/api/contacts/${contactId}/messages` : null
   );
   const [sending, setSending] = React.useState(false);
-  const [notes, setNotes] = React.useState("");
-  const bottomRef = React.useRef<HTMLDivElement>(null);
-
   const contact = contactData?.contact;
-
-  React.useEffect(() => {
-    setNotes(contact?.notes ?? "");
-  }, [contact?.id, contact?.notes]);
-
-  React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesData?.messages.length]);
 
   async function updateContact(patch: Partial<Contact>) {
     if (!contactId) return;
@@ -93,6 +82,38 @@ export function ContactDetail({ contactId, onChanged }: { contactId: string | nu
       </div>
     );
   }
+
+  return (
+    <ContactDetailPane
+      key={contact.id}
+      contact={contact}
+      messages={messagesData?.messages}
+      sending={sending}
+      updateContact={updateContact}
+      sendReply={sendReply}
+    />
+  );
+}
+
+function ContactDetailPane({
+  contact,
+  messages,
+  sending,
+  updateContact,
+  sendReply,
+}: {
+  contact: Contact;
+  messages: Message[] | undefined;
+  sending: boolean;
+  updateContact: (patch: Partial<Contact>) => Promise<void>;
+  sendReply: (text: string) => Promise<void>;
+}) {
+  const [notes, setNotes] = React.useState(contact.notes ?? "");
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages?.length]);
 
   return (
     <div className="flex h-full flex-1 flex-col">
@@ -156,9 +177,9 @@ export function ContactDetail({ contactId, onChanged }: { contactId: string | nu
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-2.5 p-4">
-          {!messagesData
+          {!messages
             ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-2/3" />)
-            : messagesData.messages.map((m) => <MessageBubble key={m.id} message={m} />)}
+            : messages.map((m) => <MessageBubble key={m.id} message={m} />)}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>

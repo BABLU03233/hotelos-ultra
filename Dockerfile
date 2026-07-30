@@ -14,6 +14,10 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# prisma.config.ts resolves DATABASE_URL eagerly; `generate` only reads
+# schema.prisma and never connects, so a placeholder is fine at build time —
+# the real value is injected into the running container at deploy time.
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate
 RUN npm run build
 

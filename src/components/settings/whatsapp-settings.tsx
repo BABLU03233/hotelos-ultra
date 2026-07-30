@@ -19,17 +19,17 @@ interface WhatsAppStatus {
 
 export function WhatsAppSettings() {
   const { data, loading, reload } = useFetch<WhatsAppStatus>("/api/settings/whatsapp");
-  const [phoneNumberId, setPhoneNumberId] = React.useState("");
-  const [wabaId, setWabaId] = React.useState("");
+
+  if (loading || !data) return <Skeleton className="h-64 w-full" />;
+
+  return <WhatsAppSettingsForm data={data} reload={reload} />;
+}
+
+function WhatsAppSettingsForm({ data, reload }: { data: WhatsAppStatus; reload: () => void }) {
+  const [phoneNumberId, setPhoneNumberId] = React.useState(data.phoneNumberId ?? "");
+  const [wabaId, setWabaId] = React.useState(data.wabaId ?? "");
   const [accessToken, setAccessToken] = React.useState("");
   const [saving, setSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    if (data) {
-      setPhoneNumberId(data.phoneNumberId ?? "");
-      setWabaId(data.wabaId ?? "");
-    }
-  }, [data]);
 
   async function save() {
     setSaving(true);
@@ -47,8 +47,6 @@ export function WhatsAppSettings() {
       setSaving(false);
     }
   }
-
-  if (loading || !data) return <Skeleton className="h-64 w-full" />;
 
   return (
     <Card>
