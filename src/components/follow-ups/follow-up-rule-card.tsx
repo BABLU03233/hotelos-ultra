@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { TemplatePicker } from "@/components/templates/template-picker";
 import { apiFetch } from "@/lib/api-client";
 import { formatMinutesDuration } from "@/lib/format";
 import { FollowUpAction, FollowUpRule } from "@/types";
@@ -94,13 +95,23 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
             </div>
           </div>
 
-          <Textarea
-            value={messageBody}
-            onChange={(e) => setMessageBody(e.target.value)}
-            onBlur={() => messageBody !== (rule.messageBody ?? "") && patch({ messageBody })}
-            placeholder="Message to send within the 24h window…"
-            className="min-h-16"
-          />
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-end">
+              <TemplatePicker
+                onInsert={(text) => {
+                  setMessageBody(text);
+                  patch({ messageBody: text });
+                }}
+              />
+            </div>
+            <Textarea
+              value={messageBody}
+              onChange={(e) => setMessageBody(e.target.value)}
+              onBlur={() => messageBody !== (rule.messageBody ?? "") && patch({ messageBody })}
+              placeholder="Message to send within the 24h window…"
+              className="min-h-16"
+            />
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`template-${rule.id}`} className="text-xs text-muted-foreground">

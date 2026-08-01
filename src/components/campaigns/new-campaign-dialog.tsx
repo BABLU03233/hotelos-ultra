@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TemplatePicker } from "@/components/templates/template-picker";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -156,7 +157,10 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <Label>Message</Label>
+              <div className="flex items-center justify-between">
+                <Label>Message</Label>
+                <TemplatePicker onInsert={setBody} />
+              </div>
               <Textarea value={body} onChange={(e) => setBody(e.target.value)} className="min-h-20" />
             </div>
           )}

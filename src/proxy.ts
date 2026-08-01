@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth/admin-session";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 
-const PUBLIC_TENANT_PATHS = ["/login", "/register"];
+const PUBLIC_TENANT_PATHS = ["/", "/login", "/register"];
 
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
