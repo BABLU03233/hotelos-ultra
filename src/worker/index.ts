@@ -25,10 +25,16 @@ if (process.env.PORT) {
   });
 }
 
+// Each Worker gets its own dedicated connection (rather than sharing one
+// instance) — BullMQ Workers need a dedicated connection for their internal
+// blocking-read loop, and sharing one across multiple Workers in the same
+// process is a known source of a worker silently never registering as
+// connected (confirmed here: getWorkers() showed 0 for campaign-send until
+// this fix, despite the process starting cleanly with no errors).
 const messageWorker = new Worker<ProcessMessageJob>(
   "message-processing",
   async (job) => processMessageJob(job.data),
-  { connection: redisConnection, concurrency: 5 }
+  { connection: redisConnection.duplicate(), concurrency: 5 }
 );
 
 // Rate-limited per the spec ("respecting rate limits") — 10/s is comfortably
@@ -36,7 +42,7 @@ const messageWorker = new Worker<ProcessMessageJob>(
 const campaignWorker = new Worker<CampaignSendJob>(
   "campaign-send",
   async (job) => sendCampaignToRecipient(job.data.campaignRecipientId),
-  { connection: redisConnection, concurrency: 5, limiter: { max: 10, duration: 1000 } }
+  { connection: redisConnection.duplicate(), concurrency: 5, limiter: { max: 10, duration: 1000 } }
 );
 
 messageWorker.on("failed", (job, err) => console.error(`message-processing job ${job?.id} failed:`, err));
