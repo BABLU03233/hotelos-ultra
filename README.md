@@ -4,7 +4,7 @@
 
 When a guest messages the hotel's WhatsApp number, Aria (the AI) replies instantly, answers questions from the hotel's own knowledge base, recommends rooms, nurtures the lead with automated follow-ups, and hands off to staff the moment it can't answer confidently or a human needs to close the booking. Staff manage everything — knowledge base, CRM, follow-up cadence, broadcast campaigns, settings — from one dashboard.
 
-First tenant: **Hotel Ivory Towers**, Mysuru, Karnataka (see `prisma/seed.ts`).
+First tenant: **Hotel Ivory Towers**, Uppal, Hyderabad (see `prisma/seed.ts` — room/FAQ/offer content sourced from the hotel's real site, hotelivorytower.com).
 
 Built as a real, deployable MVP — no mock data. Every module talks to a real Postgres database and a real WhatsApp Business Cloud API webhook.
 
