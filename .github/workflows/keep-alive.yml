@@ -1,0 +1,23 @@
+name: Keep Render services awake
+
+# Render's free tier sleeps a service after ~15 minutes with no external HTTP
+# traffic. Neither the main app nor the worker (which has no real user-facing
+# traffic of its own — see the health-check listener in src/worker/index.ts)
+# reliably get pinged often enough on their own, so a queued job or an
+# incoming guest message could sit for up to a minute waiting on a cold
+# start. This just pings both every 5 minutes to keep them warm — well
+# under GitHub's scheduling slop and Render's 15-minute threshold.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping web service
+        run: curl -fsS --max-time 30 https://hotelos-ultra-web.onrender.com/ -o /dev/null || echo "web ping failed (non-fatal)"
+      - name: Ping worker service
+        run: curl -fsS --max-time 30 https://hotelos-ultra-worker.onrender.com/ -o /dev/null || echo "worker ping failed (non-fatal)"
