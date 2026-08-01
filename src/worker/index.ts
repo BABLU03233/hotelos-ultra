@@ -3,12 +3,27 @@
 // Dockerfile). Deliberately loads its own env since it never goes through
 // Next.js's automatic .env loading.
 import "dotenv/config";
+import { createServer } from "http";
 import { Worker } from "bullmq";
 import { sendCampaignToRecipient } from "@/lib/campaigns/send-recipient";
 import { sweepDueFollowUps } from "@/lib/follow-ups/sweep";
 import { processMessageJob } from "@/lib/inbound/process-message-job";
 import { redisConnection } from "@/lib/queue/redis";
 import { CampaignSendJob, ProcessMessageJob } from "@/lib/queue/queues";
+
+// This process has no HTTP traffic of its own — this listener exists only
+// so a host that requires a bound port for health checks (e.g. running the
+// worker as a free-tier "web service" instead of a paid background-worker
+// service) sees it as healthy. No-op when PORT isn't set (local `npm run
+// worker`, or a real background-worker host that doesn't need this).
+if (process.env.PORT) {
+  createServer((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("worker ok");
+  }).listen(Number(process.env.PORT), () => {
+    console.log(`Health-check listener on :${process.env.PORT}`);
+  });
+}
 
 const messageWorker = new Worker<ProcessMessageJob>(
   "message-processing",
