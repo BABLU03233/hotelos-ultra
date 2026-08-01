@@ -7,6 +7,9 @@ export const contactUpdateSchema = z.object({
   notes: z.string().max(5000).nullable().optional(),
   followUpDate: z.string().datetime().nullable().optional(),
   aiPaused: z.boolean().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  assignedToId: z.string().nullable().optional(),
+  markRead: z.boolean().optional(),
 });
 export type ContactUpdateInput = z.infer<typeof contactUpdateSchema>;
 

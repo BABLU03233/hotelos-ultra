@@ -151,7 +151,8 @@ model User {
   role         UserRole @default(STAFF)
   createdAt    DateTime @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedContacts Contact[] @relation("ContactAssignee")
 
   @@unique([tenantId, email])
 }
@@ -295,9 +296,15 @@ model Contact {
   aiPaused       Boolean       @default(false)
   followUpDate   DateTime?
   notes          String?       @db.Text
+  // CRM tags (free-form labels, e.g. "VIP", "Corporate") and read-state /
+  // ownership for the team inbox view.
+  tags           String[]      @default([])
+  lastReadAt     DateTime?
+  assignedToId   String?
   updatedAt      DateTime      @updatedAt
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo         User?                @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages           Message[]
   scheduledFollowUps ScheduledFollowUp[]
   campaignRecipients CampaignRecipient[]
@@ -305,6 +312,7 @@ model Contact {
 
   @@unique([tenantId, whatsappNumber])
   @@index([tenantId, leadStatus])
+  @@index([assignedToId])
 }
 
 model Message {

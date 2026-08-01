@@ -26,13 +26,23 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
-import { CampaignMessageType, Contact } from "@/types";
+import { cn } from "@/lib/utils";
+import { CampaignMessageType, Contact, LeadStatus } from "@/types";
 
 const MESSAGE_TYPE_LABELS: Record<CampaignMessageType, string> = {
   TEXT: "Text",
   IMAGE: "Image",
   TEMPLATE: "Approved template",
 };
+
+const SEGMENT_FILTERS: { key: LeadStatus | "ALL"; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "NEW", label: "New" },
+  { key: "INTERESTED", label: "Interested" },
+  { key: "FOLLOW_UP", label: "Follow-up" },
+  { key: "BOOKED", label: "Booked" },
+  { key: "CLOSED", label: "Closed" },
+];
 
 export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
@@ -44,8 +54,18 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [templateName, setTemplateName] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = React.useState(false);
+  const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
 
   const { data } = useFetch<{ contacts: Contact[] }>(open ? "/api/contacts" : null);
+  const visibleContacts = data?.contacts.filter((c) => segment === "ALL" || c.leadStatus === segment) ?? [];
+
+  function selectSegment() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of visibleContacts) next.add(c.id);
+      return next;
+    });
+  }
 
   function toggle(id: string) {
     setSelectedIds((prev) => {
@@ -149,17 +169,38 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label>Recipients ({selectedIds.size} selected)</Label>
+            <div className="flex items-center justify-between">
+              <Label>Recipients ({selectedIds.size} selected)</Label>
+              <button type="button" onClick={selectSegment} className="text-xs font-medium text-primary hover:underline">
+                Select all {segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase()} (
+                {visibleContacts.length})
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_FILTERS.map((f) => (
+                <button
+                  type="button"
+                  key={f.key}
+                  onClick={() => setSegment(f.key)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    segment === f.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
             <ScrollArea className="h-40 rounded-lg border border-border p-2">
               <div className="flex flex-col gap-1.5">
-                {data?.contacts.map((c) => (
+                {visibleContacts.map((c) => (
                   <label key={c.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted">
                     <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggle(c.id)} />
                     {c.name || c.phone}
                   </label>
                 ))}
-                {data && data.contacts.length === 0 && (
-                  <p className="p-2 text-xs text-muted-foreground">No contacts yet.</p>
+                {data && visibleContacts.length === 0 && (
+                  <p className="p-2 text-xs text-muted-foreground">No contacts in this segment.</p>
                 )}
               </div>
             </ScrollArea>

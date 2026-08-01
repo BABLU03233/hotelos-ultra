@@ -28,6 +28,12 @@ export function formatMinutesDuration(minutes: number): string {
   return `${(minutes / (60 * 24)).toFixed(minutes % (60 * 24) ? 1 : 0)}d`;
 }
 
+/** "in 45m" / "due now" — for a future timestamp, e.g. a scheduled follow-up's runAt. */
+export function formatCountdown(target: string | Date): string {
+  const diffMinutes = Math.round((new Date(target).getTime() - Date.now()) / 60000);
+  return diffMinutes > 0 ? `in ${formatMinutesDuration(diffMinutes)}` : "due now";
+}
+
 export function formatRelativeTime(input: string | Date | null): string {
   if (!input) return "—";
   const date = new Date(input);

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Megaphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
@@ -40,7 +41,11 @@ export default function CampaignsPage() {
               </Link>
             ))}
         {!loading && data?.campaigns.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No campaigns yet — create your first one.</p>
+          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
+            <Megaphone className="size-8" />
+            <p className="text-sm font-medium text-foreground">No campaigns yet</p>
+            <p className="max-w-xs text-xs">Broadcast an offer or update to a segment of your guests — Aria handles any replies.</p>
+          </div>
         )}
       </div>
     </div>

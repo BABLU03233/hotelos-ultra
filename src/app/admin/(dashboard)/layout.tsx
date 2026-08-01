@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { getAdminSessionFromCookies } from "@/lib/auth/admin-session";
 import { prisma } from "@/lib/prisma";
@@ -13,7 +14,10 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
   return (
     <div className="flex min-h-dvh w-full flex-col">
       <AdminTopbar name={admin.name} />
-      <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6">{children}</main>
+      <div className="flex min-h-0 flex-1">
+        <AdminSidebar />
+        <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6">{children}</main>
+      </div>
     </div>
   );
 }

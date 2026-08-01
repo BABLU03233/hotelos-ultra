@@ -25,6 +25,7 @@ export const GET = apiRoute(async (req: NextRequest) => {
         : {}),
     },
     orderBy: { updatedAt: "desc" },
+    include: { assignedTo: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json({ contacts });

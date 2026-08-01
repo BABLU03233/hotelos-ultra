@@ -14,6 +14,8 @@ const STATUS_TONE: Record<Contact["leadStatus"], string> = {
 };
 
 export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
+  const unread = !!contact.lastInboundAt && (!contact.lastReadAt || new Date(contact.lastInboundAt) > new Date(contact.lastReadAt));
+
   return (
     <button
       type="button"
@@ -28,15 +30,28 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-medium">{contact.name || contact.phone}</p>
+          <p className={cn("truncate text-sm", unread ? "font-semibold" : "font-medium")}>{contact.name || contact.phone}</p>
+          {contact.assignedTo && (
+            <Avatar className="size-4 shrink-0" title={`Assigned to ${contact.assignedTo.name}`}>
+              <AvatarFallback className="text-[7px]">{initials(contact.assignedTo.name)}</AvatarFallback>
+            </Avatar>
+          )}
           <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
             {formatRelativeTime(contact.lastInboundAt || contact.updatedAt)}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{contact.lastMessage || "No messages yet"}</p>
+        <p className={cn("mt-0.5 truncate text-xs", unread ? "text-foreground" : "text-muted-foreground")}>
+          {contact.lastMessage || "No messages yet"}
+        </p>
         <div className="mt-1.5 flex items-center gap-1.5">
-          <span className={cn("size-1.5 rounded-full", STATUS_TONE[contact.leadStatus])} />
+          <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_TONE[contact.leadStatus])} />
           <span className="text-[10px] text-muted-foreground capitalize">{contact.leadStatus.replace("_", " ").toLowerCase()}</span>
+          {contact.tags.slice(0, 2).map((t) => (
+            <span key={t} className="truncate rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
+              {t}
+            </span>
+          ))}
+          {unread && <span className="ml-auto size-2 shrink-0 rounded-full bg-primary" />}
         </div>
       </div>
     </button>

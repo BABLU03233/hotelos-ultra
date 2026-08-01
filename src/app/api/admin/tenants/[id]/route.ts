@@ -8,6 +8,8 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+const TREND_DAYS = 14;
+
 export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   requireAdminSession(req);
   const { id } = await ctx.params;
@@ -22,10 +24,25 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   });
   if (!tenant) throw notFound("Hotel not found");
 
-  const [bookedCount, messageCount] = await Promise.all([
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const trendStart = new Date(startOfToday.getTime() - (TREND_DAYS - 1) * 24 * 60 * 60 * 1000);
+
+  const [bookedCount, messageCount, trendMessages] = await Promise.all([
     prisma.contact.count({ where: { tenantId: id, leadStatus: "BOOKED" } }),
     prisma.message.count({ where: { tenantId: id } }),
+    prisma.message.findMany({ where: { tenantId: id, createdAt: { gte: trendStart } }, select: { createdAt: true } }),
   ]);
+
+  const buckets = new Map<string, number>();
+  for (let i = 0; i < TREND_DAYS; i++) {
+    const d = new Date(trendStart.getTime() + i * 24 * 60 * 60 * 1000);
+    buckets.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const m of trendMessages) {
+    const key = m.createdAt.toISOString().slice(0, 10);
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
 
   return NextResponse.json({
     tenant: {
@@ -40,6 +57,7 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
       bookedCount,
       messageCount,
     },
+    messageVolumeTrend: Array.from(buckets.entries()).map(([date, count]) => ({ date, count })),
   });
 });
 

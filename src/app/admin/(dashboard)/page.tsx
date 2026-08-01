@@ -1,14 +1,18 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { Building2, MessagesSquare, Users } from "lucide-react";
+import { Building2, MessagesSquare, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewTenantDialog } from "@/components/admin/new-tenant-dialog";
+import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
 import { useFetch } from "@/hooks/use-fetch";
+import { cn } from "@/lib/utils";
 import { formatDate, formatMoney } from "@/lib/format";
-import { AdminTenantSummary } from "@/types";
+import { AdminTenantSummary, SubscriptionStatus } from "@/types";
 
 const STATUS_TONE: Record<AdminTenantSummary["subscriptionStatus"], string> = {
   TRIAL: "bg-blue-500/10 text-blue-600",
@@ -17,8 +21,25 @@ const STATUS_TONE: Record<AdminTenantSummary["subscriptionStatus"], string> = {
   CANCELLED: "bg-muted text-muted-foreground",
 };
 
+const STATUS_FILTERS: { key: SubscriptionStatus | "ALL"; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "TRIAL", label: "Trial" },
+  { key: "ACTIVE", label: "Active" },
+  { key: "PAST_DUE", label: "Past due" },
+  { key: "CANCELLED", label: "Cancelled" },
+];
+
 export default function AdminTenantsPage() {
+  const [search, setSearch] = React.useState("");
+  const [status, setStatus] = React.useState<SubscriptionStatus | "ALL">("ALL");
   const { data, loading, reload } = useFetch<{ tenants: AdminTenantSummary[] }>("/api/admin/tenants");
+  const { data: statsData } = useFetch<{ messageVolumeTrend: { date: string; count: number }[] }>("/api/admin/stats");
+
+  const filtered = (data?.tenants ?? []).filter((t) => {
+    if (status !== "ALL" && t.subscriptionStatus !== status) return false;
+    if (search && !`${t.name} ${t.owner?.name ?? ""} ${t.owner?.email ?? ""}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const totalMRR = data?.tenants
     .filter((t) => t.subscriptionStatus === "ACTIVE" || t.subscriptionStatus === "TRIAL")
@@ -66,10 +87,40 @@ export default function AdminTenantsPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform message volume — last 14 days</CardTitle>
+        </CardHeader>
+        <CardContent className="h-48">
+          {statsData ? <PlatformVolumeChart trend={statsData.messageVolumeTrend} /> : <Skeleton className="h-full w-full" />}
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-col gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search hotels or owners…" className="pl-8" />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatus(f.key)}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                status === f.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-3">
         {loading || !data
           ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)
-          : data.tenants.map((t) => (
+          : filtered.map((t) => (
               <Link key={t.id} href={`/admin/tenants/${t.id}`}>
                 <Card className="transition-shadow hover:shadow-md">
                   <CardContent className="flex items-center justify-between gap-4">
@@ -107,8 +158,10 @@ export default function AdminTenantsPage() {
                 </Card>
               </Link>
             ))}
-        {!loading && data?.tenants.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No hotels yet — onboard the first one.</p>
+        {!loading && filtered.length === 0 && (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            {data?.tenants.length === 0 ? "No hotels yet — onboard the first one." : "No hotels match this filter."}
+          </p>
         )}
       </div>
     </div>

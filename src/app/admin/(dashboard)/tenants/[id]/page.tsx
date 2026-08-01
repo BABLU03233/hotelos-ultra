@@ -1,9 +1,13 @@
 "use client";
 
+import * as React from "react";
 import { useParams } from "next/navigation";
+import { CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -12,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -26,6 +31,7 @@ interface TenantDetail {
     planFeeInPaise: number;
     createdAt: string;
     whatsappPhoneNumberId: string | null;
+    whatsappWabaId: string | null;
     users: { id: string; name: string; email: string; role: "OWNER" | "STAFF"; createdAt: string }[];
     hotelProfile: { address: string | null } | null;
   };
@@ -37,6 +43,7 @@ interface TenantDetail {
     bookedCount: number;
     messageCount: number;
   };
+  messageVolumeTrend: { date: string; count: number }[];
 }
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -49,15 +56,30 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
 export default function AdminTenantDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, loading, reload } = useFetch<TenantDetail>(`/api/admin/tenants/${params.id}`);
+  const [editing, setEditing] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [fee, setFee] = React.useState("");
 
-  async function updateStatus(subscriptionStatus: SubscriptionStatus) {
+  async function updateTenant(body: Record<string, unknown>) {
     try {
-      await apiFetch(`/api/admin/tenants/${params.id}`, { method: "PATCH", body: JSON.stringify({ subscriptionStatus }) });
+      await apiFetch(`/api/admin/tenants/${params.id}`, { method: "PATCH", body: JSON.stringify(body) });
       reload();
-      toast.success("Subscription status updated");
+      toast.success("Updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
+  }
+
+  function startEdit() {
+    if (!data) return;
+    setName(data.tenant.name);
+    setFee(String(data.tenant.planFeeInPaise / 100));
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    await updateTenant({ name, planFeeInPaise: Math.round(Number(fee) * 100) });
+    setEditing(false);
   }
 
   if (loading || !data) {
@@ -73,11 +95,30 @@ export default function AdminTenantDetailPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">{tenant.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {tenant.slug} · joined {formatDate(tenant.createdAt)}
-        </p>
+      <div className="flex items-start justify-between">
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-48" />
+            <Button size="sm" onClick={saveEdit}>
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">{tenant.name}</h1>
+              <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
+                <Pencil className="size-3.5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {tenant.slug} · joined {formatDate(tenant.createdAt)}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
@@ -100,16 +141,28 @@ export default function AdminTenantDetailPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Message volume — last 14 days</CardTitle>
+        </CardHeader>
+        <CardContent className="h-48">
+          <PlatformVolumeChart trend={data.messageVolumeTrend} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Subscription</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-between">
-          <div>
+          {editing ? (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span>₹</span>
+              <Input type="number" value={fee} onChange={(e) => setFee(e.target.value)} className="h-8 w-24" />
+              <span className="text-muted-foreground">/ month</span>
+            </div>
+          ) : (
             <p className="text-sm">{formatMoney(tenant.planFeeInPaise / 100)} / month platform fee</p>
-            <p className="text-xs text-muted-foreground">
-              WhatsApp: {tenant.whatsappPhoneNumberId ? "connected" : "not connected"}
-            </p>
-          </div>
-          <Select value={tenant.subscriptionStatus} onValueChange={(v) => v && updateStatus(v as SubscriptionStatus)}>
+          )}
+          <Select value={tenant.subscriptionStatus} onValueChange={(v) => v && updateTenant({ subscriptionStatus: v })}>
             <SelectTrigger className="w-40">
               <SelectValue>{(v: string) => STATUS_LABELS[v as SubscriptionStatus]}</SelectValue>
             </SelectTrigger>
@@ -121,6 +174,35 @@ export default function AdminTenantDetailPage() {
               ))}
             </SelectContent>
           </Select>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>WhatsApp connection</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {tenant.whatsappPhoneNumberId ? (
+            <div className="flex items-center gap-1.5 text-sm text-emerald-600">
+              <CheckCircle2 className="size-4" /> Connected
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-sm text-amber-600">
+              <CircleAlert className="size-4" /> Not connected
+            </div>
+          )}
+          {tenant.whatsappPhoneNumberId && (
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <p>
+                Phone number ID: <span className="font-mono text-foreground">{tenant.whatsappPhoneNumberId}</span>
+              </p>
+              {tenant.whatsappWabaId && (
+                <p>
+                  WABA ID: <span className="font-mono text-foreground">{tenant.whatsappWabaId}</span>
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

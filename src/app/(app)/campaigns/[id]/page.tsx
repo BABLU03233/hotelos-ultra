@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RecipientTable } from "@/components/campaigns/recipient-table";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { Campaign, CampaignReport } from "@/types";
@@ -86,6 +87,15 @@ export default function CampaignDetailPage() {
               <Bar dataKey="value" fill="var(--color-primary)" radius={4} />
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recipients</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RecipientTable campaignId={campaign.id} />
         </CardContent>
       </Card>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Image as ImageIcon, Trash2 } from "lucide-react";
+import { BookOpen, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,7 +50,11 @@ export default function KnowledgePage() {
               </Card>
             ))}
         {!loading && data?.docs.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">Nothing here yet — add your first document.</p>
+          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
+            <BookOpen className="size-8" />
+            <p className="text-sm font-medium text-foreground">Aria&apos;s knowledge base is empty</p>
+            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means Aria escalates almost everything.</p>
+          </div>
         )}
       </div>
     </div>

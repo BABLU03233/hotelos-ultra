@@ -19,6 +19,10 @@ export interface Contact {
   aiPaused: boolean;
   followUpDate: string | null;
   notes: string | null;
+  tags: string[];
+  lastReadAt: string | null;
+  assignedToId: string | null;
+  assignedTo?: { id: string; name: string } | null;
   updatedAt: string;
 }
 
@@ -50,6 +54,24 @@ export interface FollowUpRule {
   active: boolean;
 }
 
+export type ScheduledFollowUpStatus = "PENDING" | "SENT" | "CANCELLED" | "SKIPPED";
+
+export interface ScheduledFollowUp {
+  id: string;
+  runAt: string;
+  status: ScheduledFollowUpStatus;
+  rule: { action: FollowUpAction; messageBody: string | null };
+  contact?: { id: string; name: string | null; phone: string };
+}
+
+export interface StaffNotification {
+  id: string;
+  reason: string;
+  resolved: boolean;
+  createdAt: string;
+  contact: { id: string; name: string | null; phone: string };
+}
+
 export type CampaignMessageType = "TEXT" | "IMAGE" | "TEMPLATE";
 
 export interface Campaign {
@@ -75,6 +97,23 @@ export interface CampaignReport {
   interested: number;
   booked: number;
   failed: number;
+}
+
+export type CampaignRecipientStatus =
+  | "PENDING"
+  | "SENT"
+  | "DELIVERED"
+  | "READ"
+  | "REPLIED"
+  | "INTERESTED"
+  | "BOOKED"
+  | "FAILED";
+
+export interface CampaignRecipient {
+  id: string;
+  status: CampaignRecipientStatus;
+  sentAt: string | null;
+  contact: { id: string; name: string | null; phone: string; leadStatus: LeadStatus };
 }
 
 export interface Room {
@@ -137,6 +176,21 @@ export interface AdminTenantSummary {
   contactCount: number;
   bookedCount: number;
   whatsappConnected: boolean;
+}
+
+export interface DashboardMetrics {
+  newLeads: number;
+  activeChats: number;
+  activeChatsPrev: number;
+  bookings: number;
+  pendingFollowUps: number;
+  aiConversationsToday: number;
+  aiConversationsPrev: number;
+  leadFunnel: Record<LeadStatus, number>;
+  messageVolumeTrend: { date: string; inbound: number; ai: number; staff: number }[];
+  unresolvedNotificationCount: number;
+  recentNotifications: StaffNotification[];
+  campaignPerformance: { id: string; name: string; sent: number; replies: number }[];
 }
 
 export interface HotelProfile {
