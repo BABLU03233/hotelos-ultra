@@ -57,6 +57,8 @@ export function FaqsSettings() {
       <CardContent>
         {loading || !data ? (
           <Skeleton className="h-32 w-full" />
+        ) : data.faqs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No FAQs yet — Aria escalates more often without them.</p>
         ) : (
           <div className="flex flex-col">
             {data.faqs.map((f) => (

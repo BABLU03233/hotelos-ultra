@@ -195,6 +195,12 @@ export interface DashboardMetrics {
   unresolvedNotificationCount: number;
   recentNotifications: StaffNotification[];
   campaignPerformance: { id: string; name: string; sent: number; replies: number }[];
+  setup: {
+    hotelProfileComplete: boolean;
+    roomCount: number;
+    whatsappConnected: boolean;
+    faqCount: number;
+  };
 }
 
 export interface HotelProfile {

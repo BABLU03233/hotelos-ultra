@@ -86,6 +86,7 @@ export function OffersSettings() {
       {loading || !data
         ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
         : data.offers.map((o) => <OfferCard key={o.id} offer={o} onChanged={reload} />)}
+      {!loading && data?.offers.length === 0 && <p className="text-sm text-muted-foreground">No offers yet.</p>}
       <Button variant="outline" onClick={addOffer} className="w-fit">
         <Plus /> Add offer
       </Button>

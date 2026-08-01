@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { AuthHydrator } from "@/components/app-shell/auth-hydrator";
 import { Sidebar } from "@/components/app-shell/sidebar";
+import { WhatsAppBanner } from "@/components/app-shell/whatsapp-banner";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar hotelName={tenant.name} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader hotelName={tenant.name} userName={user.name} userEmail={user.email} />
+        {!tenant.whatsappPhoneNumberId && <WhatsAppBanner />}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

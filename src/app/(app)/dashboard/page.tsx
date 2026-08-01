@@ -7,12 +7,17 @@ import { LeadFunnelChart } from "@/components/dashboard/lead-funnel-chart";
 import { LeadSourceChart } from "@/components/dashboard/lead-source-chart";
 import { MessageVolumeChart } from "@/components/dashboard/message-volume-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { getDashboardMetrics } from "@/lib/dashboard/get-metrics";
 
 export default async function DashboardPage() {
   const session = await getSessionFromCookies();
   const metrics = await getDashboardMetrics(session!.tenantId);
+
+  const hasMessageVolume = metrics.messageVolumeTrend.some((d) => d.inbound || d.ai || d.staff);
+  const hasLeadFunnel = Object.values(metrics.leadFunnel).some((v) => v > 0);
+  const hasLeadSources = Object.values(metrics.leadsBySource).some((v) => v > 0);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -22,6 +27,8 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground">What&apos;s happening across your WhatsApp pipeline right now.</p>
         </div>
       </Reveal>
+
+      <OnboardingChecklist setup={metrics.setup} />
 
       <Reveal delay={60}>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -46,7 +53,14 @@ export default async function DashboardPage() {
               <CardDescription>Who&apos;s actually doing the talking: guests, Aria, or your team.</CardDescription>
             </CardHeader>
             <CardContent className="h-64">
-              <MessageVolumeChart trend={metrics.messageVolumeTrend} />
+              {hasMessageVolume ? (
+                <MessageVolumeChart trend={metrics.messageVolumeTrend} />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+                  <p className="text-sm font-medium">No messages yet</p>
+                  <p className="text-xs text-muted-foreground">Once guests start messaging in, activity shows up here.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -70,7 +84,14 @@ export default async function DashboardPage() {
               <CardDescription>Every contact, by stage.</CardDescription>
             </CardHeader>
             <CardContent className="h-56">
-              <LeadFunnelChart funnel={metrics.leadFunnel} />
+              {hasLeadFunnel ? (
+                <LeadFunnelChart funnel={metrics.leadFunnel} />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+                  <p className="text-sm font-medium">No leads yet</p>
+                  <p className="text-xs text-muted-foreground">New contacts show up here by stage.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -80,7 +101,14 @@ export default async function DashboardPage() {
               <CardDescription>Where they came from.</CardDescription>
             </CardHeader>
             <CardContent className="h-56">
-              <LeadSourceChart bySource={metrics.leadsBySource} />
+              {hasLeadSources ? (
+                <LeadSourceChart bySource={metrics.leadsBySource} />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+                  <p className="text-sm font-medium">No leads yet</p>
+                  <p className="text-xs text-muted-foreground">See where they came from once they start coming in.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

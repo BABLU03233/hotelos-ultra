@@ -30,6 +30,10 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     unresolvedNotificationCount,
     recentNotifications,
     trendMessages,
+    hotelProfile,
+    roomCount,
+    faqCount,
+    tenant,
   ] = await Promise.all([
     db.contact.count({ where: { leadStatus: "NEW" } }),
     db.contact.count({ where: { leadStatus: "BOOKED" } }),
@@ -64,6 +68,10 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
       where: { createdAt: { gte: trendStart } },
       select: { createdAt: true, direction: true, senderUserId: true },
     }),
+    db.hotelProfile.findUnique({ where: { tenantId } }),
+    db.room.count(),
+    db.faq.count(),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { whatsappPhoneNumberId: true } }),
   ]);
 
   const campaignPerformance = await Promise.all(
@@ -119,5 +127,11 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
       contact: n.contact,
     })),
     campaignPerformance,
+    setup: {
+      hotelProfileComplete: !!hotelProfile?.address,
+      roomCount,
+      whatsappConnected: !!tenant?.whatsappPhoneNumberId,
+      faqCount,
+    },
   };
 }
