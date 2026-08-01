@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { tenantDb } from "@/lib/tenant";
-import { DashboardMetrics, LeadStatus } from "@/types";
+import { DashboardMetrics, LeadSource, LeadStatus } from "@/types";
 
 const LEAD_STATUSES: LeadStatus[] = ["NEW", "INTERESTED", "FOLLOW_UP", "BOOKED", "CLOSED"];
+const LEAD_SOURCES: LeadSource[] = ["DIRECT", "META_AD", "COLD_IMPORT"];
 const TREND_DAYS = 14;
 
 export async function getDashboardMetrics(tenantId: string): Promise<DashboardMetrics> {
@@ -25,6 +26,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     aiConversationsYesterday,
     recentCampaigns,
     leadFunnelRaw,
+    leadSourceRaw,
     unresolvedNotificationCount,
     recentNotifications,
     trendMessages,
@@ -50,6 +52,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     }),
     db.campaign.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { id: true, name: true } }),
     db.contact.groupBy({ by: ["leadStatus"], _count: { _all: true } }),
+    db.contact.groupBy({ by: ["leadSource"], _count: { _all: true } }),
     db.staffNotification.count({ where: { resolved: false } }),
     db.staffNotification.findMany({
       where: { resolved: false },
@@ -78,6 +81,9 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
   const leadFunnel = Object.fromEntries(LEAD_STATUSES.map((s) => [s, 0])) as Record<LeadStatus, number>;
   for (const row of leadFunnelRaw) leadFunnel[row.leadStatus] = row._count._all;
 
+  const leadsBySource = Object.fromEntries(LEAD_SOURCES.map((s) => [s, 0])) as Record<LeadSource, number>;
+  for (const row of leadSourceRaw) leadsBySource[row.leadSource] = row._count._all;
+
   const trendBuckets = new Map<string, { inbound: number; ai: number; staff: number }>();
   for (let i = 0; i < TREND_DAYS; i++) {
     const d = new Date(trendStart.getTime() + i * 24 * 60 * 60 * 1000);
@@ -102,6 +108,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     aiConversationsToday: aiConversationsToday.length,
     aiConversationsPrev: aiConversationsYesterday.length,
     leadFunnel,
+    leadsBySource,
     messageVolumeTrend,
     unresolvedNotificationCount,
     recentNotifications: recentNotifications.map((n) => ({

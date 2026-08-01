@@ -12,7 +12,7 @@ import { formatRelativeTime } from "@/lib/format";
 import { StaffNotification } from "@/types";
 
 export function NotificationBell() {
-  const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications");
+  const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications", 20_000);
   const notifications = data?.notifications ?? [];
 
   async function resolve(id: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Clock, MessagesSquare, TriangleAlert, X } from "lucide-react";
+import { Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -170,6 +170,21 @@ function ContactDetailPane({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{contact.name || contact.phone}</p>
             <p className="truncate text-xs text-muted-foreground">{contact.whatsappNumber}</p>
+            {contact.leadSource !== "DIRECT" && (
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                {contact.leadSource === "META_AD" ? (
+                  <>
+                    <Target className="size-3 shrink-0" />
+                    Meta ad{contact.sourceDetail ? ` — ${contact.sourceDetail}` : ""}
+                  </>
+                ) : (
+                  <>
+                    <History className="size-3 shrink-0" />
+                    {contact.sourceDetail || "Cold import"}
+                  </>
+                )}
+              </p>
+            )}
           </div>
           {contact.aiPaused ? (
             <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>

@@ -46,16 +46,30 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   });
 
   const chronological = [...recentMessages].reverse();
-  const latestInbound = chronological.filter((m) => m.direction === "IN").at(-1);
+  const inboundMessages = chronological.filter((m) => m.direction === "IN");
+  const latestInbound = inboundMessages.at(-1);
   if (!latestInbound?.content) return; // nothing textual to react to (e.g. an image with no caption)
 
   const history: ChatMessage[] = chronological
     .filter((m) => m.id !== latestInbound.id && m.content)
     .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
 
+  // Warm vs. cold framing for Aria: a fresh ad lead gets an energetic open,
+  // a guest who's gone quiet for a while gets a gentle re-spark instead of
+  // Aria just resuming mid-conversation as if no time passed.
+  const previousInbound = inboundMessages.length > 1 ? inboundMessages[inboundMessages.length - 2] : null;
+  const replyContext = {
+    isFirstReply: !chronological.some((m) => m.direction === "OUT"),
+    daysSinceLastInbound: previousInbound
+      ? Math.floor((latestInbound.createdAt.getTime() - previousInbound.createdAt.getTime()) / 86_400_000)
+      : null,
+    leadSource: contact.leadSource,
+    sourceDetail: contact.sourceDetail,
+  };
+
   let generated: Awaited<ReturnType<typeof generateReply>>;
   try {
-    generated = await generateReply(tenantId, latestInbound.content, history);
+    generated = await generateReply(tenantId, latestInbound.content, history, replyContext);
   } catch (err) {
     // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
     // outage, rate limit, ...) must never leave the guest silently

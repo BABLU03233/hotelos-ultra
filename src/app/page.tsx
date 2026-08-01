@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Plug,
   Sparkles,
+  Target,
   TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,11 @@ const FEATURES = [
     icon: Megaphone,
     title: "Broadcast campaigns",
     body: "Segment guests by stage and send offers or updates in bulk, respecting WhatsApp's messaging rules. Replies flow straight back into the same conversation.",
+  },
+  {
+    icon: Target,
+    title: "Every lead, tagged and reachable",
+    body: "Guests who message in from a Meta ad are tagged automatically. Upload your old contact list from Excel or paste it in, and re-engage them with one approved-template message — no manual campaign-building required.",
   },
 ] as const;
 
@@ -144,7 +150,7 @@ export default async function MarketingPage() {
             <p className="mt-3 text-muted-foreground">No bloated multi-industry feature list — just what turns WhatsApp into bookings.</p>
           </div>
         </Reveal>
-        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f, i) => (
             <Reveal key={f.title} delay={i * 80}>
               <Card className="h-full">

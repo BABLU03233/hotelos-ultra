@@ -62,6 +62,12 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       whatsappNumber: msg.waId,
       lastInboundAt: now,
       lastMessage: preview,
+      // Attribution is set once at creation and never overwritten by later
+      // messages — a contact's original source shouldn't drift just because
+      // a later message happens to lack a referral block.
+      leadSource: msg.referral ? "META_AD" : "DIRECT",
+      sourceDetail: msg.referral?.headline ?? null,
+      ctwaClid: msg.referral?.ctwaClid ?? null,
     },
     update: {
       name: msg.contactName ?? undefined,

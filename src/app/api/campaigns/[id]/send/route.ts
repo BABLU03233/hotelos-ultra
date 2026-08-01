@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiRoute, notFound } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
-import { prisma } from "@/lib/prisma";
-import { campaignQueue } from "@/lib/queue/queues";
+import { queueCampaignSend } from "@/lib/campaigns/send";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -15,15 +14,7 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const campaign = await db.campaign.findUnique({ where: { id } });
   if (!campaign) throw notFound("Campaign not found");
 
-  const pending = await prisma.campaignRecipient.findMany({
-    where: { campaignId: id, status: "PENDING" },
-    select: { id: true },
-  });
+  const queued = await queueCampaignSend(id);
 
-  await Promise.all(
-    pending.map((r) => campaignQueue.add("send", { campaignRecipientId: r.id }))
-  );
-  await db.campaign.update({ where: { id }, data: { sentAt: new Date() } });
-
-  return NextResponse.json({ queued: pending.length });
+  return NextResponse.json({ queued });
 });

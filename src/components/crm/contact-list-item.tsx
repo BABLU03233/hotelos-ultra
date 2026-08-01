@@ -1,5 +1,6 @@
 "use client";
 
+import { History, Target } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { LEAD_STATUS_DOT } from "@/lib/lead-status-colors";
@@ -39,6 +40,16 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
         <div className="mt-1.5 flex items-center gap-1.5">
           <span className={cn("size-1.5 shrink-0 rounded-full", LEAD_STATUS_DOT[contact.leadStatus])} />
           <span className="text-[10px] text-muted-foreground capitalize">{contact.leadStatus.replace("_", " ").toLowerCase()}</span>
+          {contact.leadSource === "META_AD" && (
+            <span title={contact.sourceDetail ? `From a Meta ad: ${contact.sourceDetail}` : "From a Meta ad"}>
+              <Target className="size-2.5 shrink-0 text-primary" />
+            </span>
+          )}
+          {contact.leadSource === "COLD_IMPORT" && (
+            <span title="Imported old number">
+              <History className="size-2.5 shrink-0 text-muted-foreground" />
+            </span>
+          )}
           {contact.tags.slice(0, 2).map((t) => (
             <span key={t} className="truncate rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
               {t}

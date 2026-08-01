@@ -72,6 +72,20 @@ export async function sendWhatsAppMessage(
   return json.messages[0].id;
 }
 
+/** Pings the Graph API with a phone_number_id + access token pair and returns the resolved number — lets Settings confirm credentials are correct before saving them. */
+export async function verifyCredentials(creds: WhatsAppCredentials): Promise<{ displayNumber: string; verifiedName: string }> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${creds.phoneNumberId}?fields=display_phone_number,verified_name`,
+    { headers: { Authorization: `Bearer ${creds.accessToken}` } }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error?.message || `WhatsApp rejected these credentials (${res.status})`);
+  }
+  const json = (await res.json()) as { display_phone_number?: string; verified_name?: string };
+  return { displayNumber: json.display_phone_number ?? "—", verifiedName: json.verified_name ?? "—" };
+}
+
 /** Resolves a WhatsApp media id to a short-lived download URL + mime type. */
 export async function getMediaUrl(creds: WhatsAppCredentials, mediaId: string): Promise<{ url: string; mimeType: string }> {
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${mediaId}`, {

@@ -4,6 +4,7 @@
 
 export type LeadStatus = "NEW" | "INTERESTED" | "FOLLOW_UP" | "BOOKED" | "CLOSED";
 export type BookingStatus = "NONE" | "PENDING" | "CONFIRMED" | "CANCELLED";
+export type LeadSource = "DIRECT" | "META_AD" | "COLD_IMPORT";
 
 export interface Contact {
   id: string;
@@ -23,6 +24,8 @@ export interface Contact {
   lastReadAt: string | null;
   assignedToId: string | null;
   assignedTo?: { id: string; name: string } | null;
+  leadSource: LeadSource;
+  sourceDetail: string | null;
   updatedAt: string;
 }
 
@@ -187,6 +190,7 @@ export interface DashboardMetrics {
   aiConversationsToday: number;
   aiConversationsPrev: number;
   leadFunnel: Record<LeadStatus, number>;
+  leadsBySource: Record<LeadSource, number>;
   messageVolumeTrend: { date: string; inbound: number; ai: number; staff: number }[];
   unresolvedNotificationCount: number;
   recentNotifications: StaffNotification[];

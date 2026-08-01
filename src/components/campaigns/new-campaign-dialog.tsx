@@ -28,7 +28,7 @@ import { TemplatePicker } from "@/components/templates/template-picker";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { CampaignMessageType, Contact, LeadStatus } from "@/types";
+import { CampaignMessageType, Contact, LeadSource, LeadStatus } from "@/types";
 
 const MESSAGE_TYPE_LABELS: Record<CampaignMessageType, string> = {
   TEXT: "Text",
@@ -45,6 +45,13 @@ const SEGMENT_FILTERS: { key: LeadStatus | "ALL"; label: string }[] = [
   { key: "CLOSED", label: "Closed" },
 ];
 
+const SOURCE_FILTERS: { key: LeadSource | "ALL"; label: string }[] = [
+  { key: "ALL", label: "All sources" },
+  { key: "DIRECT", label: "Direct" },
+  { key: "META_AD", label: "Meta ad" },
+  { key: "COLD_IMPORT", label: "Cold import" },
+];
+
 export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -56,9 +63,13 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = React.useState(false);
   const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
+  const [source, setSource] = React.useState<LeadSource | "ALL">("ALL");
 
   const { data } = useFetch<{ contacts: Contact[] }>(open ? "/api/contacts" : null);
-  const visibleContacts = data?.contacts.filter((c) => segment === "ALL" || c.leadStatus === segment) ?? [];
+  const visibleContacts =
+    data?.contacts.filter(
+      (c) => (segment === "ALL" || c.leadStatus === segment) && (source === "ALL" || c.leadSource === source)
+    ) ?? [];
 
   function selectSegment() {
     setSelectedIds((prev) => {
@@ -189,6 +200,21 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                   className={cn(
                     "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                     segment === f.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SOURCE_FILTERS.map((f) => (
+                <button
+                  type="button"
+                  key={f.key}
+                  onClick={() => setSource(f.key)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    source === f.key ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
                   )}
                 >
                   {f.label}

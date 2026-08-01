@@ -4,8 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { useFetch } from "@/hooks/use-fetch";
 import { formatRelativeTime } from "@/lib/format";
 import { StaffNotification } from "@/types";
+
+const POLL_MS = 20_000;
+const DISPLAY_LIMIT = 5;
 
 export function DashboardAttentionPanel({
   initialCount,
@@ -14,13 +18,21 @@ export function DashboardAttentionPanel({
   initialCount: number;
   initialNotifications: StaffNotification[];
 }) {
-  const [count, setCount] = React.useState(initialCount);
-  const [notifications, setNotifications] = React.useState(initialNotifications);
+  // Polls in the background so a new escalation shows up without a manual
+  // refresh. Falls back to the SSR-rendered props until the first poll
+  // lands, so there's no loading flash on mount — and `justResolved` is an
+  // event-driven optimistic overlay, never synced from an effect.
+  const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications", POLL_MS);
+  const [justResolved, setJustResolved] = React.useState<Set<string>>(new Set());
+
+  const all = (data?.notifications ?? initialNotifications).filter((n) => !justResolved.has(n.id));
+  const count = data ? all.length : Math.max(0, initialCount - justResolved.size);
+  const visible = all.slice(0, DISPLAY_LIMIT);
 
   async function resolve(id: string) {
+    setJustResolved((prev) => new Set(prev).add(id));
     await apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) });
-    setCount((c) => Math.max(0, c - 1));
-    setNotifications((list) => list.filter((n) => n.id !== id));
+    reload();
   }
 
   if (count === 0) {
@@ -35,7 +47,7 @@ export function DashboardAttentionPanel({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {notifications.map((n) => (
+      {visible.map((n) => (
         <div key={n.id} className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
           <div className="min-w-0 flex-1">
@@ -52,8 +64,8 @@ export function DashboardAttentionPanel({
           </button>
         </div>
       ))}
-      {count > notifications.length && (
-        <p className="pt-1 text-center text-[11px] text-muted-foreground">+{count - notifications.length} more</p>
+      {count > visible.length && (
+        <p className="pt-1 text-center text-[11px] text-muted-foreground">+{count - visible.length} more</p>
       )}
     </div>
   );

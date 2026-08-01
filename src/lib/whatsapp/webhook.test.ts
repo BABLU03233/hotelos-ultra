@@ -133,4 +133,61 @@ describe("parseWebhookPayload", () => {
     const { messages } = parseWebhookPayload(payload);
     expect(messages).toHaveLength(0);
   });
+
+  it("extracts a Click-to-WhatsApp ad referral when present", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.AD1",
+                    timestamp: "1700000000",
+                    type: "text",
+                    text: { body: "Hi, I saw your ad" },
+                    referral: {
+                      source_url: "https://fb.me/ad123",
+                      headline: "Weekend Getaway Offer",
+                      ctwa_clid: "clid-abc",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].referral).toEqual({
+      headline: "Weekend Getaway Offer",
+      sourceUrl: "https://fb.me/ad123",
+      ctwaClid: "clid-abc",
+    });
+  });
+
+  it("leaves referral null for an ordinary organic message", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [{ from: "919876543210", id: "wamid.ORG1", timestamp: "1700000000", type: "text", text: { body: "Hi" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].referral).toBeNull();
+  });
 });

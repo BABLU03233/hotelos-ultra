@@ -4,6 +4,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { DashboardAttentionPanel } from "@/components/dashboard/attention-panel";
 import { CampaignPerformanceChart } from "@/components/dashboard/campaign-performance-chart";
 import { LeadFunnelChart } from "@/components/dashboard/lead-funnel-chart";
+import { LeadSourceChart } from "@/components/dashboard/lead-source-chart";
 import { MessageVolumeChart } from "@/components/dashboard/message-volume-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { getSessionFromCookies } from "@/lib/auth/session";
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
       </Reveal>
 
       <Reveal delay={60}>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle>Lead pipeline</CardTitle>
@@ -70,6 +71,16 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="h-56">
               <LeadFunnelChart funnel={metrics.leadFunnel} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Leads by source</CardTitle>
+              <CardDescription>Where they came from.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-56">
+              <LeadSourceChart bySource={metrics.leadsBySource} />
             </CardContent>
           </Card>
 

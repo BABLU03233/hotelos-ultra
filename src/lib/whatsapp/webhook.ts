@@ -10,6 +10,13 @@ export function verifyWebhookSignature(rawBody: string, signatureHeader: string 
   return timingSafeEqual(a, b);
 }
 
+/** Present only on the first message of a conversation started from a Click-to-WhatsApp ad. */
+export interface InboundReferral {
+  headline: string | null;
+  sourceUrl: string | null;
+  ctwaClid: string | null;
+}
+
 export interface InboundMessage {
   phoneNumberId: string;
   waId: string;
@@ -21,6 +28,7 @@ export interface InboundMessage {
   mediaId: string | null;
   mediaMimeType: string | null;
   location: { latitude: number; longitude: number } | null;
+  referral: InboundReferral | null;
 }
 
 export interface StatusUpdate {
@@ -61,6 +69,9 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           type === "text" ? ((raw.text as { body?: string } | undefined)?.body ?? null) : null;
         const media = raw[type] as { id?: string; mime_type?: string } | undefined;
         const location = raw.location as { latitude?: number; longitude?: number } | undefined;
+        const referral = raw.referral as
+          | { source_url?: string; headline?: string; ctwa_clid?: string }
+          | undefined;
 
         messages.push({
           phoneNumberId,
@@ -76,6 +87,13 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
             location?.latitude != null && location?.longitude != null
               ? { latitude: location.latitude, longitude: location.longitude }
               : null,
+          referral: referral
+            ? {
+                headline: referral.headline ?? null,
+                sourceUrl: referral.source_url ?? null,
+                ctwaClid: referral.ctwa_clid ?? null,
+              }
+            : null,
         });
       }
 

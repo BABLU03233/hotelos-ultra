@@ -43,6 +43,12 @@ enum LeadStatus {
   CLOSED
 }
 
+enum LeadSource {
+  DIRECT      // messaged in organically
+  META_AD     // arrived via a Click-to-WhatsApp ad referral
+  COLD_IMPORT // owner-uploaded old number
+}
+
 enum BookingStatus {
   NONE
   PENDING
@@ -301,6 +307,13 @@ model Contact {
   tags           String[]      @default([])
   lastReadAt     DateTime?
   assignedToId   String?
+  // Where this contact came from — set once at creation, never overwritten
+  // by later messages. sourceDetail is the ad headline (META_AD) or an
+  // import note (COLD_IMPORT); ctwaClid is Meta's click id, kept for future
+  // ad-platform reporting but not acted on yet.
+  leadSource     LeadSource    @default(DIRECT)
+  sourceDetail   String?
+  ctwaClid       String?
   updatedAt      DateTime      @updatedAt
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -312,6 +325,7 @@ model Contact {
 
   @@unique([tenantId, whatsappNumber])
   @@index([tenantId, leadStatus])
+  @@index([tenantId, leadSource])
   @@index([assignedToId])
 }
 

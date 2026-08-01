@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ContactDetail } from "./contact-detail";
 import { ContactList } from "./contact-list";
 import { CrmPipelineView } from "./crm-pipeline-view";
+import { ImportContactsDialog } from "./import-contacts-dialog";
 
 type View = "list" | "pipeline";
 
@@ -22,23 +23,26 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
 
   return (
     <div className="flex h-[calc(100dvh-9.5rem)] flex-col gap-3">
-      <div className="flex items-center gap-1 self-start rounded-lg border border-border bg-card p-1">
-        <Button
-          variant={view === "pipeline" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn("h-7 px-2.5 text-xs", view === "pipeline" && "shadow-sm")}
-          onClick={() => setView("pipeline")}
-        >
-          <Kanban className="size-3.5" /> Pipeline
-        </Button>
-        <Button
-          variant={view === "list" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn("h-7 px-2.5 text-xs", view === "list" && "shadow-sm")}
-          onClick={() => setView("list")}
-        >
-          <List className="size-3.5" /> List
-        </Button>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          <Button
+            variant={view === "pipeline" ? "secondary" : "ghost"}
+            size="sm"
+            className={cn("h-7 px-2.5 text-xs", view === "pipeline" && "shadow-sm")}
+            onClick={() => setView("pipeline")}
+          >
+            <Kanban className="size-3.5" /> Pipeline
+          </Button>
+          <Button
+            variant={view === "list" ? "secondary" : "ghost"}
+            size="sm"
+            className={cn("h-7 px-2.5 text-xs", view === "list" && "shadow-sm")}
+            onClick={() => setView("list")}
+          >
+            <List className="size-3.5" /> List
+          </Button>
+        </div>
+        <ImportContactsDialog onImported={onChanged} />
       </div>
 
       {view === "pipeline" ? (

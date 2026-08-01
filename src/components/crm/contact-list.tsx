@@ -35,7 +35,7 @@ export function ContactList({
   if (status !== "ALL") params.set("leadStatus", status);
   if (search) params.set("search", search);
 
-  const { data, loading, reload } = useFetch<{ contacts: Contact[] }>(`/api/contacts?${params.toString()}`);
+  const { data, loading, reload } = useFetch<{ contacts: Contact[] }>(`/api/contacts?${params.toString()}`, 20_000);
 
   React.useEffect(() => {
     if (reloadToken !== undefined) reload();
