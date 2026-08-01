@@ -57,10 +57,17 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
         </Card>
       ) : (
         <Card className="min-h-0 flex-1 flex-row overflow-hidden p-0">
-          <div className="w-80 shrink-0 border-r border-border py-3 pl-3 pr-1">
+          <div
+            className={cn(
+              "w-full shrink-0 border-border py-3 pl-3 pr-1 md:w-80 md:border-r",
+              selectedId ? "hidden md:block" : "block"
+            )}
+          >
             <ContactList selectedId={selectedId} onSelect={setSelectedId} reloadToken={reloadToken} />
           </div>
-          <ContactDetail contactId={selectedId} onChanged={onChanged} />
+          <div className={cn("min-w-0 flex-1", selectedId ? "flex" : "hidden md:flex")}>
+            <ContactDetail contactId={selectedId} onChanged={onChanged} onBack={() => setSelectedId(null)} />
+          </div>
         </Card>
       )}
     </div>

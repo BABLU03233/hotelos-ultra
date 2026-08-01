@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { AppHeader } from "@/components/app-shell/app-header";
 import { AuthHydrator } from "@/components/app-shell/auth-hydrator";
 import { Sidebar } from "@/components/app-shell/sidebar";
-import { UserMenu } from "@/components/app-shell/user-menu";
-import { NotificationBell } from "@/components/notifications/notification-bell";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
@@ -24,10 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <Sidebar hotelName={tenant.name} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass relative z-10 flex h-14 items-center justify-end gap-1 rounded-none border-t-0 border-r-0 border-l-0 px-4 md:px-6">
-          <NotificationBell />
-          <UserMenu name={user.name} email={user.email} />
-        </header>
+        <AppHeader hotelName={tenant.name} userName={user.name} userEmail={user.email} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

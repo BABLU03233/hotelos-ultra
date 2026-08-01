@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Building2, CreditCard, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [{ href: "/admin", label: "Tenants", icon: Building2 }] as const;
+export const ADMIN_NAV_ITEMS = [{ href: "/admin", label: "Tenants", icon: Building2 }] as const;
 
 const COMING_SOON = [
   { label: "Billing", icon: CreditCard },
@@ -18,7 +18,7 @@ export function AdminSidebar() {
   return (
     <aside className="glass-strong hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-l-0 md:flex">
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map((item) => {
+        {ADMIN_NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/tenants");
           return (
             <Link

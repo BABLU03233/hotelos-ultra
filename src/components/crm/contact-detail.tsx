@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,7 +47,15 @@ const ACTION_LABELS: Record<FollowUpAction, string> = {
 
 type ContactPatch = Partial<Contact> & { markRead?: boolean };
 
-export function ContactDetail({ contactId, onChanged }: { contactId: string | null; onChanged?: () => void }) {
+export function ContactDetail({
+  contactId,
+  onChanged,
+  onBack,
+}: {
+  contactId: string | null;
+  onChanged?: () => void;
+  onBack?: () => void;
+}) {
   const { data: contactData, reload: reloadContact } = useFetch<{ contact: Contact }>(
     contactId ? `/api/contacts/${contactId}` : null
   );
@@ -102,6 +110,7 @@ export function ContactDetail({ contactId, onChanged }: { contactId: string | nu
       sending={sending}
       updateContact={updateContact}
       sendReply={sendReply}
+      onBack={onBack}
     />
   );
 }
@@ -112,12 +121,14 @@ function ContactDetailPane({
   sending,
   updateContact,
   sendReply,
+  onBack,
 }: {
   contact: Contact;
   messages: Message[] | undefined;
   sending: boolean;
   updateContact: (patch: ContactPatch) => Promise<void>;
   sendReply: (text: string) => Promise<void>;
+  onBack?: () => void;
 }) {
   const [notes, setNotes] = React.useState(contact.notes ?? "");
   const [tagInput, setTagInput] = React.useState("");
@@ -164,6 +175,11 @@ function ContactDetailPane({
     <div className="flex h-full flex-1 flex-col">
       <div className="flex flex-col gap-3 border-b border-border p-3">
         <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon-sm" className="-ml-1 shrink-0 md:hidden" onClick={onBack}>
+              <ArrowLeft />
+            </Button>
+          )}
           <Avatar>
             <AvatarFallback>{initials(contact.name || contact.phone)}</AvatarFallback>
           </Avatar>
