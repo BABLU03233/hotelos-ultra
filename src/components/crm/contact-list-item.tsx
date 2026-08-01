@@ -2,16 +2,9 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
+import { LEAD_STATUS_DOT } from "@/lib/lead-status-colors";
 import { Contact } from "@/types";
 import { cn } from "@/lib/utils";
-
-const STATUS_TONE: Record<Contact["leadStatus"], string> = {
-  NEW: "bg-blue-500",
-  INTERESTED: "bg-amber-500",
-  FOLLOW_UP: "bg-violet-500",
-  BOOKED: "bg-emerald-500",
-  CLOSED: "bg-muted-foreground",
-};
 
 export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
   const unread = !!contact.lastInboundAt && (!contact.lastReadAt || new Date(contact.lastInboundAt) > new Date(contact.lastReadAt));
@@ -44,7 +37,7 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
           {contact.lastMessage || "No messages yet"}
         </p>
         <div className="mt-1.5 flex items-center gap-1.5">
-          <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_TONE[contact.leadStatus])} />
+          <span className={cn("size-1.5 shrink-0 rounded-full", LEAD_STATUS_DOT[contact.leadStatus])} />
           <span className="text-[10px] text-muted-foreground capitalize">{contact.leadStatus.replace("_", " ").toLowerCase()}</span>
           {contact.tags.slice(0, 2).map((t) => (
             <span key={t} className="truncate rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">

@@ -16,7 +16,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-card md:flex">
+    <aside className="glass-strong hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-l-0 md:flex">
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/tenants");
@@ -25,8 +25,10 @@ export function AdminSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
-                active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-all duration-200",
+                active
+                  ? "bg-primary text-primary-foreground shadow-[0_2px_12px_-2px_var(--primary)]"
+                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
               )}
             >
               <item.icon className="size-4 shrink-0" />

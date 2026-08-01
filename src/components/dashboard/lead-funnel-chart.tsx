@@ -1,6 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { LEAD_STATUS_HEX } from "@/lib/lead-status-colors";
 import { LeadStatus } from "@/types";
 
 const STAGE_LABELS: Record<LeadStatus, string> = {
@@ -9,16 +10,6 @@ const STAGE_LABELS: Record<LeadStatus, string> = {
   FOLLOW_UP: "Follow-up",
   BOOKED: "Booked",
   CLOSED: "Closed",
-};
-
-// Same hues used for lead-status dots throughout the CRM (contact-list-item,
-// contact-detail) so a stage reads as the same color everywhere in the app.
-const STAGE_COLOR: Record<LeadStatus, string> = {
-  NEW: "#3b82f6",
-  INTERESTED: "#f59e0b",
-  FOLLOW_UP: "#8b5cf6",
-  BOOKED: "#10b981",
-  CLOSED: "#71717a",
 };
 
 export function LeadFunnelChart({ funnel }: { funnel: Record<LeadStatus, number> }) {
@@ -40,7 +31,7 @@ export function LeadFunnelChart({ funnel }: { funnel: Record<LeadStatus, number>
         />
         <Bar dataKey="value" radius={4} barSize={18}>
           {data.map((d) => (
-            <Cell key={d.status} fill={STAGE_COLOR[d.status]} />
+            <Cell key={d.status} fill={LEAD_STATUS_HEX[d.status]} />
           ))}
         </Bar>
       </BarChart>

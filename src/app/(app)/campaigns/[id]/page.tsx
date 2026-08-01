@@ -1,14 +1,24 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecipientTable } from "@/components/campaigns/recipient-table";
+import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { Campaign, CampaignReport } from "@/types";
+
+const FUNNEL_COLORS = [
+  "var(--color-chart-5)",
+  "var(--color-chart-3)",
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-4)",
+  "var(--color-chart-2)",
+];
 
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
@@ -40,19 +50,21 @@ export default function CampaignDetailPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{campaign.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {campaign.type} · {campaign.messageType.toLowerCase()}
-          </p>
+      <Reveal>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-semibold">{campaign.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {campaign.type} · {campaign.messageType.toLowerCase()}
+            </p>
+          </div>
+          {!campaign.sentAt && (
+            <Button onClick={send} disabled={report.totalContacts === 0}>
+              Send now
+            </Button>
+          )}
         </div>
-        {!campaign.sentAt && (
-          <Button onClick={send} disabled={report.totalContacts === 0}>
-            Send now
-          </Button>
-        )}
-      </div>
+      </Reveal>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
         {[
@@ -84,7 +96,11 @@ export default function CampaignDetailPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} />
-              <Bar dataKey="value" fill="var(--color-primary)" radius={4} />
+              <Bar dataKey="value" radius={4}>
+                {chartData.map((d, i) => (
+                  <Cell key={d.label} fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

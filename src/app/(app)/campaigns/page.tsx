@@ -5,6 +5,7 @@ import { Megaphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
+import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatDate } from "@/lib/format";
 import { Campaign } from "@/types";
@@ -14,13 +15,15 @@ export default function CampaignsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Campaigns</h1>
-          <p className="text-sm text-muted-foreground">Broadcast offers to selected guests — Aria takes over if they reply.</p>
+      <Reveal>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-semibold">Campaigns</h1>
+            <p className="text-sm text-muted-foreground">Broadcast offers to selected guests — Aria takes over if they reply.</p>
+          </div>
+          <NewCampaignDialog onCreated={reload} />
         </div>
-        <NewCampaignDialog onCreated={reload} />
-      </div>
+      </Reveal>
 
       <div className="flex flex-col gap-3">
         {loading || !data

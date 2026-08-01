@@ -24,8 +24,8 @@ export function CampaignPerformanceChart({
           contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
         />
         <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
-        <Bar dataKey="Sent" fill="var(--color-chart-2)" radius={3} />
-        <Bar dataKey="Replies" fill="#10b981" radius={3} />
+        <Bar dataKey="Sent" fill="var(--color-chart-5)" radius={3} />
+        <Bar dataKey="Replies" fill="var(--color-chart-2)" radius={3} />
       </BarChart>
     </ResponsiveContainer>
   );

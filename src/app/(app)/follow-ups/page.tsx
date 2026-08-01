@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FollowUpActivity } from "@/components/follow-ups/follow-up-activity";
 import { FollowUpRuleCard } from "@/components/follow-ups/follow-up-rule-card";
+import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { FollowUpRule } from "@/types";
@@ -29,17 +30,19 @@ export default function FollowUpsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Follow-up automation</h1>
-          <p className="text-sm text-muted-foreground">
-            When a lead goes quiet, Aria works through these steps in order — cancelled automatically the moment they reply.
-          </p>
+      <Reveal>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-semibold">Follow-up automation</h1>
+            <p className="text-sm text-muted-foreground">
+              When a lead goes quiet, Aria works through these steps in order — cancelled automatically the moment they reply.
+            </p>
+          </div>
+          <Button onClick={addRule}>
+            <Plus /> Add step
+          </Button>
         </div>
-        <Button onClick={addRule}>
-          <Plus /> Add step
-        </Button>
-      </div>
+      </Reveal>
 
       <div className="flex flex-col">
         {loading || !data

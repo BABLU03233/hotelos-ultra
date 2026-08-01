@@ -46,8 +46,10 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
       <div className="flex flex-col items-center">
         <span
           className={
-            "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold " +
-            (rule.active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
+            "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-shadow " +
+            (rule.active
+              ? "bg-primary text-primary-foreground shadow-[0_2px_10px_-2px_var(--primary)]"
+              : "bg-muted text-muted-foreground")
           }
         >
           {rule.order}

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
+import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -95,31 +96,33 @@ export default function AdminTenantDetailPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div className="flex items-start justify-between">
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-48" />
-            <Button size="sm" onClick={saveEdit}>
-              Save
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <div>
+      <Reveal>
+        <div className="flex items-start justify-between">
+          {editing ? (
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">{tenant.name}</h1>
-              <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
-                <Pencil className="size-3.5" />
-              </button>
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-48" />
+              <Button size="sm" onClick={saveEdit}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {tenant.slug} · joined {formatDate(tenant.createdAt)}
-            </p>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-heading text-xl font-semibold">{tenant.name}</h1>
+                <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
+                  <Pencil className="size-3.5" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {tenant.slug} · joined {formatDate(tenant.createdAt)}
+              </p>
+            </div>
+          )}
+        </div>
+      </Reveal>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
         {[

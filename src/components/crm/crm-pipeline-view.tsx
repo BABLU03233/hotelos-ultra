@@ -7,15 +7,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime, initials } from "@/lib/format";
+import { LEAD_STATUS_BORDER } from "@/lib/lead-status-colors";
 import { cn } from "@/lib/utils";
 import { Contact, LeadStatus } from "@/types";
 
 const STAGES: { key: LeadStatus; label: string; tone: string }[] = [
-  { key: "NEW", label: "New", tone: "border-t-blue-500" },
-  { key: "INTERESTED", label: "Interested", tone: "border-t-amber-500" },
-  { key: "FOLLOW_UP", label: "Follow-up", tone: "border-t-violet-500" },
-  { key: "BOOKED", label: "Booked", tone: "border-t-emerald-500" },
-  { key: "CLOSED", label: "Closed", tone: "border-t-muted-foreground" },
+  { key: "NEW", label: "New", tone: LEAD_STATUS_BORDER.NEW },
+  { key: "INTERESTED", label: "Interested", tone: LEAD_STATUS_BORDER.INTERESTED },
+  { key: "FOLLOW_UP", label: "Follow-up", tone: LEAD_STATUS_BORDER.FOLLOW_UP },
+  { key: "BOOKED", label: "Booked", tone: LEAD_STATUS_BORDER.BOOKED },
+  { key: "CLOSED", label: "Closed", tone: LEAD_STATUS_BORDER.CLOSED },
 ];
 
 function PipelineCard({ contact, onSelect }: { contact: Contact; onSelect: (id: string) => void }) {

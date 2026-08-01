@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewTenantDialog } from "@/components/admin/new-tenant-dialog";
 import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
+import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { cn } from "@/lib/utils";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -47,13 +48,15 @@ export default function AdminTenantsPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Hotels</h1>
-          <p className="text-sm text-muted-foreground">Every hotel running on HotelOS Ultra.</p>
+      <Reveal>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-semibold">Hotels</h1>
+            <p className="text-sm text-muted-foreground">Every hotel running on HotelOS Ultra.</p>
+          </div>
+          <NewTenantDialog onCreated={reload} />
         </div>
-        <NewTenantDialog onCreated={reload} />
-      </div>
+      </Reveal>
 
       <div className="grid grid-cols-3 gap-4">
         <Card>

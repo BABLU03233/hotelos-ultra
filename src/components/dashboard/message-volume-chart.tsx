@@ -3,9 +3,9 @@
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const SERIES = [
-  { key: "inbound", label: "From guests", color: "#3b82f6" },
-  { key: "ai", label: "Aria replies", color: "#8b5cf6" },
-  { key: "staff", label: "Staff replies", color: "#10b981" },
+  { key: "inbound", label: "From guests", color: "var(--color-chart-5)" },
+  { key: "ai", label: "Aria replies", color: "var(--color-chart-3)" },
+  { key: "staff", label: "Staff replies", color: "var(--color-chart-2)" },
 ] as const;
 
 function formatDay(iso: string) {
