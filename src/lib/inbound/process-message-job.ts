@@ -53,15 +53,41 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     .filter((m) => m.id !== latestInbound.id && m.content)
     .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
 
-  const { reply, shouldEscalate, escalationReason } = await generateReply(tenantId, latestInbound.content, history);
+  let generated: Awaited<ReturnType<typeof generateReply>>;
+  try {
+    generated = await generateReply(tenantId, latestInbound.content, history);
+  } catch (err) {
+    // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
+    // outage, rate limit, ...) must never leave the guest silently
+    // unanswered — surface it the same way an AI-side escalation would, so
+    // a human still finds out even though Aria itself never got to reply.
+    console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
+    await prisma.staffNotification.create({
+      data: { tenantId, contactId, reason: "Aria couldn't generate a reply — needs a manual response." },
+    });
+    return;
+  }
+  const { reply, shouldEscalate, escalationReason } = generated;
 
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
     console.warn(`Tenant ${tenantId} has no WhatsApp credentials configured — cannot send AI reply.`);
+    await prisma.staffNotification.create({
+      data: { tenantId, contactId, reason: "Aria drafted a reply but WhatsApp isn't connected yet — connect it in Settings." },
+    });
     return;
   }
 
-  const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply });
+  let whatsappMessageId: string;
+  try {
+    whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply });
+  } catch (err) {
+    console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
+    await prisma.staffNotification.create({
+      data: { tenantId, contactId, reason: "Aria's reply failed to send over WhatsApp — needs a manual response." },
+    });
+    return;
+  }
 
   await prisma.message.create({
     data: {

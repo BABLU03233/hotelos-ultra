@@ -41,7 +41,12 @@ export const POST = apiRoute(async (req: NextRequest) => {
 
   if (file instanceof File) {
     const buffer = Buffer.from(await file.arrayBuffer());
-    sourceUrl = await uploadObject(session.tenantId, "knowledge", buffer, file.type || "application/octet-stream", file.name);
+    try {
+      sourceUrl = await uploadObject(session.tenantId, "knowledge", buffer, file.type || "application/octet-stream", file.name);
+    } catch (err) {
+      console.error("Knowledge file upload failed:", err);
+      throw new ApiError(400, "Object storage isn't configured yet — add STORAGE_* settings before uploading files (text/FAQ entries don't need it).");
+    }
     if (type === "PDF" || type === "BROCHURE") {
       rawText = await extractTextFromPdf(buffer).catch((err) => {
         console.error("PDF text extraction failed:", err);
@@ -56,11 +61,30 @@ export const POST = apiRoute(async (req: NextRequest) => {
 
   if (!rawText && !sourceUrl) throw new ApiError(400, "Provide either a file or text content");
 
+  if (rawText && !process.env.VOYAGE_API_KEY) {
+    throw new ApiError(
+      400,
+      "Add a Voyage AI API key (VOYAGE_API_KEY) before uploading text-based knowledge — Aria can't search it without one."
+    );
+  }
+
   const doc = await db.knowledgeDoc.create({
     data: { tenantId: session.tenantId, title, type, sourceUrl, rawText },
   });
 
-  const chunksIndexed = rawText ? await embedAndStoreDocument(session.tenantId, doc.id, rawText) : 0;
+  let chunksIndexed = 0;
+  if (rawText) {
+    try {
+      chunksIndexed = await embedAndStoreDocument(session.tenantId, doc.id, rawText);
+    } catch (err) {
+      // Don't leave an unsearchable, half-indexed doc behind — fail the
+      // whole upload so the user can retry once the embedding provider is
+      // reachable again, rather than silently landing a doc Aria can't use.
+      await db.knowledgeDoc.delete({ where: { id: doc.id } });
+      console.error("Knowledge embedding failed:", err);
+      throw new ApiError(502, "Couldn't index this document right now — try again in a moment.");
+    }
+  }
 
   return NextResponse.json({ doc, chunksIndexed }, { status: 201 });
 });

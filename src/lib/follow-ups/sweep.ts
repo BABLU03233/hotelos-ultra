@@ -45,6 +45,12 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
     const withinWindow = decision.withinWindow;
     const creds = await getWhatsAppCredentials(scheduled.tenantId);
     if (!creds) {
+      // Without this, the row stays PENDING forever and gets re-picked-up
+      // by every future sweep — an infinite retry loop for a condition
+      // retrying can never fix. WhatsApp connection status is already
+      // surfaced in Settings/admin, so treat this the same as the
+      // can't-send-in-this-window case rather than paging staff per lead.
+      await prisma.scheduledFollowUp.update({ where: { id: scheduled.id }, data: { status: "SKIPPED" } });
       failed++;
       continue;
     }

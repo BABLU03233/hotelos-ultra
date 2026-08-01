@@ -27,7 +27,9 @@ export async function uploadObject(
   filename?: string
 ): Promise<string> {
   const bucket = process.env.STORAGE_BUCKET;
-  if (!bucket) throw new Error("STORAGE_BUCKET is not set");
+  if (!bucket || !process.env.STORAGE_ENDPOINT || !process.env.STORAGE_ACCESS_KEY || !process.env.STORAGE_SECRET_KEY) {
+    throw new Error("Object storage is not configured (STORAGE_ENDPOINT/STORAGE_ACCESS_KEY/STORAGE_SECRET_KEY/STORAGE_BUCKET)");
+  }
 
   const key = `${tenantId}/${folder}/${randomUUID()}${filename ? `-${filename}` : ""}`;
 
