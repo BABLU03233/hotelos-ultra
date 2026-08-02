@@ -1,10 +1,26 @@
 import { LeadSource } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
+import { createFallbackProvider } from "./fallback-provider";
+import { geminiProvider } from "./gemini-provider";
+import { groqProvider } from "./groq-provider";
+import { mistralProvider } from "./mistral-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
 
-const aiProvider: AIProvider = anthropicProvider;
+// Tries each configured provider in order and falls through on failure
+// (rate limit, outage, missing key) so a guest is never left unanswered
+// just because one free-tier provider had a bad moment. Whichever ones
+// have no API key configured fail immediately (no network call) and the
+// chain just moves on — no need to explicitly list which are "active".
+// Order = free tiers first while testing; once there's a real Anthropic
+// budget for production, move anthropicProvider to the front for quality.
+const aiProvider: AIProvider = createFallbackProvider([
+  geminiProvider,
+  groqProvider,
+  mistralProvider,
+  anthropicProvider,
+]);
 
 const ESCALATE_MARKER = "ESCALATE:";
 
