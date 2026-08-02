@@ -38,7 +38,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <CardTitle>Create your workspace</CardTitle>
         <CardDescription>Set up HotelOS Ultra for your property in under a minute.</CardDescription>

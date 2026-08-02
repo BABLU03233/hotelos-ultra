@@ -38,7 +38,7 @@ function LoginForm() {
   }
 
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <CardTitle>Log in</CardTitle>
         <CardDescription>Welcome back to your hotel&apos;s workspace.</CardDescription>

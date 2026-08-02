@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { HeroGlow } from "@/components/hero-glow";
 import { ChatMockup } from "@/components/marketing/chat-mockup";
 import { SiteNav } from "@/components/marketing/site-nav";
 import { Reveal } from "@/components/motion/reveal";
@@ -97,7 +98,8 @@ export default async function MarketingPage() {
       <SiteNav loggedIn={!!session} />
 
       {/* Hero */}
-      <section className="mx-auto flex w-full max-w-6xl flex-col items-center gap-10 px-4 py-16 md:flex-row md:py-24">
+      <section className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-10 overflow-hidden px-4 py-16 md:flex-row md:py-24">
+        <HeroGlow />
         <Reveal className="flex flex-1 flex-col gap-5 text-center md:text-left">
           <div>
             <h1 className="font-heading text-4xl leading-[1.1] font-semibold tracking-tight text-balance md:text-5xl">
@@ -257,7 +259,7 @@ export default async function MarketingPage() {
           </div>
         </Reveal>
         <Reveal delay={100}>
-          <Card className="mt-10">
+          <Card variant="glass" className="mt-10">
             <CardContent className="flex flex-col gap-5">
               <div className="text-center">
                 <p className="font-heading text-4xl font-semibold">

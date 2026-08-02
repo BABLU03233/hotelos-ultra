@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { HeroGlow } from "@/components/hero-glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Reveal } from "@/components/motion/reveal";
@@ -38,7 +39,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh w-full items-center justify-center p-6">
+    <div className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden p-6">
+      <HeroGlow intensity="low" />
       <div className="w-full max-w-sm">
         <Reveal>
           <div className="mb-8 flex items-center justify-center gap-2">
@@ -50,7 +52,7 @@ export default function AdminLoginPage() {
         </Reveal>
         <Reveal delay={100}>
           <TiltCard>
-            <Card>
+            <Card variant="glass">
               <CardHeader>
                 <CardTitle>Platform admin</CardTitle>
                 <CardDescription>Manage every hotel on HotelOS Ultra.</CardDescription>
