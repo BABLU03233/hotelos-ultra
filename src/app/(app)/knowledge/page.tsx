@@ -24,8 +24,8 @@ export default function KnowledgePage() {
       <Reveal>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-heading text-xl font-semibold">Knowledge base</h1>
-            <p className="text-sm text-muted-foreground">Everything Aria can search through to answer guest questions.</p>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">Knowledge base</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Everything Aria can search through to answer guest questions.</p>
           </div>
           <UploadKnowledgeDialog onUploaded={reload} />
         </div>

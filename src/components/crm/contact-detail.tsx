@@ -173,7 +173,7 @@ function ContactDetailPane({
 
   return (
     <div className="flex h-full flex-1 flex-col">
-      <div className="flex flex-col gap-3 border-b border-border p-3">
+      <div className="flex flex-col gap-3 border-b border-border p-4">
         <div className="flex items-center gap-3">
           {onBack && (
             <Button variant="ghost" size="icon-sm" className="-ml-1 shrink-0 md:hidden" onClick={onBack}>

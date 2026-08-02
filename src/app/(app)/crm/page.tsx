@@ -8,8 +8,8 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <Reveal>
         <div>
-          <h1 className="font-heading text-xl font-semibold">CRM</h1>
-          <p className="text-sm text-muted-foreground">Every guest who&apos;s messaged you, and the full conversation with Aria.</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">CRM</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Every guest who&apos;s messaged you, and the full conversation with Aria.</p>
         </div>
       </Reveal>
       <CrmWorkspace initialContactId={contact ?? null} />

@@ -59,7 +59,7 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
         <Card className="min-h-0 flex-1 flex-row overflow-hidden p-0">
           <div
             className={cn(
-              "w-full shrink-0 border-border py-3 pl-3 pr-1 md:w-80 md:border-r",
+              "w-full shrink-0 border-border p-3 md:w-80 md:border-r",
               selectedId ? "hidden md:block" : "block"
             )}
           >

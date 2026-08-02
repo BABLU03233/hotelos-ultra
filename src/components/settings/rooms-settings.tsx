@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +38,7 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="flex flex-col gap-1.5">
             <Label>Name</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} onBlur={save} />
@@ -87,11 +87,7 @@ export function RoomsSettings() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Room pricing</CardTitle>
-        </CardHeader>
-      </Card>
+      <h2 className="text-sm font-semibold text-foreground">Room pricing</h2>
       {loading || !data
         ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-xl" />)
         : data.rooms.map((r) => <RoomCard key={r.id} room={r} onChanged={reload} />)}

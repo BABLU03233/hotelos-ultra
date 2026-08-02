@@ -58,7 +58,7 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
         {!isLast && <span className="mt-1 w-px flex-1 bg-border" />}
       </div>
 
-      <Card className="mb-4 flex-1">
+      <Card className="flex-1">
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <Select value={rule.action} onValueChange={(v) => v && patch({ action: v as FollowUpAction })}>

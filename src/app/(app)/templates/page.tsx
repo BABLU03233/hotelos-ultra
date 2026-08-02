@@ -7,8 +7,8 @@ export default function TemplatesPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <Reveal>
         <div>
-          <h1 className="font-heading text-xl font-semibold">Message templates</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Message templates</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Ready-to-send WhatsApp copy for every stage of a guest&apos;s stay. Copy one here, or insert it directly
             while creating a campaign or follow-up step.
           </p>

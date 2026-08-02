@@ -18,8 +18,8 @@ export default function CampaignsPage() {
       <Reveal>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-heading text-xl font-semibold">Campaigns</h1>
-            <p className="text-sm text-muted-foreground">Broadcast offers to selected guests — Aria takes over if they reply.</p>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">Campaigns</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Broadcast offers to selected guests — Aria takes over if they reply.</p>
           </div>
           <NewCampaignDialog onCreated={reload} />
         </div>

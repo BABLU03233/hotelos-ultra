@@ -23,7 +23,7 @@ export default async function DashboardPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <Reveal>
         <div>
-          <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">Dashboard</h1>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">What&apos;s happening across your WhatsApp pipeline right now.</p>
         </div>
       </Reveal>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,8 +33,8 @@ export default function FollowUpsPage() {
       <Reveal>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-heading text-xl font-semibold">Follow-up automation</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">Follow-up automation</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               When a lead goes quiet, Aria works through these steps in order — cancelled automatically the moment they reply.
             </p>
           </div>
@@ -44,14 +44,18 @@ export default function FollowUpsPage() {
         </div>
       </Reveal>
 
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-3">
         {loading || !data
-          ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="mb-4 h-32 w-full rounded-xl" />)
+          ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
           : data.rules.map((rule, i) => (
               <FollowUpRuleCard key={rule.id} rule={rule} isLast={i === data.rules.length - 1} onChanged={reload} />
             ))}
         {!loading && data?.rules.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No follow-up steps yet — add one to get started.</p>
+          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
+            <Clock className="size-8" />
+            <p className="text-sm font-medium text-foreground">No follow-up steps yet</p>
+            <p className="max-w-xs text-xs">Add a step to automatically nudge leads who go quiet.</p>
+          </div>
         )}
       </div>
 
