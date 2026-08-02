@@ -27,6 +27,7 @@ export const geminiEmbeddingProvider: EmbeddingProvider = {
       config: {
         outputDimensionality: 1024,
         taskType: type === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
+        httpOptions: { timeout: 10_000, retryOptions: { attempts: 1 } },
       },
     });
     return (response.embeddings ?? []).map((e) => e.values ?? []);

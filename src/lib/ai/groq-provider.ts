@@ -14,6 +14,7 @@ export const groqProvider: AIProvider = {
         max_tokens: 1024,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {

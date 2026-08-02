@@ -23,6 +23,7 @@ export const voyageEmbeddingProvider: EmbeddingProvider = {
         model: process.env.VOYAGE_EMBEDDING_MODEL || "voyage-3",
         input_type: type,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {

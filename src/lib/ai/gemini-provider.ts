@@ -25,7 +25,15 @@ export const geminiProvider: AIProvider = {
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       })),
-      config: { systemInstruction: systemPrompt, maxOutputTokens: 1024 },
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 1024,
+        // No retries: our own fallback chain (pipeline.ts) already moves to
+        // the next provider on failure. The SDK's default (5 attempts,
+        // exponential backoff up to 60s between tries) was silently adding
+        // up to a minute of latency per guest reply on free-tier rate limits.
+        httpOptions: { timeout: 15_000, retryOptions: { attempts: 1 } },
+      },
     });
     return response.text ?? "";
   },
