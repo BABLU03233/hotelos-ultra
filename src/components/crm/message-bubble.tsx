@@ -33,7 +33,14 @@ export function MessageBubble({ message }: { message: Message }) {
           isOutbound ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted"
         )}
       >
-        <p className="whitespace-pre-wrap">{message.content ?? `[${message.type.toLowerCase()}]`}</p>
+        {message.type === "IMAGE" && message.mediaUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- remote WhatsApp/hotel-hosted URL, not a local asset
+          <img src={message.mediaUrl} alt="" className="mb-1 max-h-64 w-full rounded-lg object-cover" />
+        )}
+        {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
+        {!message.content && message.type !== "IMAGE" && (
+          <p className="whitespace-pre-wrap">{`[${message.type.toLowerCase()}]`}</p>
+        )}
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px]",

@@ -40,7 +40,7 @@ export function DashboardAttentionPanel({
       <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
         <CircleCheck className="size-6 text-emerald-600" />
         <p className="text-sm font-medium">All clear</p>
-        <p className="text-xs text-muted-foreground">Aria hasn&apos;t needed to escalate anything.</p>
+        <p className="text-xs text-muted-foreground">Anushka hasn&apos;t needed to escalate anything.</p>
       </div>
     );
   }

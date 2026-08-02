@@ -41,7 +41,7 @@ export function NotificationBell() {
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
-            <p className="p-6 text-center text-xs text-muted-foreground">Aria&apos;s handling everything — nothing needs you right now.</p>
+            <p className="p-6 text-center text-xs text-muted-foreground">Anushka&apos;s handling everything — nothing needs you right now.</p>
           ) : (
             <div className="flex flex-col">
               {notifications.map((n) => (

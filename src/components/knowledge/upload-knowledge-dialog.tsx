@@ -63,7 +63,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
       setText("");
       setFile(null);
       onUploaded();
-      toast.success("Added to Aria's knowledge base");
+      toast.success("Added to Anushka's knowledge base");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -85,7 +85,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add to knowledge base</DialogTitle>
-          <DialogDescription>Aria answers guest questions using only what&apos;s here.</DialogDescription>
+          <DialogDescription>Anushka answers guest questions using only what&apos;s here.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -118,7 +118,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
           ) : (
             <div className="flex flex-col gap-1.5">
               <Label>Content</Label>
-              <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-32" placeholder="Paste the text Aria should know…" />
+              <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-32" placeholder="Paste the text Anushka should know…" />
             </div>
           )}
         </div>

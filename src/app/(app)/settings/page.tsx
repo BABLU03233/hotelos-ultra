@@ -9,7 +9,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <Reveal>
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Everything Aria and your team need to know about the hotel.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Everything Anushka and your team need to know about the hotel.</p>
         </div>
       </Reveal>
 

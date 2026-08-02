@@ -9,7 +9,7 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
       <Reveal>
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">CRM</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Every guest who&apos;s messaged you, and the full conversation with Aria.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Every guest who&apos;s messaged you, and the full conversation with Anushka.</p>
         </div>
       </Reveal>
       <CrmWorkspace initialContactId={contact ?? null} />

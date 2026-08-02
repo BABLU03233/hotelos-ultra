@@ -55,7 +55,7 @@ export default async function DashboardPage() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Message volume — last 14 days</CardTitle>
-              <CardDescription>Who&apos;s actually doing the talking: guests, Aria, or your team.</CardDescription>
+              <CardDescription>Who&apos;s actually doing the talking: guests, Anushka, or your team.</CardDescription>
             </CardHeader>
             <CardContent className="h-64">
               {hasMessageVolume ? (
@@ -72,7 +72,7 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Needs attention</CardTitle>
-              <CardDescription>Conversations Aria couldn&apos;t handle confidently.</CardDescription>
+              <CardDescription>Conversations Anushka couldn&apos;t handle confidently.</CardDescription>
             </CardHeader>
             <CardContent>
               <DashboardAttentionPanel initialCount={metrics.unresolvedNotificationCount} initialNotifications={metrics.recentNotifications} />

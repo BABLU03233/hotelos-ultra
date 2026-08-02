@@ -4,7 +4,7 @@ import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, X
 
 const SERIES = [
   { key: "inbound", label: "From guests", color: "var(--color-chart-5)" },
-  { key: "ai", label: "Aria replies", color: "var(--color-chart-3)" },
+  { key: "ai", label: "Anushka replies", color: "var(--color-chart-3)" },
   { key: "staff", label: "Staff replies", color: "var(--color-chart-2)" },
 ] as const;
 

@@ -92,7 +92,7 @@ export function RoomsSettings() {
         ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-xl" />)
         : data.rooms.map((r) => <RoomCard key={r.id} room={r} onChanged={reload} />)}
       {!loading && data?.rooms.length === 0 && (
-        <p className="text-sm text-muted-foreground">No rooms added yet — Aria can&apos;t recommend one until you add at least one.</p>
+        <p className="text-sm text-muted-foreground">No rooms added yet — Anushka can&apos;t recommend one until you add at least one.</p>
       )}
       <Button variant="outline" onClick={addRoom} className="w-fit">
         <Plus /> Add room

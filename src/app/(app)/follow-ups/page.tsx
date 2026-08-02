@@ -35,7 +35,7 @@ export default function FollowUpsPage() {
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Follow-up automation</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              When a lead goes quiet, Aria works through these steps in order — cancelled automatically the moment they reply.
+              When a lead goes quiet, Anushka works through these steps in order — cancelled automatically the moment they reply.
             </p>
           </div>
           <Button onClick={addRule}>

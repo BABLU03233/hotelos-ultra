@@ -25,7 +25,7 @@ export default function KnowledgePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Knowledge base</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Everything Aria can search through to answer guest questions.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Everything Anushka can search through to answer guest questions.</p>
           </div>
           <UploadKnowledgeDialog onUploaded={reload} />
         </div>
@@ -55,8 +55,8 @@ export default function KnowledgePage() {
         {!loading && data?.docs.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <BookOpen className="size-8" />
-            <p className="text-sm font-medium text-foreground">Aria&apos;s knowledge base is empty</p>
-            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means Aria escalates almost everything.</p>
+            <p className="text-sm font-medium text-foreground">Anushka&apos;s knowledge base is empty</p>
+            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means Anushka escalates almost everything.</p>
           </div>
         )}
       </div>

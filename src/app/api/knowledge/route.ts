@@ -64,7 +64,7 @@ export const POST = apiRoute(async (req: NextRequest) => {
   if (rawText && !hasEmbeddingProvider()) {
     throw new ApiError(
       400,
-      "No embedding provider is configured yet (VOYAGE_API_KEY or GEMINI_API_KEY) — Aria can't search text-based knowledge without one."
+      "No embedding provider is configured yet (VOYAGE_API_KEY or GEMINI_API_KEY) — Anushka can't search text-based knowledge without one."
     );
   }
 
@@ -79,7 +79,7 @@ export const POST = apiRoute(async (req: NextRequest) => {
     } catch (err) {
       // Don't leave an unsearchable, half-indexed doc behind — fail the
       // whole upload so the user can retry once the embedding provider is
-      // reachable again, rather than silently landing a doc Aria can't use.
+      // reachable again, rather than silently landing a doc Anushka can't use.
       await db.knowledgeDoc.delete({ where: { id: doc.id } });
       console.error("Knowledge embedding failed:", err);
       throw new ApiError(502, "Couldn't index this document right now — try again in a moment.");

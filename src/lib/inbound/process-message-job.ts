@@ -54,9 +54,9 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     .filter((m) => m.id !== latestInbound.id && m.content)
     .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
 
-  // Warm vs. cold framing for Aria: a fresh ad lead gets an energetic open,
+  // Warm vs. cold framing for Anushka: a fresh ad lead gets an energetic open,
   // a guest who's gone quiet for a while gets a gentle re-spark instead of
-  // Aria just resuming mid-conversation as if no time passed.
+  // Anushka just resuming mid-conversation as if no time passed.
   const previousInbound = inboundMessages.length > 1 ? inboundMessages[inboundMessages.length - 2] : null;
   const replyContext = {
     isFirstReply: !chronological.some((m) => m.direction === "OUT"),
@@ -74,20 +74,20 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
     // outage, rate limit, ...) must never leave the guest silently
     // unanswered — surface it the same way an AI-side escalation would, so
-    // a human still finds out even though Aria itself never got to reply.
+    // a human still finds out even though Anushka itself never got to reply.
     console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Aria couldn't generate a reply — needs a manual response." },
+      data: { tenantId, contactId, reason: "Anushka couldn't generate a reply — needs a manual response." },
     });
     return;
   }
-  const { reply, shouldEscalate, escalationReason } = generated;
+  const { reply, imageUrls, shouldEscalate, escalationReason } = generated;
 
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
     console.warn(`Tenant ${tenantId} has no WhatsApp credentials configured — cannot send AI reply.`);
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Aria drafted a reply but WhatsApp isn't connected yet — connect it in Settings." },
+      data: { tenantId, contactId, reason: "Anushka drafted a reply but WhatsApp isn't connected yet — connect it in Settings." },
     });
     return;
   }
@@ -98,7 +98,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   } catch (err) {
     console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Aria's reply failed to send over WhatsApp — needs a manual response." },
+      data: { tenantId, contactId, reason: "Anushka's reply failed to send over WhatsApp — needs a manual response." },
     });
     return;
   }
@@ -115,9 +115,29 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     },
   });
 
+  for (const url of imageUrls) {
+    try {
+      const imageMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "image", link: url });
+      await prisma.message.create({
+        data: {
+          tenantId,
+          contactId,
+          direction: "OUT",
+          type: "IMAGE",
+          mediaUrl: url,
+          whatsappMessageId: imageMessageId,
+          status: "SENT",
+        },
+      });
+    } catch (err) {
+      // Non-fatal: the guest already has Anushka's text reply, a missed photo isn't worth escalating over.
+      console.error(`Failed to send room photo for tenant ${tenantId}, contact ${contactId}:`, err);
+    }
+  }
+
   if (shouldEscalate) {
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: escalationReason || "Aria couldn't answer confidently" },
+      data: { tenantId, contactId, reason: escalationReason || "Anushka couldn't answer confidently" },
     });
   }
 

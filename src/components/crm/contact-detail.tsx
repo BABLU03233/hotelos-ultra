@@ -208,7 +208,7 @@ function ContactDetailPane({
             </Button>
           ) : (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-              <Bot className="size-3" /> Aria active
+              <Bot className="size-3" /> Anushka active
             </span>
           )}
         </div>
@@ -219,7 +219,7 @@ function ContactDetailPane({
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium">Aria escalated this conversation</p>
+              <p className="text-xs font-medium">Anushka escalated this conversation</p>
               <p className="text-xs text-muted-foreground">{escalation.reason}</p>
             </div>
             <button onClick={resolveEscalation} className="shrink-0 text-[11px] font-medium text-primary hover:underline">

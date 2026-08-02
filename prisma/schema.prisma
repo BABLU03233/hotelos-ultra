@@ -341,7 +341,7 @@ model Message {
   // webhook retries idempotently. Nullable (draft/failed-before-send rows).
   whatsappMessageId String?          @unique
   status            MessageStatus    @default(SENT)
-  // Set only for OUT messages a staff member typed manually (vs. Aria) —
+  // Set only for OUT messages a staff member typed manually (vs. Anushka) —
   // lets the CRM show "replied by Priya".
   senderUserId      String?
   createdAt         DateTime         @default(now())

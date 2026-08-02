@@ -26,7 +26,7 @@ const FEATURES = [
   {
     icon: Bot,
     title: "AI concierge, always on",
-    body: "Aria is trained on your hotel — rooms, pricing, policies, FAQs — and answers guests instantly in natural conversation. The moment she's unsure, she escalates to your team with full context.",
+    body: "Anushka is trained on your hotel — rooms, pricing, policies, FAQs — and answers guests instantly in natural conversation. The moment she's unsure, she escalates to your team with full context.",
   },
   {
     icon: Clock,
@@ -47,8 +47,8 @@ const FEATURES = [
 
 const STEPS = [
   { title: "Connect your WhatsApp number", body: "Link your Meta WhatsApp Business number — we'll walk you through it." },
-  { title: "Teach Aria about your hotel", body: "Add rooms, pricing, offers, and FAQs — Aria uses them to answer guests accurately." },
-  { title: "Go live", body: "Aria handles the conversation. You get notified only when she genuinely needs you." },
+  { title: "Teach Anushka about your hotel", body: "Add rooms, pricing, offers, and FAQs — Anushka uses them to answer guests accurately." },
+  { title: "Go live", body: "Anushka handles the conversation. You get notified only when she genuinely needs you." },
 ] as const;
 
 const TRUST_POINTS = [
@@ -61,10 +61,10 @@ const TRUST_POINTS = [
 const FAQS = [
   {
     q: "Do I need my own WhatsApp Business API account?",
-    a: "You'll need a Meta WhatsApp Business number — we'll help you connect it once you're onboarded. Aria runs on top of the official API, not a workaround.",
+    a: "You'll need a Meta WhatsApp Business number — we'll help you connect it once you're onboarded. Anushka runs on top of the official API, not a workaround.",
   },
   {
-    q: "What happens when Aria doesn't know the answer?",
+    q: "What happens when Anushka doesn't know the answer?",
     a: "She escalates instantly to your team's dashboard with the full conversation context — nothing gets silently dropped.",
   },
   {
@@ -82,7 +82,7 @@ const FAQS = [
 ] as const;
 
 const PRICING_FEATURES = [
-  "Unlimited AI conversations with Aria",
+  "Unlimited AI conversations with Anushka",
   "Automated follow-up sequences",
   "Broadcast campaigns to segmented guests",
   "Knowledge base with document upload",
@@ -106,7 +106,7 @@ export default async function MarketingPage() {
               Turn WhatsApp into your hotel&apos;s 24/7 front desk
             </h1>
             <p className="mt-4 text-base text-muted-foreground md:text-lg">
-              Aria answers guest questions, takes bookings, and follows up automatically — so nothing falls through the
+              Anushka answers guest questions, takes bookings, and follows up automatically — so nothing falls through the
               cracks, and your staff only steps in when it truly matters.
             </p>
           </div>
@@ -204,7 +204,7 @@ export default async function MarketingPage() {
                 </span>
                 <h2 className="font-heading text-2xl font-semibold tracking-tight">Never miss what actually needs you</h2>
                 <p className="text-sm text-muted-foreground">
-                  Aria handles the routine. The moment a conversation needs a human — a tricky question, an angry guest,
+                  Anushka handles the routine. The moment a conversation needs a human — a tricky question, an angry guest,
                   a request she can&apos;t fulfil — it lands straight in your team&apos;s escalation inbox, with the full
                   conversation attached.
                 </p>

@@ -55,7 +55,7 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
       <Card>
         <CardHeader>
           <CardTitle>Hotel information</CardTitle>
-          <CardDescription>What Aria tells guests when they ask about the property.</CardDescription>
+          <CardDescription>What Anushka tells guests when they ask about the property.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FIELDS.map((f) => (
@@ -78,7 +78,7 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
       <Card>
         <CardHeader>
           <CardTitle>AI instructions</CardTitle>
-          <CardDescription>Extra guidance for Aria — tone, things to always mention, things to avoid.</CardDescription>
+          <CardDescription>Extra guidance for Anushka — tone, things to always mention, things to avoid.</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea

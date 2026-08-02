@@ -24,7 +24,7 @@ export function ChatMockup() {
           <Bot className="size-4" />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">Aria · Hotel Ivory Towers</p>
+          <p className="truncate text-sm font-semibold">Anushka · Hotel Ivory Towers</p>
           <p className="text-[11px] text-muted-foreground">Online · replies in seconds</p>
         </div>
       </div>
