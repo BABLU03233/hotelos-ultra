@@ -128,7 +128,11 @@ function WhatsAppSettingsForm({ data, reload }: { data: WhatsAppStatus; reload: 
           >
             <PlugZap /> {testing ? "Testing…" : "Test connection"}
           </Button>
-          <Button onClick={save} disabled={saving || !phoneNumberId || !accessToken}>
+          <Button
+            onClick={save}
+            disabled={saving || !phoneNumberId || !accessToken}
+            className="bg-[#25D366] text-white shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_4px_14px_-4px_#25D366] hover:bg-[#20bd5a] hover:brightness-100"
+          >
             {saving ? "Saving…" : "Save connection"}
           </Button>
         </div>

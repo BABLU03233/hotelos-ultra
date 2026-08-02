@@ -62,8 +62,8 @@
   --card-foreground: #161311;
   --popover: #ffffff;
   --popover-foreground: #161311;
-  --primary: #a16207;
-  --primary-foreground: #ffffff;
+  --primary: #d9a441;
+  --primary-foreground: #161311;
   --secondary: #efeae2;
   --secondary-foreground: #161311;
   --muted: #eef0f4;
@@ -73,8 +73,8 @@
   --destructive: #dc2626;
   --border: rgba(20, 20, 30, 0.1);
   --input: rgba(20, 20, 30, 0.14);
-  --ring: #a16207;
-  --chart-1: #b8863a;
+  --ring: #d9a441;
+  --chart-1: #d9a441;
   --chart-2: #10b981;
   --chart-3: #8b5cf6;
   --chart-4: #f43f5e;
@@ -82,12 +82,12 @@
   --radius: 0.875rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #161311;
-  --sidebar-primary: #a16207;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #d9a441;
+  --sidebar-primary-foreground: #161311;
   --sidebar-accent: #eef0f4;
   --sidebar-accent-foreground: #161311;
   --sidebar-border: rgba(20, 20, 30, 0.08);
-  --sidebar-ring: #a16207;
+  --sidebar-ring: #d9a441;
 
   --font-display: var(--font-playfair), var(--font-sans);
   --glass-bg: rgba(255, 255, 255, 0.78);
@@ -147,16 +147,6 @@
   html {
     @apply font-sans;
   }
-}
-
-/* Scoped to the authenticated app/admin shells only — a software-tool
-   product reads as sharper in a geometric sans than the serif display font,
-   which is kept for the marketing/auth pages where a warmer, editorial
-   hospitality voice still fits. Overriding --font-display (not
-   --font-heading directly) here so it cascades to every existing
-   font-heading usage inside these shells with no per-component changes. */
-.app-shell {
-  --font-display: var(--font-sans);
 }
 
 /* ─── Glass surfaces ─────────────────────────────────────────────────── */

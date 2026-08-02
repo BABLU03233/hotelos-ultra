@@ -62,7 +62,16 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
                 {item.label}
               </span>
               {!item.done && (
-                <Button size="sm" variant="outline" className="border-primary text-primary" render={<Link href={item.href} />}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={
+                    item.key === "whatsapp"
+                      ? "border-[#25D366] text-[#128C4A] hover:bg-[#25D366]/10"
+                      : "border-primary text-primary"
+                  }
+                  render={<Link href={item.href} />}
+                >
                   {item.cta} →
                 </Button>
               )}
