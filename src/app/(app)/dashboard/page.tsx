@@ -32,22 +32,20 @@ export default async function DashboardPage() {
 
       <Reveal delay={60}>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-          <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} tone={5} />
+          <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} />
           <MetricCard
             label="Active chats (24h)"
             value={metrics.activeChats}
             icon={MessagesSquare}
             previous={metrics.activeChatsPrev}
-            tone={1}
           />
-          <MetricCard label="Bookings" value={metrics.bookings} icon={CalendarCheck} tone={2} />
-          <MetricCard label="Pending follow-ups" value={metrics.pendingFollowUps} icon={Clock} tone={3} />
+          <MetricCard label="Bookings" value={metrics.bookings} icon={CalendarCheck} />
+          <MetricCard label="Pending follow-ups" value={metrics.pendingFollowUps} icon={Clock} />
           <MetricCard
             label="AI conversations today"
             value={metrics.aiConversationsToday}
             icon={Bot}
             previous={metrics.aiConversationsPrev}
-            tone={4}
           />
         </div>
       </Reveal>

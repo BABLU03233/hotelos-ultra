@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user || !tenant) redirect("/login");
 
   return (
-    <div className="flex min-h-dvh w-full">
+    <div className="app-shell flex min-h-dvh w-full">
       <AuthHydrator
         user={{ id: user.id, name: user.name, email: user.email, role: user.role }}
         tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug }}

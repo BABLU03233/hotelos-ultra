@@ -12,16 +12,14 @@ interface ChecklistItem {
   done: boolean;
   href: string;
   cta: string;
-  /** chart-1..5 token index — same shared palette used across dashboard/sidebar/CRM. */
-  tone: 1 | 2 | 3 | 4 | 5;
 }
 
 export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"] }) {
   const items: ChecklistItem[] = [
-    { key: "profile", label: "Add your hotel profile", done: setup.hotelProfileComplete, href: "/settings?tab=hotel", cta: "Add", tone: 1 },
-    { key: "room", label: "Add your first room", done: setup.roomCount > 0, href: "/settings?tab=rooms", cta: "Add", tone: 3 },
-    { key: "whatsapp", label: "Connect WhatsApp", done: setup.whatsappConnected, href: "/settings?tab=whatsapp", cta: "Go", tone: 2 },
-    { key: "faq", label: "Add an FAQ", done: setup.faqCount > 0, href: "/settings?tab=faqs", cta: "Add", tone: 5 },
+    { key: "profile", label: "Add your hotel profile", done: setup.hotelProfileComplete, href: "/settings?tab=hotel", cta: "Add" },
+    { key: "room", label: "Add your first room", done: setup.roomCount > 0, href: "/settings?tab=rooms", cta: "Add" },
+    { key: "whatsapp", label: "Connect WhatsApp", done: setup.whatsappConnected, href: "/settings?tab=whatsapp", cta: "Go" },
+    { key: "faq", label: "Add an FAQ", done: setup.faqCount > 0, href: "/settings?tab=faqs", cta: "Add" },
   ];
 
   const doneCount = items.filter((i) => i.done).length;
@@ -53,26 +51,23 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-1">
-          {items.map((item) => {
-            const toneVar = `var(--color-chart-${item.tone})`;
-            return (
-              <div key={item.key} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5">
-                {item.done ? (
-                  <CheckCircle2 className="size-4 shrink-0" style={{ color: "var(--color-chart-2)" }} />
-                ) : (
-                  <Circle className="size-4 shrink-0" style={{ color: toneVar }} />
-                )}
-                <span className={cn("flex-1 text-sm", item.done ? "text-muted-foreground line-through" : "text-foreground")}>
-                  {item.label}
-                </span>
-                {!item.done && (
-                  <Button size="sm" variant="outline" style={{ borderColor: toneVar, color: toneVar }} render={<Link href={item.href} />}>
-                    {item.cta} →
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+          {items.map((item) => (
+            <div key={item.key} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5">
+              {item.done ? (
+                <CheckCircle2 className="size-4 shrink-0 text-[var(--color-chart-2)]" />
+              ) : (
+                <Circle className="size-4 shrink-0 text-muted-foreground" />
+              )}
+              <span className={cn("flex-1 text-sm", item.done ? "text-muted-foreground line-through" : "text-foreground")}>
+                {item.label}
+              </span>
+              {!item.done && (
+                <Button size="sm" variant="outline" className="border-primary text-primary" render={<Link href={item.href} />}>
+                  {item.cta} →
+                </Button>
+              )}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </Reveal>

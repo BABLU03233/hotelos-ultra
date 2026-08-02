@@ -149,6 +149,16 @@
   }
 }
 
+/* Scoped to the authenticated app/admin shells only — a software-tool
+   product reads as sharper in a geometric sans than the serif display font,
+   which is kept for the marketing/auth pages where a warmer, editorial
+   hospitality voice still fits. Overriding --font-display (not
+   --font-heading directly) here so it cascades to every existing
+   font-heading usage inside these shells with no per-component changes. */
+.app-shell {
+  --font-display: var(--font-sans);
+}
+
 /* ─── Glass surfaces ─────────────────────────────────────────────────── */
 @utility glass {
   background: var(--glass-bg);

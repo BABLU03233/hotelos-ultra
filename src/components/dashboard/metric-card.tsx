@@ -2,29 +2,23 @@ import { LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-/** Same 5-hue palette used everywhere else (charts, lead-status dots) — see globals.css chart-1..5. */
-export type MetricTone = 1 | 2 | 3 | 4 | 5;
-
 export function MetricCard({
   label,
   value,
   icon: Icon,
   previous,
-  tone = 1,
 }: {
   label: string;
   value: number | string;
   icon: LucideIcon;
   /** Comparable value for the prior period — renders a "+N vs yesterday" delta when provided. */
   previous?: number;
-  tone?: MetricTone;
 }) {
   const delta = previous !== undefined && typeof value === "number" ? value - previous : null;
-  const toneVar = `var(--color-chart-${tone})`;
 
   return (
     <Card className="relative overflow-hidden transition-shadow duration-300 hover:shadow-md">
-      <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: toneVar }} aria-hidden="true" />
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" aria-hidden="true" />
       <CardContent className="flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
@@ -42,10 +36,7 @@ export function MetricCard({
             </p>
           )}
         </div>
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg"
-          style={{ background: `color-mix(in oklch, ${toneVar}, transparent 85%)`, color: toneVar }}
-        >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-4.5" />
         </span>
       </CardContent>
