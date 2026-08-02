@@ -7,19 +7,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime, initials } from "@/lib/format";
-import { LEAD_STATUS_BORDER } from "@/lib/lead-status-colors";
+import { LEAD_STATUS_BG, LEAD_STATUS_BORDER, LEAD_STATUS_DOT, LEAD_STATUS_HEX, LEAD_STATUS_LEFT_BORDER } from "@/lib/lead-status-colors";
 import { cn } from "@/lib/utils";
 import { Contact, LeadStatus } from "@/types";
 
-const STAGES: { key: LeadStatus; label: string; tone: string }[] = [
-  { key: "NEW", label: "New", tone: LEAD_STATUS_BORDER.NEW },
-  { key: "INTERESTED", label: "Interested", tone: LEAD_STATUS_BORDER.INTERESTED },
-  { key: "FOLLOW_UP", label: "Follow-up", tone: LEAD_STATUS_BORDER.FOLLOW_UP },
-  { key: "BOOKED", label: "Booked", tone: LEAD_STATUS_BORDER.BOOKED },
-  { key: "CLOSED", label: "Closed", tone: LEAD_STATUS_BORDER.CLOSED },
+const STAGES: { key: LeadStatus; label: string; topBorder: string; leftBorder: string; bg: string; dot: string; hex: string }[] = [
+  { key: "NEW", label: "New", topBorder: LEAD_STATUS_BORDER.NEW, leftBorder: LEAD_STATUS_LEFT_BORDER.NEW, bg: LEAD_STATUS_BG.NEW, dot: LEAD_STATUS_DOT.NEW, hex: LEAD_STATUS_HEX.NEW },
+  { key: "INTERESTED", label: "Interested", topBorder: LEAD_STATUS_BORDER.INTERESTED, leftBorder: LEAD_STATUS_LEFT_BORDER.INTERESTED, bg: LEAD_STATUS_BG.INTERESTED, dot: LEAD_STATUS_DOT.INTERESTED, hex: LEAD_STATUS_HEX.INTERESTED },
+  { key: "FOLLOW_UP", label: "Follow-up", topBorder: LEAD_STATUS_BORDER.FOLLOW_UP, leftBorder: LEAD_STATUS_LEFT_BORDER.FOLLOW_UP, bg: LEAD_STATUS_BG.FOLLOW_UP, dot: LEAD_STATUS_DOT.FOLLOW_UP, hex: LEAD_STATUS_HEX.FOLLOW_UP },
+  { key: "BOOKED", label: "Booked", topBorder: LEAD_STATUS_BORDER.BOOKED, leftBorder: LEAD_STATUS_LEFT_BORDER.BOOKED, bg: LEAD_STATUS_BG.BOOKED, dot: LEAD_STATUS_DOT.BOOKED, hex: LEAD_STATUS_HEX.BOOKED },
+  { key: "CLOSED", label: "Closed", topBorder: LEAD_STATUS_BORDER.CLOSED, leftBorder: LEAD_STATUS_LEFT_BORDER.CLOSED, bg: LEAD_STATUS_BG.CLOSED, dot: LEAD_STATUS_DOT.CLOSED, hex: LEAD_STATUS_HEX.CLOSED },
 ];
 
-function PipelineCard({ contact, onSelect }: { contact: Contact; onSelect: (id: string) => void }) {
+function PipelineCard({
+  contact,
+  onSelect,
+  borderTone,
+}: {
+  contact: Contact;
+  onSelect: (id: string) => void;
+  borderTone: string;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: contact.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   const unread = !!contact.lastInboundAt && (!contact.lastReadAt || new Date(contact.lastInboundAt) > new Date(contact.lastReadAt));
@@ -32,7 +40,8 @@ function PipelineCard({ contact, onSelect }: { contact: Contact; onSelect: (id: 
       {...attributes}
       onClick={() => onSelect(contact.id)}
       className={cn(
-        "flex w-full touch-none flex-col gap-1.5 rounded-lg border border-border bg-card p-2.5 text-left shadow-sm transition-shadow hover:shadow-md",
+        "flex w-full touch-none flex-col gap-1.5 rounded-lg border-l-[3px] border-y border-r border-border bg-card p-2.5 text-left shadow-sm transition-shadow hover:shadow-md",
+        borderTone,
         isDragging && "z-10 opacity-50"
       )}
     >
@@ -80,16 +89,21 @@ function PipelineColumn({
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2">
-      <div className={cn("flex items-center justify-between border-t-2 pt-2", stage.tone)}>
-        <p className="text-xs font-semibold">{stage.label}</p>
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{contacts.length}</span>
+      <div className={cn("flex items-center justify-between border-t-2 pt-2", stage.topBorder)}>
+        <p className="flex items-center gap-1.5 text-xs font-semibold">
+          <span className={cn("size-1.5 shrink-0 rounded-full", stage.dot)} />
+          {stage.label}
+        </p>
+        <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", stage.bg)} style={{ color: stage.hex }}>
+          {contacts.length}
+        </span>
       </div>
       <div
         ref={setNodeRef}
-        className={cn("flex min-h-24 flex-1 flex-col gap-2 rounded-lg p-1 transition-colors", isOver && "bg-muted/60")}
+        className={cn("flex min-h-24 flex-1 flex-col gap-2 rounded-lg p-1 transition-colors", isOver && stage.bg)}
       >
         {contacts.map((c) => (
-          <PipelineCard key={c.id} contact={c} onSelect={onSelect} />
+          <PipelineCard key={c.id} contact={c} onSelect={onSelect} borderTone={stage.leftBorder} />
         ))}
         {contacts.length === 0 && <p className="p-4 text-center text-[10px] text-muted-foreground">No contacts</p>}
       </div>

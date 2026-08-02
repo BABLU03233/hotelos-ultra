@@ -29,3 +29,21 @@ export const LEAD_STATUS_BORDER: Record<LeadStatus, string> = {
   BOOKED: "border-t-[var(--color-chart-2)]",
   CLOSED: "border-t-muted-foreground",
 };
+
+/** Same hues as LEAD_STATUS_BORDER but for a left edge (pipeline cards) instead of a top edge (column headers). */
+export const LEAD_STATUS_LEFT_BORDER: Record<LeadStatus, string> = {
+  NEW: "border-l-[var(--color-chart-5)]",
+  INTERESTED: "border-l-[var(--color-chart-1)]",
+  FOLLOW_UP: "border-l-[var(--color-chart-3)]",
+  BOOKED: "border-l-[var(--color-chart-2)]",
+  CLOSED: "border-l-muted-foreground",
+};
+
+/** Soft translucent tint for column/section chrome — same hues, low-opacity fill instead of a hairline border. */
+export const LEAD_STATUS_BG: Record<LeadStatus, string> = {
+  NEW: "bg-[color-mix(in_oklch,var(--color-chart-5),transparent_88%)]",
+  INTERESTED: "bg-[color-mix(in_oklch,var(--color-chart-1),transparent_88%)]",
+  FOLLOW_UP: "bg-[color-mix(in_oklch,var(--color-chart-3),transparent_88%)]",
+  BOOKED: "bg-[color-mix(in_oklch,var(--color-chart-2),transparent_88%)]",
+  CLOSED: "bg-muted",
+};

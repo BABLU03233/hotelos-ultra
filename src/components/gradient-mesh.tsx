@@ -3,6 +3,7 @@ export function GradientMesh() {
   return (
     <div className="gradient-mesh" aria-hidden="true">
       <div className="mesh-blob" />
+      <div className="mesh-blob-2" />
     </div>
   );
 }

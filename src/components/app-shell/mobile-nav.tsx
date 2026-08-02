@@ -14,7 +14,7 @@ export function MobileNav({
   brandName,
   brandHref,
 }: {
-  items: readonly { href: string; label: string; icon: LucideIcon }[];
+  items: readonly { href: string; label: string; icon: LucideIcon; tone?: number | null }[];
   brandName: string;
   brandHref: string;
 }) {
@@ -42,17 +42,27 @@ export function MobileNav({
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
           {items.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const toneVar = item.tone ? `var(--color-chart-${item.tone})` : undefined;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-all duration-200",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-[0_2px_12px_-2px_var(--primary)]"
-                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  "flex items-center gap-2.5 rounded-md border-l-2 border-transparent px-2.5 py-2 text-sm font-medium transition-all duration-200",
+                  active ? "font-semibold" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                 )}
+                style={
+                  active
+                    ? toneVar
+                      ? {
+                          background: `color-mix(in oklch, ${toneVar}, transparent 88%)`,
+                          borderLeftColor: toneVar,
+                          color: toneVar,
+                        }
+                      : { background: "var(--muted)", borderLeftColor: "var(--muted-foreground)", color: "var(--foreground)" }
+                    : undefined
+                }
               >
                 <item.icon className="size-4 shrink-0" />
                 {item.label}

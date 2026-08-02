@@ -96,7 +96,8 @@
   --mesh-a: #d9a441; /* gold */
   --mesh-b: #8b5cf6; /* violet */
   --mesh-c: #10b981; /* emerald */
-  --mesh-opacity: 0.16;
+  --mesh-d: #f43f5e; /* rose */
+  --mesh-opacity: 0.22;
 }
 
 .dark {
@@ -137,7 +138,7 @@
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-highlight: rgba(255, 255, 255, 0.07);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.3);
-  --mesh-opacity: 0.28;
+  --mesh-opacity: 0.36;
 }
 
 @layer base {
@@ -171,7 +172,7 @@
 
 /* ─── Ambient gradient-mesh background ──────────────────────────────────
    Fixed, decorative, behind all content (z-index handled by placement).
-   Three soft blurred color blobs that drift slowly — purely ambient, never
+   Four soft blurred color blobs that drift slowly — purely ambient, never
    under interactive content, paused for prefers-reduced-motion. */
 .gradient-mesh {
   position: fixed;
@@ -182,7 +183,8 @@
 }
 .gradient-mesh::before,
 .gradient-mesh::after,
-.gradient-mesh .mesh-blob {
+.gradient-mesh .mesh-blob,
+.gradient-mesh .mesh-blob-2 {
   content: "";
   position: absolute;
   width: 60vmax;
@@ -212,6 +214,14 @@
   height: 45vmax;
   animation: mesh-drift-3 22s ease-in-out infinite;
 }
+.gradient-mesh .mesh-blob-2 {
+  background: var(--mesh-d);
+  bottom: 5%;
+  left: 15%;
+  width: 40vmax;
+  height: 40vmax;
+  animation: mesh-drift-4 29s ease-in-out infinite;
+}
 
 @keyframes mesh-drift-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -225,11 +235,16 @@
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(-10%, 5%) scale(0.95); }
 }
+@keyframes mesh-drift-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(7%, -6%) scale(1.06); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .gradient-mesh::before,
   .gradient-mesh::after,
-  .gradient-mesh .mesh-blob {
+  .gradient-mesh .mesh-blob,
+  .gradient-mesh .mesh-blob-2 {
     animation: none;
   }
 }
