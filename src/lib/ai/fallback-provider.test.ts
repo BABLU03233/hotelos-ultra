@@ -40,6 +40,6 @@ describe("createFallbackProvider", () => {
 
   it("throws with every provider's error message when all fail", async () => {
     const chain = createFallbackProvider([fakeProvider("fail", "a"), fakeProvider("fail", "b")]);
-    await expect(chain.chat({ systemPrompt: "sys", messages: [] })).rejects.toThrow(/a failed.*b failed/s);
+    await expect(chain.chat({ systemPrompt: "sys", messages: [] })).rejects.toThrow(/a failed[\s\S]*b failed/);
   });
 });

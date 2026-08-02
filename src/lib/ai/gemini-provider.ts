@@ -12,11 +12,15 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
-/** Free-tier alternative to anthropicProvider — same AIProvider contract, swap via AI_PROVIDER=gemini. */
+/** Free-tier alternative to anthropicProvider — same AIProvider contract, tried first in the fallback chain (see pipeline.ts). */
 export const geminiProvider: AIProvider = {
   async chat({ systemPrompt, messages }) {
     const response = await getClient().models.generateContent({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      // "-latest" alias tracks Google's current flash-tier model — pinned
+      // versions (e.g. gemini-2.5-flash) get retired from new accounts
+      // over time (confirmed: 2.5-flash already 404s "no longer available
+      // to new users" as of Aug 2026), so an alias avoids repeating that.
+      model: process.env.GEMINI_MODEL || "gemini-flash-latest",
       contents: messages.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
