@@ -23,17 +23,8 @@ export function MetricCard({
   const toneVar = `var(--color-chart-${tone})`;
 
   return (
-    <Card className="group/metric relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5">
-      <div
-        className="absolute inset-x-0 top-0 h-0.5 opacity-70"
-        style={{ background: toneVar }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -top-6 -right-6 size-24 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover/metric:opacity-25"
-        style={{ background: toneVar }}
-        aria-hidden="true"
-      />
+    <Card className="relative overflow-hidden transition-shadow duration-300 hover:shadow-md">
+      <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: toneVar }} aria-hidden="true" />
       <CardContent className="flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>

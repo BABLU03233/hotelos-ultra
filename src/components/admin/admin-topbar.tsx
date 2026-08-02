@@ -18,7 +18,7 @@ export function AdminTopbar({ name }: { name: string }) {
   }
 
   return (
-    <header className="glass relative z-10 flex h-14 items-center justify-between rounded-none border-t-0 border-r-0 border-l-0 px-4 md:px-6">
+    <header className="relative z-10 flex h-14 items-center justify-between rounded-none border-t-0 border-r-0 border-b border-l-0 border-border bg-card px-4 md:px-6">
       <div className="flex items-center gap-2">
         <MobileNav items={ADMIN_NAV_ITEMS} brandName="HotelOS Ultra — Admin" brandHref="/admin" />
         <Link href="/admin" className="flex items-center gap-2">

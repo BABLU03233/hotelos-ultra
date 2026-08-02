@@ -10,9 +10,9 @@ export function Sidebar({ hotelName }: { hotelName: string }) {
   const pathname = usePathname();
 
   return (
-    <aside className="glass-strong hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-l-0 md:flex">
+    <aside className="hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-r border-l-0 border-sidebar-border bg-sidebar md:flex">
       <div className="flex h-14 items-center gap-2 border-b border-border/60 px-4">
-        <span className="flex size-7 items-center justify-center rounded-md bg-[linear-gradient(135deg,var(--mesh-a),var(--mesh-b))] text-white shadow-[0_2px_10px_-2px_var(--mesh-a)]">
+        <span className="flex size-7 items-center justify-center rounded-md bg-[linear-gradient(135deg,var(--color-chart-1),var(--color-chart-3))] text-white shadow-[0_2px_10px_-2px_var(--color-chart-1)]">
           <Sparkles className="size-3.5" />
         </span>
         <span className="truncate font-heading text-sm font-semibold">{hotelName}</span>

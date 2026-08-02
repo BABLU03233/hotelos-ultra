@@ -38,7 +38,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
               <span
                 className="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
                 style={{
-                  background: `conic-gradient(var(--mesh-a) ${progressDeg}deg, color-mix(in oklch, var(--muted-foreground), transparent 75%) 0deg)`,
+                  background: `conic-gradient(var(--color-primary) ${progressDeg}deg, color-mix(in oklch, var(--muted-foreground), transparent 75%) 0deg)`,
                 }}
               >
                 <span className="flex size-4.5 items-center justify-center rounded-full bg-card text-[9px] font-bold text-foreground">
@@ -56,11 +56,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
           {items.map((item) => {
             const toneVar = `var(--color-chart-${item.tone})`;
             return (
-              <div
-                key={item.key}
-                className="flex items-center gap-2.5 rounded-lg px-1 py-1.5 transition-colors"
-                style={!item.done ? { background: `color-mix(in oklch, ${toneVar}, transparent 94%)` } : undefined}
-              >
+              <div key={item.key} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5">
                 {item.done ? (
                   <CheckCircle2 className="size-4 shrink-0" style={{ color: "var(--color-chart-2)" }} />
                 ) : (

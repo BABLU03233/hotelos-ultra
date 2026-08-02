@@ -16,7 +16,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="glass-strong hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-l-0 md:flex">
+    <aside className="hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-r border-l-0 border-sidebar-border bg-sidebar md:flex">
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
         {ADMIN_NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/tenants");

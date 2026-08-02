@@ -48,11 +48,13 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ─── "Aurora Glass" theme ──────────────────────────────────────────────
-   Warm gold brand color + emerald/violet/rose/blue status accents, glass
-   panels (translucent + backdrop-blur) floating over an ambient animated
-   gradient-mesh background. See .glass / .glass-strong / .gradient-mesh
-   utilities below — every <Card> uses .glass by default (src/components/ui/card.tsx). */
+/* ─── Theme ──────────────────────────────────────────────────────────────
+   Warm gold brand color + emerald/violet/rose/blue status accents on solid,
+   clearly-elevated surfaces (real bg contrast + border, not translucency) —
+   content cards need to read as solid, not hazy. .glass / .glass-strong
+   below are reserved for genuinely floating overlays (dialog, popover,
+   dropdown, sheet) that sit on top of solid content, never stacked on each
+   other. */
 :root {
   --background: #f8f7f4;
   --foreground: #161311;
@@ -88,16 +90,11 @@
   --sidebar-ring: #a16207;
 
   --font-display: var(--font-playfair), var(--font-sans);
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-bg-strong: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(255, 255, 255, 0.65);
   --glass-highlight: rgba(255, 255, 255, 0.9);
   --glass-shadow: 0 8px 32px rgba(31, 41, 55, 0.08), 0 1px 1px rgba(31, 41, 55, 0.04);
-  --mesh-a: #d9a441; /* gold */
-  --mesh-b: #8b5cf6; /* violet */
-  --mesh-c: #10b981; /* emerald */
-  --mesh-d: #f43f5e; /* rose */
-  --mesh-opacity: 0.22;
 }
 
 .dark {
@@ -116,8 +113,8 @@
   --accent: #1b2231;
   --accent-foreground: #f1f0ed;
   --destructive: #f04b4b;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.16);
+  --input: rgba(255, 255, 255, 0.18);
   --ring: #e3b458;
   --chart-1: #e3b458;
   --chart-2: #34d399;
@@ -130,15 +127,14 @@
   --sidebar-primary-foreground: #171008;
   --sidebar-accent: #1b2231;
   --sidebar-accent-foreground: #f1f0ed;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
   --sidebar-ring: #e3b458;
 
-  --glass-bg: rgba(20, 26, 38, 0.55);
-  --glass-bg-strong: rgba(20, 26, 38, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(20, 26, 38, 0.82);
+  --glass-bg-strong: rgba(20, 26, 38, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.14);
   --glass-highlight: rgba(255, 255, 255, 0.07);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.3);
-  --mesh-opacity: 0.36;
 }
 
 @layer base {
@@ -168,83 +164,4 @@
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-}
-
-/* ─── Ambient gradient-mesh background ──────────────────────────────────
-   Fixed, decorative, behind all content (z-index handled by placement).
-   Four soft blurred color blobs that drift slowly — purely ambient, never
-   under interactive content, paused for prefers-reduced-motion. */
-.gradient-mesh {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-.gradient-mesh::before,
-.gradient-mesh::after,
-.gradient-mesh .mesh-blob,
-.gradient-mesh .mesh-blob-2 {
-  content: "";
-  position: absolute;
-  width: 60vmax;
-  height: 60vmax;
-  border-radius: 9999px;
-  filter: blur(90px);
-  opacity: var(--mesh-opacity);
-  will-change: transform;
-}
-.gradient-mesh::before {
-  background: var(--mesh-a);
-  top: -20%;
-  left: -10%;
-  animation: mesh-drift-1 26s ease-in-out infinite;
-}
-.gradient-mesh::after {
-  background: var(--mesh-b);
-  bottom: -25%;
-  right: -10%;
-  animation: mesh-drift-2 32s ease-in-out infinite;
-}
-.gradient-mesh .mesh-blob {
-  background: var(--mesh-c);
-  top: 30%;
-  right: 20%;
-  width: 45vmax;
-  height: 45vmax;
-  animation: mesh-drift-3 22s ease-in-out infinite;
-}
-.gradient-mesh .mesh-blob-2 {
-  background: var(--mesh-d);
-  bottom: 5%;
-  left: 15%;
-  width: 40vmax;
-  height: 40vmax;
-  animation: mesh-drift-4 29s ease-in-out infinite;
-}
-
-@keyframes mesh-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(8%, 6%) scale(1.08); }
-}
-@keyframes mesh-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-6%, -8%) scale(1.05); }
-}
-@keyframes mesh-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-10%, 5%) scale(0.95); }
-}
-@keyframes mesh-drift-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(7%, -6%) scale(1.06); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gradient-mesh::before,
-  .gradient-mesh::after,
-  .gradient-mesh .mesh-blob,
-  .gradient-mesh .mesh-blob-2 {
-    animation: none;
-  }
 }
