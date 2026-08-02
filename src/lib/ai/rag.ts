@@ -1,8 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { voyageEmbeddingProvider } from "./embeddings";
+import { geminiEmbeddingProvider } from "./gemini-embedding-provider";
 import { EmbeddingProvider } from "./provider";
 
-const embeddingProvider: EmbeddingProvider = voyageEmbeddingProvider;
+// Unlike the chat providers (pipeline.ts), this is a single pick, NOT a
+// per-call fallback chain: embeddings from different models live in
+// different vector spaces, so a document indexed with one provider and a
+// query embedded with another would produce meaningless similarity scores
+// even though both happen to output 1024 dimensions. Prefers Voyage (the
+// original/most-tested path) when configured, otherwise falls back to the
+// free Gemini embeddings once and stays on it consistently.
+const embeddingProvider: EmbeddingProvider = process.env.VOYAGE_API_KEY ? voyageEmbeddingProvider : geminiEmbeddingProvider;
 
 /** Simple fixed-size character chunking with overlap — fine for an MVP; swap for a token-aware splitter later if needed. */
 export function chunkText(text: string, chunkSize = 1000, overlap = 150): string[] {
