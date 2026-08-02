@@ -12,6 +12,11 @@ import { EmbeddingProvider } from "./provider";
 // free Gemini embeddings once and stays on it consistently.
 const embeddingProvider: EmbeddingProvider = process.env.VOYAGE_API_KEY ? voyageEmbeddingProvider : geminiEmbeddingProvider;
 
+/** True once either embedding provider has a key configured — kept next to the selection above so the two can't drift apart. */
+export function hasEmbeddingProvider(): boolean {
+  return !!(process.env.VOYAGE_API_KEY || process.env.GEMINI_API_KEY);
+}
+
 /** Simple fixed-size character chunking with overlap — fine for an MVP; swap for a token-aware splitter later if needed. */
 export function chunkText(text: string, chunkSize = 1000, overlap = 150): string[] {
   const cleaned = text.replace(/\s+/g, " ").trim();

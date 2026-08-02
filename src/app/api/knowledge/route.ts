@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiError, apiRoute } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
-import { embedAndStoreDocument } from "@/lib/ai/rag";
+import { embedAndStoreDocument, hasEmbeddingProvider } from "@/lib/ai/rag";
 import { extractTextFromPdf } from "@/lib/knowledge/extract-text";
 import { uploadObject } from "@/lib/storage/s3";
 
@@ -61,10 +61,10 @@ export const POST = apiRoute(async (req: NextRequest) => {
 
   if (!rawText && !sourceUrl) throw new ApiError(400, "Provide either a file or text content");
 
-  if (rawText && !process.env.VOYAGE_API_KEY) {
+  if (rawText && !hasEmbeddingProvider()) {
     throw new ApiError(
       400,
-      "Add a Voyage AI API key (VOYAGE_API_KEY) before uploading text-based knowledge — Aria can't search it without one."
+      "No embedding provider is configured yet (VOYAGE_API_KEY or GEMINI_API_KEY) — Aria can't search text-based knowledge without one."
     );
   }
 
