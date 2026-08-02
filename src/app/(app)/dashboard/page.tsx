@@ -23,15 +23,15 @@ export default async function DashboardPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <Reveal>
         <div>
-          <h1 className="font-heading text-xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">What&apos;s happening across your WhatsApp pipeline right now.</p>
+          <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">What&apos;s happening across your WhatsApp pipeline right now.</p>
         </div>
       </Reveal>
 
       <OnboardingChecklist setup={metrics.setup} />
 
       <Reveal delay={60}>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-5">
           <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} />
           <MetricCard
             label="Active chats (24h)"

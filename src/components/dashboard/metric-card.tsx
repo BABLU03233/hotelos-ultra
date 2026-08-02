@@ -17,16 +17,18 @@ export function MetricCard({
   const delta = previous !== undefined && typeof value === "number" ? value - previous : null;
 
   return (
-    <Card className="relative overflow-hidden transition-shadow duration-300 hover:shadow-md">
-      <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" aria-hidden="true" />
-      <CardContent className="flex items-center justify-between">
+    <Card variant="flat" className="border-b border-border pb-4">
+      <CardContent className="flex items-start justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+          <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            <Icon className="size-3.5" />
+            {label}
+          </p>
+          <p className="mt-2 text-5xl font-semibold tracking-tight tabular-nums">{value}</p>
           {delta !== null && (
             <p
               className={cn(
-                "mt-0.5 flex items-center gap-0.5 text-[11px] font-medium",
+                "mt-1.5 flex items-center gap-0.5 text-[11px] font-medium",
                 delta > 0 ? "text-emerald-600" : delta < 0 ? "text-muted-foreground" : "text-muted-foreground"
               )}
             >
@@ -36,9 +38,6 @@ export function MetricCard({
             </p>
           )}
         </div>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="size-4.5" />
-        </span>
       </CardContent>
     </Card>
   );

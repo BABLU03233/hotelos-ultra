@@ -7,14 +7,16 @@ function Card({
   size = "default",
   variant = "solid",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm"; variant?: "solid" | "glass" }) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm"; variant?: "solid" | "glass" | "flat" }) {
   return (
     <div
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm text-card-foreground transition-[transform,box-shadow] duration-300 hover:-translate-y-px hover:shadow-md [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        variant === "glass" ? "glass" : "border border-border bg-card shadow-sm",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm text-card-foreground transition-[transform,box-shadow] duration-300 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        variant === "glass" && "glass hover:-translate-y-px hover:shadow-md",
+        variant === "solid" && "border border-border bg-card shadow-sm hover:-translate-y-px hover:shadow-md",
+        variant === "flat" && "border-transparent bg-transparent shadow-none",
         className
       )}
       {...props}

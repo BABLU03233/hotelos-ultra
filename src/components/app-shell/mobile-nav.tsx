@@ -48,10 +48,10 @@ export function MobileNav({
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2 text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2 text-sm tracking-wide transition-all duration-200",
                   active
                     ? "border-primary bg-[color-mix(in_oklch,var(--primary),transparent_88%)] font-semibold text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                    : "border-transparent font-normal text-muted-foreground/80 hover:bg-foreground/5 hover:text-foreground"
                 )}
               >
                 <item.icon className="size-4 shrink-0" />
