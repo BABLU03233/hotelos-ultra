@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
 import { CampaignMessageType, Contact, LeadSource, LeadStatus } from "@/types";
 
@@ -55,7 +56,6 @@ const SOURCE_FILTERS: { key: LeadSource | "ALL"; label: string }[] = [
 export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
-  const [type, setType] = React.useState("weekend_offer");
   const [messageType, setMessageType] = React.useState<CampaignMessageType>("TEXT");
   const [body, setBody] = React.useState("");
   const [mediaUrl, setMediaUrl] = React.useState("");
@@ -98,7 +98,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
         method: "POST",
         body: JSON.stringify({
           name,
-          type,
+          type: slugify(name) || "campaign",
           messageType,
           body: body || null,
           mediaUrl: mediaUrl || null,
@@ -134,15 +134,9 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Weekend Offer — Nov" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Type</Label>
-              <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="weekend_offer" />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Weekend Offer — Nov" />
           </div>
 
           <div className="flex flex-col gap-1.5">
