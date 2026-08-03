@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UploadKnowledgeDialog } from "@/components/knowledge/upload-knowledge-dialog";
 import { Reveal } from "@/components/motion/reveal";
+import { SkeletonSwap } from "@/components/motion/skeleton-swap";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
@@ -32,26 +34,39 @@ export default function KnowledgePage() {
       </Reveal>
 
       <div className="flex flex-col gap-3">
-        {loading || !data
-          ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
-          : data.docs.map((doc) => (
-              <Card key={doc.id}>
-                <CardContent className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {doc.type === "IMAGE" ? <ImageIcon className="size-4.5" /> : <FileText className="size-4.5" />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{doc.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {doc.type} · {doc._count?.chunks ?? 0} indexed chunks · {formatDate(doc.createdAt)}
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="icon-sm" onClick={() => remove(doc.id)}>
-                    <Trash2 className="text-destructive" />
-                  </Button>
-                </CardContent>
-              </Card>
+        <SkeletonSwap
+          showSkeleton={loading || !data}
+          skeleton={
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            {data?.docs.map((doc, i) => (
+              <StaggerItem key={doc.id} index={i}>
+                <Card>
+                  <CardContent className="flex items-center gap-3">
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      {doc.type === "IMAGE" ? <ImageIcon className="size-4.5" /> : <FileText className="size-4.5" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.type} · {doc._count?.chunks ?? 0} indexed chunks · {formatDate(doc.createdAt)}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon-sm" onClick={() => remove(doc.id)}>
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
             ))}
+          </div>
+        </SkeletonSwap>
         {!loading && data?.docs.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <BookOpen className="size-8" />

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-config";
@@ -26,12 +27,19 @@ export function Sidebar({ hotelName }: { hotelName: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-1.5 text-sm tracking-wide transition-all duration-200",
+                "relative flex items-center gap-2.5 rounded-md border-l-2 border-transparent px-2.5 py-1.5 text-sm tracking-wide transition-all duration-200",
                 active
-                  ? "border-primary bg-[color-mix(in_oklch,var(--primary),transparent_88%)] font-semibold text-primary"
-                  : "border-transparent font-normal text-muted-foreground/80 hover:bg-foreground/5 hover:text-foreground"
+                  ? "bg-[color-mix(in_oklch,var(--primary),transparent_88%)] font-semibold text-primary"
+                  : "font-normal text-muted-foreground/80 hover:bg-foreground/5 hover:text-foreground"
               )}
             >
+              {active && (
+                <motion.span
+                  layoutId="sidebar-nav-indicator"
+                  className="absolute inset-y-0 left-0 w-0.5 rounded-full bg-primary"
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                />
+              )}
               <item.icon className="size-4 shrink-0" />
               {item.label}
             </Link>

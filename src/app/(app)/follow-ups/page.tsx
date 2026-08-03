@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FollowUpActivity } from "@/components/follow-ups/follow-up-activity";
 import { FollowUpRuleCard } from "@/components/follow-ups/follow-up-rule-card";
 import { Reveal } from "@/components/motion/reveal";
+import { SkeletonSwap } from "@/components/motion/skeleton-swap";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { FollowUpRule } from "@/types";
@@ -45,11 +47,24 @@ export default function FollowUpsPage() {
       </Reveal>
 
       <div className="flex flex-col gap-3">
-        {loading || !data
-          ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
-          : data.rules.map((rule, i) => (
-              <FollowUpRuleCard key={rule.id} rule={rule} isLast={i === data.rules.length - 1} onChanged={reload} />
+        <SkeletonSwap
+          showSkeleton={loading || !data}
+          skeleton={
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full rounded-xl" />
+              ))}
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            {data?.rules.map((rule, i) => (
+              <StaggerItem key={rule.id} index={i}>
+                <FollowUpRuleCard rule={rule} isLast={i === data.rules.length - 1} onChanged={reload} />
+              </StaggerItem>
             ))}
+          </div>
+        </SkeletonSwap>
         {!loading && data?.rules.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Clock className="size-8" />

@@ -5,6 +5,8 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonSwap } from "@/components/motion/skeleton-swap";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { cn } from "@/lib/utils";
 import { Contact, LeadStatus } from "@/types";
@@ -67,11 +69,24 @@ export function ContactList({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-1 pr-2">
-          {loading || !data
-            ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
-            : data.contacts.map((c) => (
-                <ContactListItem key={c.id} contact={c} active={c.id === selectedId} onClick={() => onSelect(c.id)} />
+          <SkeletonSwap
+            showSkeleton={loading || !data}
+            skeleton={
+              <div className="flex flex-col gap-1">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            }
+          >
+            <div className="flex flex-col gap-1">
+              {data?.contacts.map((c, i) => (
+                <StaggerItem key={c.id} index={i}>
+                  <ContactListItem contact={c} active={c.id === selectedId} onClick={() => onSelect(c.id)} />
+                </StaggerItem>
               ))}
+            </div>
+          </SkeletonSwap>
           {!loading && data?.contacts.length === 0 && (
             <p className="px-2 py-8 text-center text-sm text-muted-foreground">No contacts yet.</p>
           )}

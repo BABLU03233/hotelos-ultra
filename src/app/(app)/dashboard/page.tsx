@@ -1,6 +1,7 @@
 import { Bot, CalendarCheck, Clock, MessagesSquare, UserPlus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { DashboardAttentionPanel } from "@/components/dashboard/attention-panel";
 import { CampaignPerformanceChart } from "@/components/dashboard/campaign-performance-chart";
 import { LeadFunnelChart } from "@/components/dashboard/lead-funnel-chart";
@@ -30,25 +31,33 @@ export default async function DashboardPage() {
 
       <OnboardingChecklist setup={metrics.setup} />
 
-      <Reveal delay={60}>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-5">
+        <StaggerItem index={0}>
           <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} />
+        </StaggerItem>
+        <StaggerItem index={1}>
           <MetricCard
             label="Active chats (24h)"
             value={metrics.activeChats}
             icon={MessagesSquare}
             previous={metrics.activeChatsPrev}
           />
+        </StaggerItem>
+        <StaggerItem index={2}>
           <MetricCard label="Bookings" value={metrics.bookings} icon={CalendarCheck} />
+        </StaggerItem>
+        <StaggerItem index={3}>
           <MetricCard label="Pending follow-ups" value={metrics.pendingFollowUps} icon={Clock} />
+        </StaggerItem>
+        <StaggerItem index={4}>
           <MetricCard
             label="AI conversations today"
             value={metrics.aiConversationsToday}
             icon={Bot}
             previous={metrics.aiConversationsPrev}
           />
-        </div>
-      </Reveal>
+        </StaggerItem>
+      </div>
 
       <Reveal delay={120}>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

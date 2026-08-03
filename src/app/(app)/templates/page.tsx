@@ -1,4 +1,5 @@
 import { Reveal } from "@/components/motion/reveal";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { TemplateCard } from "@/components/templates/template-card";
 import { WA_TEMPLATES } from "@/lib/wa-templates";
 
@@ -15,13 +16,13 @@ export default function TemplatesPage() {
         </div>
       </Reveal>
 
-      <Reveal delay={60}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {WA_TEMPLATES.map((t) => (
-            <TemplateCard key={t.id} template={t} />
-          ))}
-        </div>
-      </Reveal>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {WA_TEMPLATES.map((t, i) => (
+          <StaggerItem key={t.id} index={i}>
+            <TemplateCard template={t} />
+          </StaggerItem>
+        ))}
+      </div>
     </div>
   );
 }

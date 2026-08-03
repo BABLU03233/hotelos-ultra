@@ -2,8 +2,11 @@
 
 import * as React from "react";
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import { Inbox } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonSwap } from "@/components/motion/skeleton-swap";
+import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime, initials } from "@/lib/format";
@@ -102,10 +105,17 @@ function PipelineColumn({
         ref={setNodeRef}
         className={cn("flex min-h-24 flex-1 flex-col gap-2 rounded-lg p-1 transition-colors", isOver && stage.bg)}
       >
-        {contacts.map((c) => (
-          <PipelineCard key={c.id} contact={c} onSelect={onSelect} borderTone={stage.leftBorder} />
+        {contacts.map((c, i) => (
+          <StaggerItem key={c.id} index={i}>
+            <PipelineCard contact={c} onSelect={onSelect} borderTone={stage.leftBorder} />
+          </StaggerItem>
         ))}
-        {contacts.length === 0 && <p className="p-4 text-center text-[10px] text-muted-foreground">No contacts</p>}
+        {contacts.length === 0 && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center">
+            <Inbox className="size-5 text-muted-foreground opacity-30" />
+            <p className="text-[10px] text-muted-foreground">No contacts</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -130,28 +140,29 @@ export function CrmPipelineView({ onSelect, reloadToken }: { onSelect: (id: stri
     reload();
   }
 
-  if (loading || !data) {
-    return (
-      <div className="flex h-full gap-3 p-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-full w-64 shrink-0" />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="flex h-full gap-3 overflow-x-auto p-3">
-        {STAGES.map((stage) => (
-          <PipelineColumn
-            key={stage.key}
-            stage={stage}
-            contacts={data.contacts.filter((c) => c.leadStatus === stage.key)}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
-    </DndContext>
+    <SkeletonSwap
+      showSkeleton={loading || !data}
+      skeleton={
+        <div className="flex h-full gap-3 p-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-full w-64 shrink-0" />
+          ))}
+        </div>
+      }
+    >
+      <DndContext onDragEnd={handleDragEnd}>
+        <div className="flex h-full gap-3 overflow-x-auto p-3">
+          {STAGES.map((stage) => (
+            <PipelineColumn
+              key={stage.key}
+              stage={stage}
+              contacts={data?.contacts.filter((c) => c.leadStatus === stage.key) ?? []}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      </DndContext>
+    </SkeletonSwap>
   );
 }

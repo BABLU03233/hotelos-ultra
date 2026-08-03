@@ -1,5 +1,6 @@
 import { LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { AnimatedValue } from "@/components/dashboard/animated-value";
 import { cn } from "@/lib/utils";
 
 export function MetricCard({
@@ -24,7 +25,7 @@ export function MetricCard({
             <Icon className="size-3.5" />
             {label}
           </p>
-          <p className="mt-2 text-5xl font-semibold tracking-tight tabular-nums">{value}</p>
+          <AnimatedValue value={value} className="mt-2 text-5xl font-semibold tracking-tight tabular-nums" />
           {delta !== null && (
             <p
               className={cn(
