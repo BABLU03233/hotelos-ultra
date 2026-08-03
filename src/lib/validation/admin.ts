@@ -19,3 +19,9 @@ export const adminUpdateTenantSchema = z.object({
   subscriptionStatus: z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "CANCELLED"]).optional(),
   planFeeInPaise: z.number().int().min(0).optional(),
 });
+
+export const adminChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+export type AdminChangePasswordInput = z.infer<typeof adminChangePasswordSchema>;

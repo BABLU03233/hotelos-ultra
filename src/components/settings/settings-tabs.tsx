@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountSettings } from "@/components/settings/account-settings";
 import { FaqsSettings } from "@/components/settings/faqs-settings";
 import { HotelSettings } from "@/components/settings/hotel-settings";
 import { OffersSettings } from "@/components/settings/offers-settings";
@@ -8,7 +9,7 @@ import { StaffSettings } from "@/components/settings/staff-settings";
 import { WhatsAppSettings } from "@/components/settings/whatsapp-settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const VALID_TABS = ["hotel", "rooms", "faqs", "offers", "whatsapp", "staff"] as const;
+const VALID_TABS = ["hotel", "rooms", "faqs", "offers", "whatsapp", "staff", "account"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
 
 function resolveTab(tab: string | undefined): SettingsTab {
@@ -25,6 +26,7 @@ export function SettingsTabs({ initialTab }: { initialTab?: string }) {
         <TabsTrigger value="offers">Offers</TabsTrigger>
         <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         <TabsTrigger value="staff">Staff</TabsTrigger>
+        <TabsTrigger value="account">Account</TabsTrigger>
       </TabsList>
 
       <TabsContent value="hotel" className="mt-4">
@@ -44,6 +46,9 @@ export function SettingsTabs({ initialTab }: { initialTab?: string }) {
       </TabsContent>
       <TabsContent value="staff" className="mt-4">
         <StaffSettings />
+      </TabsContent>
+      <TabsContent value="account" className="mt-4">
+        <AccountSettings />
       </TabsContent>
     </Tabs>
   );

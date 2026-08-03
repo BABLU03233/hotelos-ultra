@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CreditCard, ShieldCheck } from "lucide-react";
+import { Building2, CreditCard, ShieldCheck, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const ADMIN_NAV_ITEMS = [{ href: "/admin", label: "Tenants", icon: Building2 }] as const;
+export const ADMIN_NAV_ITEMS = [
+  { href: "/admin", label: "Tenants", icon: Building2 },
+  { href: "/admin/account", label: "Account", icon: UserCog },
+] as const;
 
 const COMING_SOON = [
   { label: "Billing", icon: CreditCard },
