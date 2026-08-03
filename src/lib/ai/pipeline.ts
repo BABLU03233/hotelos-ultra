@@ -38,14 +38,16 @@ function buildConversationContext(context?: ReplyContext): string {
 
   const languageAsk =
     "If it's not already obvious from how they wrote (e.g. they messaged you in Hindi or Telugu already), casually ask which language they'd prefer — English, Hindi, or Telugu — as part of your first message, so the rest of the conversation happens in whatever's easiest for them.";
+  const introduceYourself =
+    "Start by introducing yourself — your name and that you're with the hotel (e.g. \"Hi, I'm Anushka from [hotel name]!\") — before getting into their question, so they know who they're talking to.";
 
   if (context.isFirstReply && context.leadSource === "META_AD") {
     const about = context.sourceDetail ? ` about "${context.sourceDetail}"` : "";
-    return `\nCONVERSATION CONTEXT\nThis is a brand-new enquiry from a Meta ad${about} — they're warm and primed. Open with energy, reference what likely drew them in, and get straight to being useful. ${languageAsk}\n`;
+    return `\nCONVERSATION CONTEXT\nThis is a brand-new enquiry from a Meta ad${about} — they're warm and primed. ${introduceYourself} Reference what likely drew them in, and get straight to being useful. ${languageAsk}\n`;
   }
 
   if (context.isFirstReply) {
-    return `\nCONVERSATION CONTEXT\nThis is the first time you're speaking to this guest. ${languageAsk}\n`;
+    return `\nCONVERSATION CONTEXT\nThis is the first time you're speaking to this guest. ${introduceYourself} ${languageAsk}\n`;
   }
 
   if (context.daysSinceLastInbound !== null && context.daysSinceLastInbound > 14) {
