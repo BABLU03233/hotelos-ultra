@@ -1,4 +1,5 @@
 import { MessageStatus, MessageType } from "@/generated/prisma/enums";
+import { transcribeAudio } from "@/lib/ai/transcription";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { downloadMedia, getMediaUrl } from "@/lib/whatsapp/client";
@@ -22,13 +23,18 @@ function mapMessageType(type: InboundMessage["type"]): MessageType {
   }
 }
 
-async function storeInboundMedia(tenantId: string, msg: InboundMessage): Promise<string | null> {
+async function storeInboundMedia(
+  tenantId: string,
+  msg: InboundMessage
+): Promise<{ mediaUrl: string; buffer: Buffer; contentType: string } | null> {
   if (!msg.mediaId) return null;
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) return null;
   const { url, mimeType } = await getMediaUrl(creds, msg.mediaId);
   const { buffer, contentType } = await downloadMedia(creds, url);
-  return uploadObject(tenantId, "inbound-media", buffer, contentType || mimeType, msg.mediaId);
+  const resolvedType = contentType || mimeType;
+  const mediaUrl = await uploadObject(tenantId, "inbound-media", buffer, resolvedType, msg.mediaId);
+  return { mediaUrl, buffer, contentType: resolvedType };
 }
 
 /**
@@ -50,7 +56,19 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (existing) return;
   }
 
-  const preview = msg.text ?? `[${msg.type}]`;
+  const media = msg.mediaId ? await storeInboundMedia(tenant.id, msg).catch((err) => (console.error(err), null)) : null;
+
+  let content = msg.text;
+  if (!content && msg.type === "audio" && media) {
+    content = await transcribeAudio(media.buffer, media.contentType)
+      .then((text) => (text ? `🎤 ${text}` : null))
+      .catch((err) => {
+        console.error(`Voice note transcription failed for tenant ${tenant.id}:`, err);
+        return null;
+      });
+  }
+
+  const preview = content ?? `[${msg.type}]`;
   const now = new Date();
 
   const contact = await prisma.contact.upsert({
@@ -76,16 +94,14 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     },
   });
 
-  const mediaUrl = msg.mediaId ? await storeInboundMedia(tenant.id, msg).catch((err) => (console.error(err), null)) : null;
-
   const messageRow = await prisma.message.create({
     data: {
       tenantId: tenant.id,
       contactId: contact.id,
       direction: "IN",
       type: mapMessageType(msg.type),
-      content: msg.text,
-      mediaUrl,
+      content,
+      mediaUrl: media?.mediaUrl ?? null,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",
     },
