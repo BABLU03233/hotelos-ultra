@@ -14,23 +14,27 @@ export function SkeletonSwap({
   showSkeleton,
   skeleton,
   children,
+  className,
 }: {
   showSkeleton: boolean;
   skeleton: React.ReactNode;
   children: React.ReactNode;
+  /** Applied to the wrapper around whichever branch is showing — pass e.g. "h-full" if a caller's content relies on filling its parent's height. */
+  className?: string;
 }) {
   const reduceMotion = useReducedMotion();
   const [revealed, setRevealed] = React.useState(false);
   const showContent = revealed || !showSkeleton;
   if (!showSkeleton && !revealed) setRevealed(true);
 
-  if (reduceMotion) return <>{showContent ? children : skeleton}</>;
+  if (reduceMotion) return <div className={className}>{showContent ? children : skeleton}</div>;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       {showContent ? (
         <motion.div
           key="content"
+          className={className}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -41,6 +45,7 @@ export function SkeletonSwap({
       ) : (
         <motion.div
           key="skeleton"
+          className={className}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

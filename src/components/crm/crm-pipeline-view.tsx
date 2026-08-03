@@ -143,6 +143,7 @@ export function CrmPipelineView({ onSelect, reloadToken }: { onSelect: (id: stri
   return (
     <SkeletonSwap
       showSkeleton={loading || !data}
+      className="h-full"
       skeleton={
         <div className="flex h-full gap-3 p-3">
           {Array.from({ length: 5 }).map((_, i) => (
