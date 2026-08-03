@@ -23,18 +23,14 @@ function mapMessageType(type: InboundMessage["type"]): MessageType {
   }
 }
 
-async function storeInboundMedia(
-  tenantId: string,
-  msg: InboundMessage
-): Promise<{ mediaUrl: string; buffer: Buffer; contentType: string } | null> {
+/** Downloads the raw bytes from WhatsApp — needed for transcription regardless of whether object storage is configured. */
+async function downloadInboundMedia(tenantId: string, msg: InboundMessage): Promise<{ buffer: Buffer; contentType: string } | null> {
   if (!msg.mediaId) return null;
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) return null;
   const { url, mimeType } = await getMediaUrl(creds, msg.mediaId);
   const { buffer, contentType } = await downloadMedia(creds, url);
-  const resolvedType = contentType || mimeType;
-  const mediaUrl = await uploadObject(tenantId, "inbound-media", buffer, resolvedType, msg.mediaId);
-  return { mediaUrl, buffer, contentType: resolvedType };
+  return { buffer, contentType: contentType || mimeType };
 }
 
 /**
@@ -56,11 +52,22 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (existing) return;
   }
 
-  const media = msg.mediaId ? await storeInboundMedia(tenant.id, msg).catch((err) => (console.error(err), null)) : null;
+  const downloaded = msg.mediaId ? await downloadInboundMedia(tenant.id, msg).catch((err) => (console.error(err), null)) : null;
+
+  // Storing to S3 is best-effort (lets the CRM show the original attachment)
+  // and deliberately kept separate from transcription below — a broken/
+  // unconfigured bucket shouldn't also block Anushka from understanding a
+  // voice note, since transcription only needs the bytes, not a stored URL.
+  const mediaUrl = downloaded
+    ? await uploadObject(tenant.id, "inbound-media", downloaded.buffer, downloaded.contentType, msg.mediaId ?? undefined).catch((err) => {
+        console.error(`Failed to store inbound media for tenant ${tenant.id}:`, err);
+        return null;
+      })
+    : null;
 
   let content = msg.text;
-  if (!content && msg.type === "audio" && media) {
-    content = await transcribeAudio(media.buffer, media.contentType)
+  if (!content && msg.type === "audio" && downloaded) {
+    content = await transcribeAudio(downloaded.buffer, downloaded.contentType)
       .then((text) => (text ? `🎤 ${text}` : null))
       .catch((err) => {
         console.error(`Voice note transcription failed for tenant ${tenant.id}:`, err);
@@ -101,7 +108,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       direction: "IN",
       type: mapMessageType(msg.type),
       content,
-      mediaUrl: media?.mediaUrl ?? null,
+      mediaUrl,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",
     },
