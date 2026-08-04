@@ -37,6 +37,12 @@ const MESSAGE_TYPE_LABELS: Record<CampaignMessageType, string> = {
   TEMPLATE: "Approved template",
 };
 
+const MESSAGE_TYPE_HELP: Record<CampaignMessageType, string> = {
+  TEXT: "A free-text message, only deliverable to contacts inside the 24h window (recent inbound message).",
+  IMAGE: "An image with an optional caption, same 24h-window rule as text.",
+  TEMPLATE: "A Meta-approved template — the only way to reach contacts outside the 24h window.",
+};
+
 const SEGMENT_FILTERS: { key: LeadStatus | "ALL"; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "NEW", label: "New" },
@@ -153,11 +159,15 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-[11px] text-muted-foreground">{MESSAGE_TYPE_HELP[messageType]}</p>
           </div>
 
           {messageType === "TEMPLATE" ? (
             <div className="flex flex-col gap-1.5">
-              <Label>Approved template name</Label>
+              <Label>Meta-approved template name</Label>
+              <p className="-mt-1 text-[11px] text-muted-foreground">
+                Different from the Templates tab&apos;s starter copy — must match one already approved in Meta Business Manager.
+              </p>
               <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="weekend_offer_v1" />
             </div>
           ) : (

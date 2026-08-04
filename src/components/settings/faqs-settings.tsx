@@ -4,7 +4,17 @@ import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
@@ -38,16 +48,61 @@ function FaqRow({ faq, onChanged }: { faq: Faq; onChanged: () => void }) {
   );
 }
 
+function AddFaqDialog({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [question, setQuestion] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await apiFetch("/api/settings/faqs", {
+        method: "POST",
+        body: JSON.stringify({ question: question.trim(), answer: "" }),
+      });
+      setOpen(false);
+      setQuestion("");
+      onAdded();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="mt-3">
+            <Plus /> Add FAQ
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add a frequently asked question</DialogTitle>
+          <DialogDescription>You&apos;ll fill in the answer right after.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <Label>Question</Label>
+          <Input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g. Do you have free parking?"
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button onClick={submit} disabled={submitting || !question.trim()}>
+            {submitting ? "Adding…" : "Add FAQ"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function FaqsSettings() {
   const { data, loading, reload } = useFetch<{ faqs: Faq[] }>("/api/settings/faqs");
-
-  async function addFaq() {
-    await apiFetch("/api/settings/faqs", {
-      method: "POST",
-      body: JSON.stringify({ question: "New question", answer: "New answer" }),
-    });
-    reload();
-  }
 
   return (
     <Card>
@@ -66,9 +121,7 @@ export function FaqsSettings() {
             ))}
           </div>
         )}
-        <Button variant="outline" onClick={addFaq} className="mt-3">
-          <Plus /> Add FAQ
-        </Button>
+        <AddFaqDialog onAdded={reload} />
       </CardContent>
     </Card>
   );

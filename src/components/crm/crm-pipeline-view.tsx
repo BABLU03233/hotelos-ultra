@@ -5,12 +5,20 @@ import { DndContext, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/c
 import { Inbox } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime, initials } from "@/lib/format";
-import { LEAD_STATUS_BG, LEAD_STATUS_BORDER, LEAD_STATUS_DOT, LEAD_STATUS_HEX, LEAD_STATUS_LEFT_BORDER } from "@/lib/lead-status-colors";
+import {
+  LEAD_STATUS_BG,
+  LEAD_STATUS_BORDER,
+  LEAD_STATUS_DESCRIPTION,
+  LEAD_STATUS_DOT,
+  LEAD_STATUS_HEX,
+  LEAD_STATUS_LEFT_BORDER,
+} from "@/lib/lead-status-colors";
 import { cn } from "@/lib/utils";
 import { Contact, LeadStatus } from "@/types";
 
@@ -93,10 +101,17 @@ function PipelineColumn({
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2">
       <div className={cn("flex items-center justify-between border-t-2 pt-2", stage.topBorder)}>
-        <p className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={cn("size-1.5 shrink-0 rounded-full", stage.dot)} />
-          {stage.label}
-        </p>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <p className="flex cursor-help items-center gap-1.5 text-xs font-semibold">
+                <span className={cn("size-1.5 shrink-0 rounded-full", stage.dot)} />
+                {stage.label}
+              </p>
+            }
+          />
+          <TooltipContent>{LEAD_STATUS_DESCRIPTION[stage.key]}</TooltipContent>
+        </Tooltip>
         <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", stage.bg)} style={{ color: stage.hex }}>
           {contacts.length}
         </span>

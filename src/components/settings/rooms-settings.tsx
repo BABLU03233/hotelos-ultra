@@ -4,6 +4,15 @@ import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +54,12 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Type</Label>
-            <Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} onBlur={save} />
+            <Input
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              onBlur={save}
+              placeholder="e.g. Standard, Deluxe, Suite"
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Price / night (₹)</Label>
@@ -74,16 +88,64 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
   );
 }
 
+function AddRoomDialog({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [type, setType] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await apiFetch("/api/settings/rooms", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), type: type.trim() || "Standard", price: 2500, capacity: 2 }),
+      });
+      setOpen(false);
+      setName("");
+      setType("");
+      onAdded();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="w-fit">
+            <Plus /> Add room
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add a room</DialogTitle>
+          <DialogDescription>You can fill in price, sleeps, and description right after.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Classic Room" autoFocus />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Type</Label>
+            <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. Standard, Deluxe, Suite" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={submit} disabled={submitting || !name.trim()}>
+            {submitting ? "Adding…" : "Add room"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function RoomsSettings() {
   const { data, loading, reload } = useFetch<{ rooms: Room[] }>("/api/settings/rooms");
-
-  async function addRoom() {
-    await apiFetch("/api/settings/rooms", {
-      method: "POST",
-      body: JSON.stringify({ name: "New Room", type: "Standard", price: 2500, capacity: 2 }),
-    });
-    reload();
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,9 +156,7 @@ export function RoomsSettings() {
       {!loading && data?.rooms.length === 0 && (
         <p className="text-sm text-muted-foreground">No rooms added yet — Anushka can&apos;t recommend one until you add at least one.</p>
       )}
-      <Button variant="outline" onClick={addRoom} className="w-fit">
-        <Plus /> Add room
-      </Button>
+      <AddRoomDialog onAdded={reload} />
     </div>
   );
 }

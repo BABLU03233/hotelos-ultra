@@ -60,7 +60,7 @@ export function DashboardAttentionPanel({
             <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
           </div>
           <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
-            Resolve
+            Mark resolved
           </button>
         </div>
       ))}

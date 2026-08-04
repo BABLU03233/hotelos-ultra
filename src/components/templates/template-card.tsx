@@ -20,9 +20,10 @@ export function TemplateCard({ template, onUse }: { template: WaTemplate; onUse?
     <Card>
       <CardContent className="flex flex-col gap-3">
         <div>
-          <Badge variant="outline" className="mb-1.5">
-            {WA_TEMPLATE_CATEGORY_LABELS[template.category]}
-          </Badge>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Badge variant="outline">{WA_TEMPLATE_CATEGORY_LABELS[template.category]}</Badge>
+            <Badge variant="secondary">Starter draft</Badge>
+          </div>
           <p className="text-sm font-medium">{template.title}</p>
         </div>
 

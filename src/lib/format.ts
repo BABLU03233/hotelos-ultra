@@ -34,6 +34,11 @@ export function formatCountdown(target: string | Date): string {
   return diffMinutes > 0 ? `in ${formatMinutesDuration(diffMinutes)}` : "due now";
 }
 
+/** Hours elapsed since a timestamp — used to check WhatsApp's 24h reply window. */
+export function hoursSince(input: string | Date): number {
+  return (Date.now() - new Date(input).getTime()) / 3_600_000;
+}
+
 export function formatRelativeTime(input: string | Date | null): string {
   if (!input) return "—";
   const date = new Date(input);

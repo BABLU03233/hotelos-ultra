@@ -7,6 +7,7 @@ import { OffersSettings } from "@/components/settings/offers-settings";
 import { RoomsSettings } from "@/components/settings/rooms-settings";
 import { StaffSettings } from "@/components/settings/staff-settings";
 import { WhatsAppSettings } from "@/components/settings/whatsapp-settings";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const VALID_TABS = ["hotel", "rooms", "faqs", "offers", "whatsapp", "staff", "account"] as const;
@@ -20,11 +21,17 @@ export function SettingsTabs({ initialTab }: { initialTab?: string }) {
   return (
     <Tabs defaultValue={resolveTab(initialTab)}>
       <TabsList>
-        <TabsTrigger value="hotel">Hotel</TabsTrigger>
-        <TabsTrigger value="rooms">Rooms</TabsTrigger>
+        <TabsTrigger value="hotel">
+          Hotel <Badge variant="secondary">Required</Badge>
+        </TabsTrigger>
+        <TabsTrigger value="rooms">
+          Rooms <Badge variant="secondary">Required</Badge>
+        </TabsTrigger>
         <TabsTrigger value="faqs">FAQs</TabsTrigger>
         <TabsTrigger value="offers">Offers</TabsTrigger>
-        <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+        <TabsTrigger value="whatsapp">
+          WhatsApp <Badge variant="secondary">Required</Badge>
+        </TabsTrigger>
         <TabsTrigger value="staff">Staff</TabsTrigger>
         <TabsTrigger value="account">Account</TabsTrigger>
       </TabsList>

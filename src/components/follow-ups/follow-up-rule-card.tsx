@@ -16,8 +16,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { TemplatePicker } from "@/components/templates/template-picker";
+import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { apiFetch } from "@/lib/api-client";
-import { formatMinutesDuration } from "@/lib/format";
 import { FollowUpAction, FollowUpRule } from "@/types";
 
 const ACTION_LABELS: Record<FollowUpAction, string> = {
@@ -27,8 +27,31 @@ const ACTION_LABELS: Record<FollowUpAction, string> = {
   LAST: "Last follow-up",
 };
 
+const ACTION_DESCRIPTIONS: Record<FollowUpAction, string> = {
+  REMINDER: "A gentle nudge that they were looking at booking.",
+  OFFER: "Mentions a current discount or promotion to re-spark interest.",
+  PACKAGE: "Highlights a specific room or package that fits what they asked about.",
+  LAST: "The final message in this sequence — sent once, never repeated.",
+};
+
+type DelayUnit = "minutes" | "hours" | "days";
+
+function minutesToUnit(minutes: number): { value: number; unit: DelayUnit } {
+  if (minutes >= 1440 && minutes % 1440 === 0) return { value: minutes / 1440, unit: "days" };
+  if (minutes >= 60 && minutes % 60 === 0) return { value: minutes / 60, unit: "hours" };
+  return { value: minutes, unit: "minutes" };
+}
+
+function unitToMinutes(value: number, unit: DelayUnit): number {
+  if (unit === "days") return value * 1440;
+  if (unit === "hours") return value * 60;
+  return value;
+}
+
 export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRule; isLast: boolean; onChanged: () => void }) {
-  const [delayMinutes, setDelayMinutes] = React.useState(rule.delayMinutes);
+  const initialDelay = minutesToUnit(rule.delayMinutes);
+  const [delayValue, setDelayValue] = React.useState(initialDelay.value);
+  const [delayUnit, setDelayUnit] = React.useState<DelayUnit>(initialDelay.unit);
   const [messageBody, setMessageBody] = React.useState(rule.messageBody ?? "");
   const [templateName, setTemplateName] = React.useState(rule.templateName ?? "");
 
@@ -60,30 +83,56 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
 
       <Card className="flex-1">
         <CardContent className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <Select value={rule.action} onValueChange={(v) => v && patch({ action: v as FollowUpAction })}>
-              <SelectTrigger className="w-40">
-                <SelectValue>{(v: string) => ACTION_LABELS[v as FollowUpAction]}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col gap-0.5">
+              <Select value={rule.action} onValueChange={(v) => v && patch({ action: v as FollowUpAction })}>
+                <SelectTrigger className="w-40">
+                  <SelectValue>{(v: string) => ACTION_LABELS[v as FollowUpAction]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ACTION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="max-w-40 text-[10px] text-muted-foreground">{ACTION_DESCRIPTIONS[rule.action]}</p>
+            </div>
 
             <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Wait</span>
               <Input
                 type="number"
                 min={1}
-                value={delayMinutes}
-                onChange={(e) => setDelayMinutes(Number(e.target.value))}
-                onBlur={() => delayMinutes !== rule.delayMinutes && patch({ delayMinutes })}
-                className="w-24"
+                value={delayValue}
+                onChange={(e) => setDelayValue(Number(e.target.value))}
+                onBlur={() => {
+                  const minutes = unitToMinutes(delayValue, delayUnit);
+                  if (minutes !== rule.delayMinutes) patch({ delayMinutes: minutes });
+                }}
+                className="w-16"
               />
-              <span className="text-xs text-muted-foreground">min ({formatMinutesDuration(delayMinutes)} after last message)</span>
+              <Select
+                value={delayUnit}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const unit = v as DelayUnit;
+                  setDelayUnit(unit);
+                  const minutes = unitToMinutes(delayValue, unit);
+                  if (minutes !== rule.delayMinutes) patch({ delayMinutes: minutes });
+                }}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minutes">Minutes</SelectItem>
+                  <SelectItem value="hours">Hours</SelectItem>
+                  <SelectItem value="days">Days</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">after last message</span>
             </div>
 
             <div className="ml-auto flex items-center gap-2">
@@ -111,12 +160,20 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
               placeholder="Message to send within the 24h window…"
               className="min-h-16"
             />
+            <p className="text-[11px] text-muted-foreground">
+              Sent as a normal message if you&apos;re still inside the <GlossaryTerm term="24h-window" />; otherwise the{" "}
+              <GlossaryTerm term="approved-template" />
+              {" "}below is used instead.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`template-${rule.id}`} className="text-xs text-muted-foreground">
-              Approved template name (used automatically once outside the 24h WhatsApp window)
+              Meta-approved template name
             </Label>
+            <p className="-mt-1 text-[11px] text-muted-foreground">
+              Different from the Templates tab — must match one already approved in Meta Business Manager.
+            </p>
             <Input
               id={`template-${rule.id}`}
               value={templateName}

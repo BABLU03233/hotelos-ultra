@@ -10,8 +10,10 @@ export default function TemplatesPage() {
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">Message templates</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ready-to-send WhatsApp copy for every stage of a guest&apos;s stay. Copy one here, or insert it directly
-            while creating a campaign or follow-up step.
+            Starter drafts for every stage of a guest&apos;s stay — copy one in and edit the{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">{"{{placeholders}}"}</code> before sending.
+            These aren&apos;t Meta-approved templates (no approval needed to use them) — that&apos;s a separate,
+            official thing you set up in Meta Business Manager for messaging guests outside the 24-hour window.
           </p>
         </div>
       </Reveal>

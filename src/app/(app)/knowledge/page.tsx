@@ -11,7 +11,15 @@ import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import { KnowledgeDoc } from "@/types";
+import { KnowledgeDoc, KnowledgeDocType } from "@/types";
+
+const TYPE_LABELS: Record<KnowledgeDocType, string> = {
+  TEXT: "Pasted text",
+  PDF: "PDF document",
+  IMAGE: "Image",
+  BROCHURE: "Brochure",
+  FAQ: "FAQ list",
+};
 
 export default function KnowledgePage() {
   const { data, loading, reload } = useFetch<{ docs: KnowledgeDoc[] }>("/api/knowledge");
@@ -55,7 +63,7 @@ export default function KnowledgePage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{doc.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {doc.type} · {doc._count?.chunks ?? 0} indexed chunks · {formatDate(doc.createdAt)}
+                        {TYPE_LABELS[doc.type]} · added {formatDate(doc.createdAt)}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon-sm" onClick={() => remove(doc.id)}>

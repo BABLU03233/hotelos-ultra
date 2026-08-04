@@ -23,7 +23,9 @@ export function TemplatePicker({ onInsert }: { onInsert: (body: string) => void 
       <PopoverContent align="start" className="w-80 p-0">
         <div className="border-b border-border px-3 py-2">
           <p className="text-xs font-medium">Message templates</p>
-          <p className="text-[11px] text-muted-foreground">Insert, then edit before sending.</p>
+          <p className="text-[11px] text-muted-foreground">
+            Insert, then edit before sending. Starter copy — not the same as a Meta-approved template.
+          </p>
         </div>
         <ScrollArea className="max-h-72">
           <div className="flex flex-col p-1">

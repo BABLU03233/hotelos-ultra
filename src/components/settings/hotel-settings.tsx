@@ -12,18 +12,18 @@ import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { HotelProfile } from "@/types";
 
-const FIELDS: { key: keyof HotelProfile; label: string; textarea?: boolean }[] = [
+const FIELDS: { key: keyof HotelProfile; label: string; textarea?: boolean; placeholder?: string }[] = [
   { key: "name", label: "Hotel name" },
   { key: "address", label: "Address" },
   { key: "checkInTime", label: "Check-in time (e.g. 14:00)" },
   { key: "checkOutTime", label: "Check-out time (e.g. 11:00)" },
-  { key: "businessHours", label: "Business hours" },
-  { key: "wifiInfo", label: "Wi-Fi info", textarea: true },
-  { key: "parkingInfo", label: "Parking", textarea: true },
-  { key: "restaurantInfo", label: "Restaurant", textarea: true },
-  { key: "cancellationPolicy", label: "Cancellation policy", textarea: true },
-  { key: "refundPolicy", label: "Refund policy", textarea: true },
-  { key: "nearbyAttractions", label: "Nearby attractions", textarea: true },
+  { key: "businessHours", label: "Business hours", placeholder: "e.g. 24/7 front desk, restaurant 7am–11pm" },
+  { key: "wifiInfo", label: "Wi-Fi info", textarea: true, placeholder: "e.g. Free Wi-Fi, network 'HotelName_Guest', password given at check-in" },
+  { key: "parkingInfo", label: "Parking", textarea: true, placeholder: "e.g. Free self-parking, 20 spots, valet available on request" },
+  { key: "restaurantInfo", label: "Restaurant", textarea: true, placeholder: "e.g. In-house restaurant, breakfast 7–10am, multi-cuisine dinner till 11pm" },
+  { key: "cancellationPolicy", label: "Cancellation policy", textarea: true, placeholder: "e.g. Free cancellation up to 48 hours before check-in" },
+  { key: "refundPolicy", label: "Refund policy", textarea: true, placeholder: "e.g. Refunds processed within 5–7 business days" },
+  { key: "nearbyAttractions", label: "Nearby attractions", textarea: true, placeholder: "e.g. 10 min from City Beach, 5 min from Central Market" },
 ];
 
 export function HotelSettings() {
@@ -65,10 +65,15 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
                 <Textarea
                   value={(form[f.key] as string) ?? ""}
                   onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  placeholder={f.placeholder}
                   className="min-h-16"
                 />
               ) : (
-                <Input value={(form[f.key] as string) ?? ""} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+                <Input
+                  value={(form[f.key] as string) ?? ""}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  placeholder={f.placeholder}
+                />
               )}
             </div>
           ))}

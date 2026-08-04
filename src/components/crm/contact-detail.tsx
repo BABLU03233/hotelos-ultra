@@ -16,15 +16,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
-import { formatCountdown, initials } from "@/lib/format";
+import { formatCountdown, formatRelativeTime, hoursSince, initials } from "@/lib/format";
 import { BookingStatus, Contact, FollowUpAction, LeadStatus, Message, ScheduledFollowUp, StaffMember, StaffNotification } from "@/types";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 
 const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
-  NEW: "New Lead",
+  NEW: "New",
   INTERESTED: "Interested",
   FOLLOW_UP: "Follow-up",
   BOOKED: "Booked",
@@ -141,6 +142,8 @@ function ContactDetailPane({
   const { data: followUpsData } = useFetch<{ followUps: ScheduledFollowUp[] }>(`/api/contacts/${contact.id}/follow-ups`);
   const escalation = notificationsData?.notifications.find((n) => n.contact.id === contact.id);
   const upcomingFollowUps = followUpsData?.followUps.filter((f) => f.status === "PENDING") ?? [];
+  const hoursSinceInbound = contact.lastInboundAt ? hoursSince(contact.lastInboundAt) : null;
+  const windowOpen = hoursSinceInbound === null || hoursSinceInbound < 24;
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -207,9 +210,14 @@ function ContactDetailPane({
               <Bot /> Resume AI
             </Button>
           ) : (
-            <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-              <Bot className="size-3" /> Anushka active
-            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                <Bot className="size-3" /> Anushka active
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
+                Pause AI
+              </Button>
+            </div>
           )}
         </div>
 
@@ -223,7 +231,7 @@ function ContactDetailPane({
               <p className="text-xs text-muted-foreground">{escalation.reason}</p>
             </div>
             <button onClick={resolveEscalation} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
-              Resolve
+              Mark resolved
             </button>
           </div>
         )}
@@ -346,6 +354,19 @@ function ContactDetailPane({
         </div>
       </ScrollArea>
 
+      {contact.lastInboundAt && (
+        <p className="border-t border-border px-4 pt-2 text-[11px] text-muted-foreground">
+          {windowOpen ? (
+            <>Free-form replies open — guest messaged {formatRelativeTime(contact.lastInboundAt)}.</>
+          ) : (
+            <>
+              <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm>
+              {" "}closed — only a{" "}
+              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm> can reach this guest now.
+            </>
+          )}
+        </p>
+      )}
       <MessageComposer onSend={sendReply} sending={sending} />
     </div>
   );
