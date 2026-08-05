@@ -25,7 +25,7 @@ Worker (src/worker)  ──── separate long-running Node process:
                            - campaign-send queue (rate-limited broadcast sends)
                            - follow-up sweep (60s interval, not a queue — see below)
 
-Postgres + pgvector   ──── one schema, every business table carries tenantId (currently Neon)
+Postgres + pgvector   ──── one schema, every business table carries tenantId (self-hosted container in production)
 Redis                 ──── BullMQ job queues (self-hosted container in production)
 ```
 
@@ -55,7 +55,7 @@ npm run dev                   # http://localhost:3000
 npm run worker                # separate terminal — required for AI replies/follow-ups/campaigns to actually send
 ```
 
-The seed script prints both logins (uses this repo owner's real email for each, per `prisma/seed.ts`) — **change both passwords immediately after first login** (there is currently no self-service password-reset flow — see "Known gaps" below).
+The seed script prints both logins (uses this repo owner's real email for each, per `prisma/seed.ts`) — **change both passwords immediately after first login**, via Settings → Account (owner) or `/admin/account` (platform admin).
 - Hotel owner (Hotel Ivory Towers): `http://localhost:3000/login`
 - Platform admin (manages every hotel): `http://localhost:3000/admin/login`
 
@@ -99,15 +99,17 @@ Nginx (SSL via Certbot/Let's Encrypt, auto-renews)
   └─ reverse-proxies :80/:443 → 127.0.0.1:3000
 
 Docker containers (network: hotelos-net):
-  hotelos-web     — built from Dockerfile, default CMD (`npm start`), port 3000 published to localhost only
-  hotelos-worker  — same image, CMD overridden to `npm run worker:start`
-  hotelos-redis   — redis:7-alpine, persistent volume, internal only (no published port)
-
-Database: unchanged — same Neon Postgres the app has always used (DATABASE_URL points at it,
-          nothing about the DB itself moved when the app moved off Render)
+  hotelos-web       — built from Dockerfile, default CMD (`npm start`), port 3000 published to localhost only
+  hotelos-worker    — same image, CMD overridden to `npm run worker:start`
+  hotelos-redis     — redis:7-alpine, persistent volume, internal only (no published port)
+  hotelos-postgres  — pgvector/pgvector:pg17, persistent volume (hotelos-pgdata), internal only (no published port)
 ```
 
-**Secrets** live only in `/opt/hotelos/app.env` on the VPS (mode 600, root-only) — never committed to the repo. `JWT_SECRET` and `ENCRYPTION_KEY` were freshly generated for this deployment (`openssl rand -hex 32` each) rather than reused from the prior Render deployment, since a hard cutover meant old sessions/encrypted values didn't need to survive.
+**Database**: self-hosted (`hotelos-postgres` above), not Neon — moved off Neon after its serverless compute's autosuspend/cold-start behavior was causing intermittent `ETIMEDOUT` failures on every query (tenant lookups, AI reply generation, follow-up sweeps), which blocked Anushka from replying to guests entirely. A container on the same VPS, on the same Docker network the app already used for Redis, removes the network hop and the autosuspend behavior — query latency dropped from 2000ms+ to under 200ms, and a 10-query back-to-back stress test went from ~66% success (Neon's pooled endpoint) to 10/10.
+
+Self-hosting means backups are no longer Neon's problem — a cron at `/opt/hotelos/backup-db.sh` runs nightly (`0 3 * * *`, root's crontab) and writes a gzip'd `pg_dump` to `/opt/hotelos/backups/`, pruning anything older than 14 days. This is VPS-local only — periodically copying a backup file off-box (your own machine, cloud storage) is still recommended, since it doesn't protect against total VPS loss.
+
+**Secrets** live only in `/opt/hotelos/app.env` on the VPS (mode 600, root-only) — never committed to the repo. `JWT_SECRET` and `ENCRYPTION_KEY` were freshly generated for this deployment (`openssl rand -hex 32` each) rather than reused from the prior Render deployment, since a hard cutover meant old sessions/encrypted values didn't need to survive. The `hotelos-postgres` credentials live in the same file.
 
 **To redeploy after a code change:**
 ```bash
@@ -139,7 +141,7 @@ Run `npx prisma migrate deploy` (not `migrate dev`) against production, then `np
 
 ## Known gaps (worth fixing before wider rollout)
 
-- **No self-service password reset.** Losing the owner or platform-admin password currently requires a direct database update (bcrypt-hash a new password, update the `User`/`PlatformAdmin` row) — there's no "forgot password" email flow. Worth building if this goes to real customers.
+- **No email-based "forgot password" flow.** Self-service password *change* exists (Settings → Account / `/admin/account`), but if a password is lost outright with no active session, recovery still requires a direct database update. Worth building if this goes to real customers.
 - **Object storage incomplete in production** — `STORAGE_ENDPOINT` / `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` aren't fully set, so inbound media (images, voice note originals) can't be persisted to a bucket. Voice-note transcription still works regardless (see Architecture), but the CRM can't show the original audio/image file until this is configured.
 - **Worker concurrency is fixed at 5** (`concurrency: 5` in `src/worker/index.ts`) — fine for one hotel's traffic (see the throughput estimate this was validated against: comfortably hundreds of messages/minute of headroom), but worth revisiting if onboarding many tenants or running large broadcast campaigns.
 
