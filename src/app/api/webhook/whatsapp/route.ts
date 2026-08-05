@@ -39,7 +39,10 @@ export const POST = apiRoute(async (req: NextRequest) => {
   const payload = JSON.parse(rawBody);
   const { messages, statuses } = parseWebhookPayload(payload);
 
-  await Promise.allSettled([...messages.map(handleInboundMessage), ...statuses.map(handleStatusUpdate)]);
+  const results = await Promise.allSettled([...messages.map(handleInboundMessage), ...statuses.map(handleStatusUpdate)]);
+  for (const result of results) {
+    if (result.status === "rejected") console.error("Webhook event handling failed:", result.reason);
+  }
 
   return NextResponse.json({ received: true });
 });
