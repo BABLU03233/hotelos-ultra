@@ -11,6 +11,7 @@ import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
+import { useAuthStore } from "@/store/use-auth-store";
 import { KnowledgeDoc, KnowledgeDocType } from "@/types";
 
 const TYPE_LABELS: Record<KnowledgeDocType, string> = {
@@ -23,6 +24,7 @@ const TYPE_LABELS: Record<KnowledgeDocType, string> = {
 
 export default function KnowledgePage() {
   const { data, loading, reload } = useFetch<{ docs: KnowledgeDoc[] }>("/api/knowledge");
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function remove(id: string) {
     await apiFetch(`/api/knowledge/${id}`, { method: "DELETE" });
@@ -35,7 +37,7 @@ export default function KnowledgePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Knowledge base</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Everything Anushka can search through to answer guest questions.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Everything {agentName} can search through to answer guest questions.</p>
           </div>
           <UploadKnowledgeDialog onUploaded={reload} />
         </div>
@@ -78,8 +80,8 @@ export default function KnowledgePage() {
         {!loading && data?.docs.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <BookOpen className="size-8" />
-            <p className="text-sm font-medium text-foreground">Anushka&apos;s knowledge base is empty</p>
-            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means Anushka escalates almost everything.</p>
+            <p className="text-sm font-medium text-foreground">{agentName}&apos;s knowledge base is empty</p>
+            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means {agentName} escalates almost everything.</p>
           </div>
         )}
       </div>

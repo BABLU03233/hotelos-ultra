@@ -9,11 +9,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/format";
+import { useAuthStore } from "@/store/use-auth-store";
 import { StaffNotification } from "@/types";
 
 export function NotificationBell() {
   const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications", 20_000);
   const notifications = data?.notifications ?? [];
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function resolve(id: string) {
     await apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) });
@@ -41,7 +43,7 @@ export function NotificationBell() {
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
-            <p className="p-6 text-center text-xs text-muted-foreground">Anushka&apos;s handling everything — nothing needs you right now.</p>
+            <p className="p-6 text-center text-xs text-muted-foreground">{agentName}&apos;s handling everything — nothing needs you right now.</p>
           ) : (
             <div className="flex flex-col">
               {notifications.map((n) => (

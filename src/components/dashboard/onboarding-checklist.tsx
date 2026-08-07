@@ -17,13 +17,13 @@ interface ChecklistItem {
   hardest?: boolean;
 }
 
-export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"] }) {
+export function OnboardingChecklist({ setup, agentName = "Anushka" }: { setup: DashboardMetrics["setup"]; agentName?: string }) {
   // Ordered to match the Settings tabs themselves (Hotel → Rooms → FAQs → WhatsApp), not by how hard each step is.
   const items: ChecklistItem[] = [
     {
       key: "profile",
       label: "Add your hotel profile",
-      why: "So Anushka knows your address, check-in time, and policies when guests ask.",
+      why: `So ${agentName} knows your address, check-in time, and policies when guests ask.`,
       done: setup.hotelProfileComplete,
       href: "/settings?tab=hotel",
       cta: "Add",
@@ -31,7 +31,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
     {
       key: "room",
       label: "Add your first room",
-      why: "Anushka can't recommend a room to a guest until at least one exists.",
+      why: `${agentName} can't recommend a room to a guest until at least one exists.`,
       done: setup.roomCount > 0,
       href: "/settings?tab=rooms",
       cta: "Add",
@@ -39,7 +39,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
     {
       key: "faq",
       label: "Add an FAQ",
-      why: "The more Anushka knows, the less she has to escalate to your team.",
+      why: `The more ${agentName} knows, the less it has to escalate to your team.`,
       done: setup.faqCount > 0,
       href: "/settings?tab=faqs",
       cta: "Add",
@@ -47,7 +47,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
     {
       key: "whatsapp",
       label: "Connect WhatsApp",
-      why: "Nothing else works until guests can actually reach Anushka.",
+      why: `Nothing else works until guests can actually reach ${agentName}.`,
       done: setup.whatsappConnected,
       href: "/settings?tab=whatsapp",
       cta: "Go",
@@ -65,7 +65,7 @@ export function OnboardingChecklist({ setup }: { setup: DashboardMetrics["setup"
         <Card>
           <CardContent className="flex items-center justify-between gap-2 py-4">
             <span className="flex items-center gap-2 text-sm font-medium">
-              <PartyPopper className="size-4 text-[var(--color-chart-2)]" /> Setup complete — Anushka&apos;s ready to go.
+              <PartyPopper className="size-4 text-[var(--color-chart-2)]" /> Setup complete — {agentName}&apos;s ready to go.
             </span>
             <Button size="sm" variant="ghost" render={<Link href="/settings" />}>
               Review setup

@@ -28,7 +28,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     id: "welcome-concierge",
     category: "WELCOME",
     title: "Concierge greeting",
-    body: "Welcome to {{hotel_name}}, {{guest_name}}! 👋 I'm Anushka, your WhatsApp concierge — ask me about rooms, pricing, or anything else. I'm here 24/7, and our team jumps in whenever you need a human.",
+    body: "Welcome to {{hotel_name}}, {{guest_name}}! 👋 I'm {{agent_name}}, your WhatsApp concierge — ask me about rooms, pricing, or anything else. I'm here 24/7, and our team jumps in whenever you need a human.",
   },
   {
     id: "booking-confirmed",

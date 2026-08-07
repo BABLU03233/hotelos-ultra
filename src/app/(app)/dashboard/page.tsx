@@ -29,7 +29,7 @@ export default async function DashboardPage() {
         </div>
       </Reveal>
 
-      <OnboardingChecklist setup={metrics.setup} />
+      <OnboardingChecklist setup={metrics.setup} agentName={metrics.aiAgentName} />
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-5">
         <StaggerItem index={0}>
@@ -64,11 +64,11 @@ export default async function DashboardPage() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Message volume — last 14 days</CardTitle>
-              <CardDescription>Who&apos;s actually doing the talking: guests, Anushka, or your team.</CardDescription>
+              <CardDescription>Who&apos;s actually doing the talking: guests, {metrics.aiAgentName}, or your team.</CardDescription>
             </CardHeader>
             <CardContent className="h-64">
               {hasMessageVolume ? (
-                <MessageVolumeChart trend={metrics.messageVolumeTrend} />
+                <MessageVolumeChart trend={metrics.messageVolumeTrend} agentName={metrics.aiAgentName} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
                   <p className="text-sm font-medium">No messages yet</p>
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Needs attention</CardTitle>
-              <CardDescription>Conversations Anushka couldn&apos;t handle confidently.</CardDescription>
+              <CardDescription>Conversations {metrics.aiAgentName} couldn&apos;t handle confidently.</CardDescription>
             </CardHeader>
             <CardContent>
               <DashboardAttentionPanel initialCount={metrics.unresolvedNotificationCount} initialNotifications={metrics.recentNotifications} />

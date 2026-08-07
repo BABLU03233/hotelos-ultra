@@ -11,10 +11,12 @@ import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { useAuthStore } from "@/store/use-auth-store";
 import { FollowUpRule } from "@/types";
 
 export default function FollowUpsPage() {
   const { data, loading, reload } = useFetch<{ rules: FollowUpRule[] }>("/api/follow-up-rules");
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function addRule() {
     const nextOrder = (data?.rules.at(-1)?.order ?? 0) + 1;
@@ -36,9 +38,7 @@ export default function FollowUpsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Follow-up automation</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              When a lead goes quiet, Anushka works through these steps in order — cancelled automatically the moment they reply.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">When a lead goes quiet, {agentName} works through these steps in order — cancelled automatically the moment they reply.</p>
           </div>
           <Button onClick={addRule}>
             <Plus /> Add step

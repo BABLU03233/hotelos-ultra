@@ -76,18 +76,20 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // unanswered — surface it the same way an AI-side escalation would, so
     // a human still finds out even though Anushka itself never got to reply.
     console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
+    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true } });
+    const agentName = profile?.aiAgentName?.trim() || "Anushka";
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Anushka couldn't generate a reply — needs a manual response." },
+      data: { tenantId, contactId, reason: `${agentName} couldn't generate a reply — needs a manual response.` },
     });
     return;
   }
-  const { reply, imageUrls, shouldEscalate, escalationReason } = generated;
+  const { reply, imageUrls, shouldEscalate, escalationReason, agentName } = generated;
 
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
     console.warn(`Tenant ${tenantId} has no WhatsApp credentials configured — cannot send AI reply.`);
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Anushka drafted a reply but WhatsApp isn't connected yet — connect it in Settings." },
+      data: { tenantId, contactId, reason: `${agentName} drafted a reply but WhatsApp isn't connected yet — connect it in Settings.` },
     });
     return;
   }
@@ -98,7 +100,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   } catch (err) {
     console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: "Anushka's reply failed to send over WhatsApp — needs a manual response." },
+      data: { tenantId, contactId, reason: `${agentName}'s reply failed to send over WhatsApp — needs a manual response.` },
     });
     return;
   }
@@ -145,13 +147,14 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
 
     if (shouldEscalate) {
       await prisma.staffNotification.create({
-        data: { tenantId, contactId, reason: escalationReason || "Anushka couldn't answer confidently" },
+        data: { tenantId, contactId, reason: escalationReason || `${agentName} couldn't answer confidently` },
       });
     }
 
-    const summary = await summarizeConversation([...history, { role: "user", content: latestInbound.content }, { role: "assistant", content: reply }]).catch(
-      () => contact.aiSummary ?? ""
-    );
+    const summary = await summarizeConversation(
+      [...history, { role: "user", content: latestInbound.content }, { role: "assistant", content: reply }],
+      agentName
+    ).catch(() => contact.aiSummary ?? "");
 
     await prisma.contact.update({
       where: { id: contactId },

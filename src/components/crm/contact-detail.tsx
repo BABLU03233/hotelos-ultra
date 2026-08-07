@@ -20,6 +20,7 @@ import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatCountdown, formatRelativeTime, hoursSince, initials } from "@/lib/format";
+import { useAuthStore } from "@/store/use-auth-store";
 import { BookingStatus, Contact, FollowUpAction, LeadStatus, Message, ScheduledFollowUp, StaffMember, StaffNotification } from "@/types";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
@@ -134,6 +135,7 @@ function ContactDetailPane({
   const [notes, setNotes] = React.useState(contact.notes ?? "");
   const [tagInput, setTagInput] = React.useState("");
   const bottomRef = React.useRef<HTMLDivElement>(null);
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   const { data: staffData } = useFetch<{ staff: StaffMember[] }>("/api/settings/staff");
   const { data: notificationsData, reload: reloadNotifications } = useFetch<{ notifications: StaffNotification[] }>(
@@ -212,8 +214,7 @@ function ContactDetailPane({
           ) : (
             <div className="flex shrink-0 items-center gap-1">
               <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-                <Bot className="size-3" /> Anushka active
-              </span>
+                <Bot className="size-3" /> {agentName} active</span>
               <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
                 Pause AI
               </Button>
@@ -227,7 +228,7 @@ function ContactDetailPane({
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium">Anushka escalated this conversation</p>
+              <p className="text-xs font-medium">{agentName} escalated this conversation</p>
               <p className="text-xs text-muted-foreground">{escalation.reason}</p>
             </div>
             <button onClick={resolveEscalation} className="shrink-0 text-[11px] font-medium text-primary hover:underline">

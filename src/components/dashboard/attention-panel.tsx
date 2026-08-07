@@ -6,6 +6,7 @@ import { CircleCheck, TriangleAlert } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatRelativeTime } from "@/lib/format";
+import { useAuthStore } from "@/store/use-auth-store";
 import { StaffNotification } from "@/types";
 
 const POLL_MS = 20_000;
@@ -24,6 +25,7 @@ export function DashboardAttentionPanel({
   // event-driven optimistic overlay, never synced from an effect.
   const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications", POLL_MS);
   const [justResolved, setJustResolved] = React.useState<Set<string>>(new Set());
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   const all = (data?.notifications ?? initialNotifications).filter((n) => !justResolved.has(n.id));
   const count = data ? all.length : Math.max(0, initialCount - justResolved.size);
@@ -40,7 +42,7 @@ export function DashboardAttentionPanel({
       <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
         <CircleCheck className="size-6 text-emerald-600" />
         <p className="text-sm font-medium">All clear</p>
-        <p className="text-xs text-muted-foreground">Anushka hasn&apos;t needed to escalate anything.</p>
+        <p className="text-xs text-muted-foreground">{agentName} hasn&apos;t needed to escalate anything.</p>
       </div>
     );
   }

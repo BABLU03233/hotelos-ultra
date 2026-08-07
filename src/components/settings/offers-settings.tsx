@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Offer } from "@/types";
 
 function OfferCard({ offer, onChanged }: { offer: Offer; onChanged: () => void }) {
@@ -124,6 +125,7 @@ function AddOfferDialog({ onAdded }: { onAdded: () => void }) {
 
 export function OffersSettings() {
   const { data, loading, reload } = useFetch<{ offers: Offer[] }>("/api/settings/offers");
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,9 +138,7 @@ export function OffersSettings() {
         ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
         : data.offers.map((o) => <OfferCard key={o.id} offer={o} onChanged={reload} />)}
       {!loading && data?.offers.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No offers yet — Anushka can&apos;t mention a promotion to guests until you add one.
-        </p>
+        <p className="text-sm text-muted-foreground">No offers yet — {agentName} can&apos;t mention a promotion to guests until you add one.</p>
       )}
       <AddOfferDialog onAdded={reload} />
     </div>

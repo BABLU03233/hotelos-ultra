@@ -2,17 +2,23 @@
 
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const SERIES = [
-  { key: "inbound", label: "From guests", color: "var(--color-chart-5)" },
-  { key: "ai", label: "Anushka replies", color: "var(--color-chart-3)" },
-  { key: "staff", label: "Staff replies", color: "var(--color-chart-2)" },
-] as const;
-
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-export function MessageVolumeChart({ trend }: { trend: { date: string; inbound: number; ai: number; staff: number }[] }) {
+export function MessageVolumeChart({
+  trend,
+  agentName = "Anushka",
+}: {
+  trend: { date: string; inbound: number; ai: number; staff: number }[];
+  agentName?: string;
+}) {
+  const SERIES = [
+    { key: "inbound", label: "From guests", color: "var(--color-chart-5)" },
+    { key: "ai", label: `${agentName} replies`, color: "var(--color-chart-3)" },
+    { key: "staff", label: "Staff replies", color: "var(--color-chart-2)" },
+  ] as const;
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={trend} margin={{ left: -16, right: 8 }}>

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Faq } from "@/types";
 
 function FaqRow({ faq, onChanged }: { faq: Faq; onChanged: () => void }) {
@@ -103,6 +104,7 @@ function AddFaqDialog({ onAdded }: { onAdded: () => void }) {
 
 export function FaqsSettings() {
   const { data, loading, reload } = useFetch<{ faqs: Faq[] }>("/api/settings/faqs");
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   return (
     <Card>
@@ -113,7 +115,7 @@ export function FaqsSettings() {
         {loading || !data ? (
           <Skeleton className="h-32 w-full" />
         ) : data.faqs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No FAQs yet — Anushka escalates more often without them.</p>
+          <p className="text-sm text-muted-foreground">No FAQs yet — {agentName} escalates more often without them.</p>
         ) : (
           <div className="flex flex-col">
             {data.faqs.map((f) => (

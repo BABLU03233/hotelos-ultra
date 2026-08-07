@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuthStore } from "@/store/use-auth-store";
 import { KnowledgeDocType } from "@/types";
 
 const TYPE_LABELS: Record<KnowledgeDocType, string> = {
@@ -40,6 +41,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
   const [text, setText] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   const needsFile = type !== "TEXT" && type !== "FAQ";
 
@@ -63,7 +65,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
       setText("");
       setFile(null);
       onUploaded();
-      toast.success("Added to Anushka's knowledge base");
+      toast.success(`Added to ${agentName}'s knowledge base`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -85,7 +87,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add to knowledge base</DialogTitle>
-          <DialogDescription>Anushka answers guest questions using only what&apos;s here.</DialogDescription>
+          <DialogDescription>{agentName} answers guest questions using only what&apos;s here.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -118,7 +120,7 @@ export function UploadKnowledgeDialog({ onUploaded }: { onUploaded: () => void }
           ) : (
             <div className="flex flex-col gap-1.5">
               <Label>Content</Label>
-              <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-32" placeholder="Paste the text Anushka should know…" />
+              <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-32" placeholder={`Paste the text ${agentName} should know…`} />
             </div>
           )}
         </div>

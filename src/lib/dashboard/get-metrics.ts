@@ -108,6 +108,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
   const messageVolumeTrend = Array.from(trendBuckets.entries()).map(([date, counts]) => ({ date, ...counts }));
 
   return {
+    aiAgentName: hotelProfile?.aiAgentName?.trim() || "Anushka",
     newLeads,
     activeChats: activeChatContactIds.length,
     activeChatsPrev: activeChatContactIdsPrev.length,

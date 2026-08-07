@@ -37,6 +37,7 @@ export function HotelSettings() {
 function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | null }) {
   const [form, setForm] = React.useState<Partial<HotelProfile>>(initialProfile ?? {});
   const [saving, setSaving] = React.useState(false);
+  const agentName = form.aiAgentName?.trim() || "Anushka";
 
   async function save() {
     setSaving(true);
@@ -54,8 +55,26 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
+          <CardTitle>AI agent name</CardTitle>
+          <CardDescription>What your WhatsApp concierge calls itself when chatting with guests.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label>Agent name</Label>
+            <Input
+              value={form.aiAgentName ?? ""}
+              onChange={(e) => setForm({ ...form, aiAgentName: e.target.value })}
+              placeholder="Anushka"
+              maxLength={50}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Hotel information</CardTitle>
-          <CardDescription>What Anushka tells guests when they ask about the property.</CardDescription>
+          <CardDescription>What {agentName} tells guests when they ask about the property.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FIELDS.map((f) => (
@@ -83,7 +102,7 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
       <Card>
         <CardHeader>
           <CardTitle>AI instructions</CardTitle>
-          <CardDescription>Extra guidance for Anushka — tone, things to always mention, things to avoid.</CardDescription>
+          <CardDescription>Extra guidance for {agentName} — tone, things to always mention, things to avoid.</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea

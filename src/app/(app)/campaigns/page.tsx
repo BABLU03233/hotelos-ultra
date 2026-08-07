@@ -10,10 +10,12 @@ import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatDate } from "@/lib/format";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Campaign } from "@/types";
 
 export default function CampaignsPage() {
   const { data, loading, reload } = useFetch<{ campaigns: Campaign[] }>("/api/campaigns");
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -21,7 +23,7 @@ export default function CampaignsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Campaigns</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Broadcast offers to selected guests — Anushka takes over if they reply.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Broadcast offers to selected guests — {agentName} takes over if they reply.</p>
           </div>
           <NewCampaignDialog onCreated={reload} />
         </div>
@@ -62,7 +64,7 @@ export default function CampaignsPage() {
           <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Megaphone className="size-8" />
             <p className="text-sm font-medium text-foreground">No campaigns yet</p>
-            <p className="max-w-xs text-xs">Broadcast an offer or update to a segment of your guests — Anushka handles any replies.</p>
+            <p className="max-w-xs text-xs">Broadcast an offer or update to a segment of your guests — {agentName} handles any replies.</p>
           </div>
         )}
       </div>

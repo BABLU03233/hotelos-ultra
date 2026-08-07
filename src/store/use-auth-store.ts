@@ -11,6 +11,7 @@ export interface AuthTenant {
   id: string;
   name: string;
   slug: string;
+  aiAgentName: string;
 }
 
 interface AuthState {

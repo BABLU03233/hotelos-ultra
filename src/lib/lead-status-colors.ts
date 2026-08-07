@@ -15,13 +15,15 @@ export const LEAD_STATUS_HEX: Record<LeadStatus, string> = {
 };
 
 /** One-clause definition of what each pipeline stage means, surfaced via tooltip on board/column headers. */
-export const LEAD_STATUS_DESCRIPTION: Record<LeadStatus, string> = {
-  NEW: "Just messaged in — Anushka hasn't qualified them yet.",
-  INTERESTED: "Asked about rooms, dates, or pricing — actively considering a stay.",
-  FOLLOW_UP: "Went quiet — automatic follow-up messages are keeping the conversation alive.",
-  BOOKED: "Confirmed a booking.",
-  CLOSED: "No longer an active lead — booked elsewhere, or not interested.",
-};
+export function getLeadStatusDescription(agentName = "Anushka"): Record<LeadStatus, string> {
+  return {
+    NEW: `Just messaged in — ${agentName} hasn't qualified them yet.`,
+    INTERESTED: "Asked about rooms, dates, or pricing — actively considering a stay.",
+    FOLLOW_UP: "Went quiet — automatic follow-up messages are keeping the conversation alive.",
+    BOOKED: "Confirmed a booking.",
+    CLOSED: "No longer an active lead — booked elsewhere, or not interested.",
+  };
+}
 
 export const LEAD_STATUS_DOT: Record<LeadStatus, string> = {
   NEW: "bg-[var(--color-chart-5)]",

@@ -209,6 +209,7 @@ export interface AdminTenantSummary {
 }
 
 export interface DashboardMetrics {
+  aiAgentName: string;
   newLeads: number;
   activeChats: number;
   activeChatsPrev: number;
@@ -246,4 +247,5 @@ export interface HotelProfile {
   nearbyAttractions: string | null;
   businessHours: string | null;
   aiSystemPrompt: string | null;
+  aiAgentName: string;
 }

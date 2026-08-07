@@ -211,6 +211,7 @@ model HotelProfile {
   nearbyAttractions  String?
   businessHours      String?
   aiSystemPrompt     String?  @db.Text
+  aiAgentName        String   @default("Anushka")
   updatedAt          DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

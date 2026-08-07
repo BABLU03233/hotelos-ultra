@@ -15,6 +15,7 @@ export const hotelProfileSchema = z.object({
   nearbyAttractions: z.string().max(2000).nullable().optional(),
   businessHours: z.string().max(1000).nullable().optional(),
   aiSystemPrompt: z.string().max(4000).nullable().optional(),
+  aiAgentName: z.string().trim().min(1).max(50).optional(),
 });
 export type HotelProfileInput = z.infer<typeof hotelProfileSchema>;
 

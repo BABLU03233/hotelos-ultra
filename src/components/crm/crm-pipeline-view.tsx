@@ -14,12 +14,13 @@ import { formatRelativeTime, initials } from "@/lib/format";
 import {
   LEAD_STATUS_BG,
   LEAD_STATUS_BORDER,
-  LEAD_STATUS_DESCRIPTION,
   LEAD_STATUS_DOT,
   LEAD_STATUS_HEX,
   LEAD_STATUS_LEFT_BORDER,
+  getLeadStatusDescription,
 } from "@/lib/lead-status-colors";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Contact, LeadStatus } from "@/types";
 
 const STAGES: { key: LeadStatus; label: string; topBorder: string; leftBorder: string; bg: string; dot: string; hex: string }[] = [
@@ -97,6 +98,7 @@ function PipelineColumn({
   onSelect: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key });
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2">
@@ -110,7 +112,7 @@ function PipelineColumn({
               </p>
             }
           />
-          <TooltipContent>{LEAD_STATUS_DESCRIPTION[stage.key]}</TooltipContent>
+          <TooltipContent>{getLeadStatusDescription(agentName)[stage.key]}</TooltipContent>
         </Tooltip>
         <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", stage.bg)} style={{ color: stage.hex }}>
           {contacts.length}

@@ -39,13 +39,13 @@ export interface ReplyContext {
   sourceDetail: string | null;
 }
 
-function buildConversationContext(context?: ReplyContext): string {
+function buildConversationContext(agentName: string, context?: ReplyContext): string {
   if (!context) return "";
 
   const languageAsk =
     "If it's not already obvious from how they wrote (e.g. they messaged you in Hindi or Telugu already), casually ask which language they'd prefer — English, Hindi, or Telugu — as part of your first message, so the rest of the conversation happens in whatever's easiest for them.";
   const introduceYourself =
-    "Start by introducing yourself — your name and that you're with the hotel (e.g. \"Hi, I'm Anushka from [hotel name]!\") — before getting into their question, so they know who they're talking to.";
+    `Start by introducing yourself — your name and that you're with the hotel (e.g. "Hi, I'm ${agentName} from [hotel name]!") — before getting into their question, so they know who they're talking to.`;
 
   if (context.isFirstReply && context.leadSource === "META_AD") {
     const about = context.sourceDetail ? ` about "${context.sourceDetail}"` : "";
@@ -63,13 +63,19 @@ function buildConversationContext(context?: ReplyContext): string {
   return "";
 }
 
-async function buildSystemPrompt(tenantId: string, retrievedContext: string[], context?: ReplyContext): Promise<string> {
+async function buildSystemPrompt(
+  tenantId: string,
+  retrievedContext: string[],
+  context?: ReplyContext
+): Promise<{ prompt: string; agentName: string }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
     prisma.room.findMany({ where: { tenantId } }),
     prisma.faq.findMany({ where: { tenantId } }),
     prisma.offer.findMany({ where: { tenantId, active: true } }),
   ]);
+
+  const agentName = profile?.aiAgentName?.trim() || "Anushka";
 
   const roomLines =
     rooms
@@ -84,8 +90,8 @@ async function buildSystemPrompt(tenantId: string, retrievedContext: string[], c
     offers.map((o) => `- ${o.title}: ${o.description ?? ""}${o.discount ? ` (${o.discount})` : ""}`.trim()).join("\n") ||
     "None currently.";
 
-  return `
-You are Anushka, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text — simple everyday words, short sentences, easy to read in a glance. Never sound like a corporate script or a formal letter.
+  const prompt = `
+You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text — simple everyday words, short sentences, easy to read in a glance. Never sound like a corporate script or a formal letter.
 ${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
 HOTEL INFORMATION
 Address: ${profile?.address ?? "—"}
@@ -106,7 +112,7 @@ ${offerLines}
 FREQUENTLY ASKED QUESTIONS
 ${faqLines}
 
-${retrievedContext.length ? `RELEVANT KNOWLEDGE BASE EXCERPTS\n${retrievedContext.join("\n---\n")}\n` : ""}${buildConversationContext(context)}
+${retrievedContext.length ? `RELEVANT KNOWLEDGE BASE EXCERPTS\n${retrievedContext.join("\n---\n")}\n` : ""}${buildConversationContext(agentName, context)}
 RULES
 - Only answer using the information above. Never invent prices, policies, room types, or availability that isn't stated here.
 - If you don't have enough information to answer confidently, reply with EXACTLY: "${ESCALATE_MARKER} <one short reason>" and nothing else — a staff member will take over from there.
@@ -134,6 +140,8 @@ TONE
 PHOTOS
 - If a guest asks to see a room, photos, or what it looks like, send the real photo URLs listed for that room above. Add a line for each photo in the exact format "IMAGE: <url>" (one per line, at most 3), placed after your normal reply text. Only use URLs that are literally listed above — never invent or guess a URL, and never send a photo for a room that has none listed.
 `.trim();
+
+  return { prompt, agentName };
 }
 
 export interface GenerateReplyResult {
@@ -141,6 +149,7 @@ export interface GenerateReplyResult {
   imageUrls: string[];
   shouldEscalate: boolean;
   escalationReason?: string;
+  agentName: string;
 }
 
 const IMAGE_LINE = /^IMAGE:\s*(\S+)\s*$/gim;
@@ -159,7 +168,7 @@ export async function generateReply(
   context?: ReplyContext
 ): Promise<GenerateReplyResult> {
   const retrieved = await retrieveRelevantChunks(tenantId, guestMessage).catch(() => []);
-  const systemPrompt = await buildSystemPrompt(tenantId, retrieved, context);
+  const { prompt: systemPrompt, agentName } = await buildSystemPrompt(tenantId, retrieved, context);
 
   const reply = await aiProvider.chat({
     systemPrompt,
@@ -173,17 +182,18 @@ export async function generateReply(
       imageUrls: [],
       shouldEscalate: true,
       escalationReason: trimmed.slice(ESCALATE_MARKER.length).trim(),
+      agentName,
     };
   }
 
   const { text, imageUrls } = extractImageUrls(trimmed);
-  return { reply: text, imageUrls, shouldEscalate: false };
+  return { reply: text, imageUrls, shouldEscalate: false, agentName };
 }
 
 /** One-sentence CRM summary of a conversation so far, refreshed after each inbound message. */
-export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
+export async function summarizeConversation(messages: ChatMessage[], agentName = "Anushka"): Promise<string> {
   if (!messages.length) return "";
-  const transcript = messages.map((m) => `${m.role === "user" ? "Guest" : "Anushka"}: ${m.content}`).join("\n");
+  const transcript = messages.map((m) => `${m.role === "user" ? "Guest" : agentName}: ${m.content}`).join("\n");
   const summary = await aiProvider.chat({
     systemPrompt:
       "Summarize this WhatsApp conversation between a hotel's AI assistant and a guest in one short sentence (under 20 words), focused on what the guest wants and where things stand. Reply with only the summary, no preamble.",
