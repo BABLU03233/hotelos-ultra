@@ -26,6 +26,7 @@ export interface Contact {
   assignedTo?: { id: string; name: string } | null;
   leadSource: LeadSource;
   sourceDetail: string | null;
+  optedOutAt: string | null;
   updatedAt: string;
 }
 

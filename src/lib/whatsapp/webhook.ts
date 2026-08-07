@@ -23,8 +23,12 @@ export interface InboundMessage {
   contactName: string | null;
   whatsappMessageId: string;
   timestamp: string;
-  type: "text" | "image" | "document" | "location" | "audio" | "video" | "sticker" | "unknown";
+  type: "text" | "image" | "document" | "location" | "audio" | "video" | "sticker" | "button" | "interactive" | "unknown";
   text: string | null;
+  // Set for a template quick-reply click ("button") or an interactive
+  // list/button-reply message ("interactive") — the visible label text of
+  // whichever option the guest tapped (e.g. "Stop promos").
+  buttonText: string | null;
   mediaId: string | null;
   mediaMimeType: string | null;
   location: { latitude: number; longitude: number } | null;
@@ -73,6 +77,18 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           | { source_url?: string; headline?: string; ctwa_clid?: string }
           | undefined;
 
+        // Template quick-reply click: { type: "button", button: { text, payload } }.
+        // Interactive list/button message: { type: "interactive", interactive: { type: "button_reply"|"list_reply", button_reply|list_reply: { id, title } } }.
+        let buttonText: string | null = null;
+        if (type === "button") {
+          buttonText = (raw.button as { text?: string } | undefined)?.text ?? null;
+        } else if (type === "interactive") {
+          const interactive = raw.interactive as
+            | { button_reply?: { title?: string }; list_reply?: { title?: string } }
+            | undefined;
+          buttonText = interactive?.button_reply?.title ?? interactive?.list_reply?.title ?? null;
+        }
+
         messages.push({
           phoneNumberId,
           waId: String(raw.from ?? ""),
@@ -81,6 +97,7 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           timestamp: String(raw.timestamp ?? ""),
           type,
           text: textBody,
+          buttonText,
           mediaId: media?.id ?? null,
           mediaMimeType: media?.mime_type ?? null,
           location:

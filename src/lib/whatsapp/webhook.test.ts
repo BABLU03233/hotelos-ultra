@@ -171,6 +171,62 @@ describe("parseWebhookPayload", () => {
     });
   });
 
+  it("extracts a template quick-reply button click's label text", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.BTN1",
+                    timestamp: "1700000000",
+                    type: "button",
+                    button: { text: "Stop promos", payload: "STOP_PROMOS" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0]).toMatchObject({ type: "button", text: null, buttonText: "Stop promos" });
+  });
+
+  it("extracts an interactive button_reply's title", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.INT1",
+                    timestamp: "1700000000",
+                    type: "interactive",
+                    interactive: { type: "button_reply", button_reply: { id: "stop", title: "Stop promos" } },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0]).toMatchObject({ type: "interactive", buttonText: "Stop promos" });
+  });
+
   it("leaves referral null for an ordinary organic message", () => {
     const payload = {
       entry: [

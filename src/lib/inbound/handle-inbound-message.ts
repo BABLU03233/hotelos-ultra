@@ -2,10 +2,13 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import { transcribeAudio } from "@/lib/ai/transcription";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
-import { downloadMedia, getMediaUrl } from "@/lib/whatsapp/client";
+import { downloadMedia, getMediaUrl, sendWhatsAppMessage } from "@/lib/whatsapp/client";
+import { isOptOutSignal } from "@/lib/whatsapp/opt-out";
 import { getWhatsAppCredentials, resolveTenantByPhoneNumberId } from "@/lib/whatsapp/tenant-credentials";
 import { InboundMessage, StatusUpdate } from "@/lib/whatsapp/webhook";
 import { uploadObject } from "@/lib/storage/s3";
+
+const OPT_OUT_CONFIRMATION = "You're unsubscribed from promotional messages and won't get any more offers or reminders. Message us anytime if you still need help with a booking.";
 
 function mapMessageType(type: InboundMessage["type"]): MessageType {
   switch (type) {
@@ -77,6 +80,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
   const preview = content ?? `[${msg.type}]`;
   const now = new Date();
+  const optingOut = isOptOutSignal(msg);
 
   const contact = await prisma.contact.upsert({
     where: { tenantId_whatsappNumber: { tenantId: tenant.id, whatsappNumber: msg.waId } },
@@ -93,11 +97,13 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       leadSource: msg.referral ? "META_AD" : "DIRECT",
       sourceDetail: msg.referral?.headline ?? null,
       ctwaClid: msg.referral?.ctwaClid ?? null,
+      optedOutAt: optingOut ? now : undefined,
     },
     update: {
       name: msg.contactName ?? undefined,
       lastInboundAt: now,
       lastMessage: preview,
+      optedOutAt: optingOut ? now : undefined,
     },
   });
 
@@ -107,7 +113,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       contactId: contact.id,
       direction: "IN",
       type: mapMessageType(msg.type),
-      content,
+      content: content ?? msg.buttonText,
       mediaUrl,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",
@@ -125,6 +131,36 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     where: { contactId: contact.id, status: { in: ["SENT", "DELIVERED", "READ"] } },
     data: { status: "REPLIED" },
   });
+
+  // A "Stop promos" click or a texted STOP is a compliance action, not a
+  // conversational turn — handle it directly with a fixed confirmation
+  // rather than routing it through the AI pipeline (which might otherwise
+  // reply as if the guest just asked a normal question).
+  if (optingOut) {
+    const creds = await getWhatsAppCredentials(tenant.id);
+    if (creds) {
+      try {
+        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "text",
+          text: OPT_OUT_CONFIRMATION,
+        });
+        await prisma.message.create({
+          data: {
+            tenantId: tenant.id,
+            contactId: contact.id,
+            direction: "OUT",
+            type: "TEXT",
+            content: OPT_OUT_CONFIRMATION,
+            whatsappMessageId,
+            status: "SENT",
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to send opt-out confirmation for tenant ${tenant.id}, contact ${contact.id}:`, err);
+      }
+    }
+    return;
+  }
 
   // jobId keyed to the inbound message: if this same message is ever
   // enqueued twice (e.g. a Meta webhook retry that got past the

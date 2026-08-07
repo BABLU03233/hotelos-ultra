@@ -14,6 +14,14 @@ export async function sendCampaignToRecipient(campaignRecipientId: string): Prom
 
   const { campaign, contact } = recipient;
 
+  // Required under WhatsApp's Business Messaging Policy — a guest who
+  // opted out (STOP or the "Stop promos" button) never gets another
+  // broadcast, regardless of pacing/scheduling.
+  if (contact.optedOutAt) {
+    await prisma.campaignRecipient.update({ where: { id: recipient.id }, data: { status: "CANCELLED" } });
+    return;
+  }
+
   // Free-form text/image campaigns can only reach contacts inside the 24h
   // window; template campaigns work regardless (that's what templates are
   // for) — this is exactly the "respecting... the template rule" guardrail.

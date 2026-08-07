@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import { Clock, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,19 +19,32 @@ import { FollowUpRule } from "@/types";
 export default function FollowUpsPage() {
   const { data, loading, reload } = useFetch<{ rules: FollowUpRule[] }>("/api/follow-up-rules");
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
+  const [addingRule, setAddingRule] = React.useState(false);
 
   async function addRule() {
-    const nextOrder = (data?.rules.at(-1)?.order ?? 0) + 1;
-    await apiFetch("/api/follow-up-rules", {
-      method: "POST",
-      body: JSON.stringify({
-        order: nextOrder,
-        delayMinutes: 60,
-        action: "REMINDER",
-        messageBody: "Just checking in — still interested in booking with us?",
-      }),
-    });
-    reload();
+    // Guards against a double-click firing two POSTs before the first
+    // response lands — each duplicate step means a guest gets several
+    // near-identical messages when it fires, which is exactly the pattern
+    // that risks a spam flag / block from Meta.
+    if (addingRule) return;
+    setAddingRule(true);
+    try {
+      const nextOrder = (data?.rules.at(-1)?.order ?? 0) + 1;
+      await apiFetch("/api/follow-up-rules", {
+        method: "POST",
+        body: JSON.stringify({
+          order: nextOrder,
+          delayMinutes: 60,
+          action: "REMINDER",
+          messageBody: "Just checking in — still interested in booking with us?",
+        }),
+      });
+      reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't add step");
+    } finally {
+      setAddingRule(false);
+    }
   }
 
   return (
@@ -40,7 +55,7 @@ export default function FollowUpsPage() {
             <h1 className="font-heading text-3xl font-semibold tracking-tight">Follow-up automation</h1>
             <p className="mt-1 text-sm text-muted-foreground">When a lead goes quiet, {agentName} works through these steps in order — cancelled automatically the moment they reply.</p>
           </div>
-          <Button onClick={addRule}>
+          <Button onClick={addRule} disabled={addingRule}>
             <Plus /> Add step
           </Button>
         </div>

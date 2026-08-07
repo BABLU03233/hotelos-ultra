@@ -29,6 +29,14 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
   for (const scheduled of due) {
     const { contact, rule } = scheduled;
 
+    // Required under WhatsApp's Business Messaging Policy — a guest who
+    // opted out never gets another follow-up nudge. Cancel outright (not
+    // "skip") so a repeatDaily rule doesn't just re-arm itself 24h later.
+    if (contact.optedOutAt) {
+      await prisma.scheduledFollowUp.update({ where: { id: scheduled.id }, data: { status: "CANCELLED" } });
+      continue;
+    }
+
     const effectiveTemplateName = rule.metaTemplate?.name ?? rule.templateName;
     const decision = decideFollowUpAction(
       { ruleActive: rule.active, ruleTemplateName: effectiveTemplateName, leadStatus: contact.leadStatus, lastInboundAt: contact.lastInboundAt },

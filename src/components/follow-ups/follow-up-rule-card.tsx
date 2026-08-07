@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,8 +57,12 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
   const [messageBody, setMessageBody] = React.useState(rule.messageBody ?? "");
 
   async function patch(body: Partial<FollowUpRule>) {
-    await apiFetch(`/api/follow-up-rules/${rule.id}`, { method: "PATCH", body: JSON.stringify(body) });
-    onChanged();
+    try {
+      await apiFetch(`/api/follow-up-rules/${rule.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save that change");
+    }
   }
 
   async function remove() {

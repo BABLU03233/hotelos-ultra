@@ -21,6 +21,23 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     if (!template) throw new ApiError(400, "That template wasn't found for this hotel.");
   }
 
+  const effectiveActive = body.active ?? existing.active;
+  const effectiveAction = body.action ?? existing.action;
+  const effectiveDelay = body.delayMinutes ?? existing.delayMinutes;
+  const effectiveBody = (body.messageBody !== undefined ? body.messageBody : existing.messageBody) ?? "";
+  if (effectiveActive) {
+    const otherRules = await db.followUpRule.findMany({ where: { active: true, id: { not: id } } });
+    const isDuplicate = otherRules.some(
+      (r) =>
+        r.action === effectiveAction &&
+        r.delayMinutes === effectiveDelay &&
+        (r.messageBody ?? "").trim().toLowerCase() === effectiveBody.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      throw new ApiError(409, "An active follow-up step with this exact action, message, and delay already exists.");
+    }
+  }
+
   const rule = await db.followUpRule.update({
     where: { id },
     data: {

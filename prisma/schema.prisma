@@ -328,6 +328,12 @@ model Contact {
   leadSource     LeadSource    @default(DIRECT)
   sourceDetail   String?
   ctwaClid       String?
+  // Set when the guest clicks a "Stop promos" quick-reply button or texts
+  // STOP/UNSUBSCRIBE — a required opt-out mechanism under WhatsApp's
+  // Business Messaging Policy. Suppresses campaign broadcasts and follow-up
+  // nudges, but not the core AI concierge — a guest who opts out of
+  // promotions should still get help if they message in on their own.
+  optedOutAt     DateTime?
   updatedAt      DateTime      @updatedAt
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)

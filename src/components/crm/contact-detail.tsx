@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, BellOff, Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -204,6 +204,12 @@ function ContactDetailPane({
                     {contact.sourceDetail || "Cold import"}
                   </>
                 )}
+              </p>
+            )}
+            {contact.optedOutAt && (
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                <BellOff className="size-3 shrink-0" />
+                Opted out of promotions — no campaigns or follow-ups will be sent
               </p>
             )}
           </div>
