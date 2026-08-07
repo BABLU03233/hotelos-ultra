@@ -1,6 +1,6 @@
 "use client";
 
-import { History, Target } from "lucide-react";
+import { BellOff, BotOff, History, Target } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { LEAD_STATUS_DOT } from "@/lib/lead-status-colors";
@@ -49,6 +49,16 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
           {contact.leadSource === "COLD_IMPORT" && (
             <span title="Imported old number">
               <History className="size-2.5 shrink-0 text-muted-foreground" />
+            </span>
+          )}
+          {contact.aiPaused && (
+            <span title="AI paused — replies aren't automated right now">
+              <BotOff className="size-2.5 shrink-0 text-amber-600" />
+            </span>
+          )}
+          {contact.optedOutAt && (
+            <span title="Opted out of promotions">
+              <BellOff className="size-2.5 shrink-0 text-amber-600" />
             </span>
           )}
           {contact.tags.slice(0, 2).map((t) => (

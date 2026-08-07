@@ -13,6 +13,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { formatDateTime } from "@/lib/format";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import { Campaign, CampaignReport } from "@/types";
 
 const FUNNEL_COLORS = [
@@ -139,14 +140,17 @@ export default function CampaignDetailPage() {
           ["Interested", report.interested],
           ["Booked", report.booked],
           ["Failed", report.failed],
-        ].map(([label, value]) => (
-          <Card key={label as string}>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-            </CardContent>
-          </Card>
-        ))}
+        ].map(([label, value]) => {
+          const isFailed = label === "Failed" && (value as number) > 0;
+          return (
+            <Card key={label as string} className={isFailed ? "border-destructive/30" : undefined}>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className={cn("mt-1 text-xl font-semibold tabular-nums", isFailed && "text-destructive")}>{value}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <Card>

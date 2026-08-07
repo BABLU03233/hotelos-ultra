@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
-import { Inbox } from "lucide-react";
+import { BellOff, BotOff, Inbox } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -72,8 +72,18 @@ function PipelineCard({
         )}
       </div>
       <p className="line-clamp-2 text-[11px] text-muted-foreground">{contact.lastMessage || "No messages yet"}</p>
-      {contact.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+      {(contact.tags.length > 0 || contact.aiPaused || contact.optedOutAt) && (
+        <div className="flex flex-wrap items-center gap-1">
+          {contact.aiPaused && (
+            <span title="AI paused — replies aren't automated right now">
+              <BotOff className="size-2.5 shrink-0 text-amber-600" />
+            </span>
+          )}
+          {contact.optedOutAt && (
+            <span title="Opted out of promotions">
+              <BellOff className="size-2.5 shrink-0 text-amber-600" />
+            </span>
+          )}
           {contact.tags.slice(0, 3).map((t) => (
             <span key={t} className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
               {t}

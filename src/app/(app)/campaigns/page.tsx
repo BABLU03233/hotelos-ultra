@@ -52,7 +52,17 @@ export default function CampaignsPage() {
                           {c.type} · {c._count?.recipients ?? 0} recipients · {formatDate(c.createdAt)}
                         </p>
                       </div>
-                      <span className="text-xs text-muted-foreground">{c.sentAt ? "Sent" : "Draft"}</span>
+                      <span
+                        className={
+                          c.sentAt
+                            ? "text-xs font-medium text-emerald-600"
+                            : c.scheduledAt
+                              ? "text-xs font-medium text-amber-600"
+                              : "text-xs text-muted-foreground"
+                        }
+                      >
+                        {c.sentAt ? "Sent" : c.scheduledAt ? "Scheduled" : "Draft"}
+                      </span>
                     </CardContent>
                   </Card>
                 </Link>

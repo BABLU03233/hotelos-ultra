@@ -229,9 +229,14 @@ function ContactDetailPane({
             </div>
           </button>
           {contact.aiPaused ? (
-            <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
-              <Bot /> Resume AI
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="hidden items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 sm:flex">
+                <Bot className="size-3" /> AI paused
+              </span>
+              <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
+                Resume AI
+              </Button>
+            </div>
           ) : (
             <div className="flex shrink-0 items-center gap-1">
               <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary sm:flex">
@@ -431,7 +436,14 @@ function ContactDetailPane({
                     {contact.followUpDate ? (
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-xs font-medium">{formatCountdown(contact.followUpDate)}</p>
+                          <p
+                            className={cn(
+                              "text-xs font-medium",
+                              new Date(contact.followUpDate) <= new Date() && "text-amber-600"
+                            )}
+                          >
+                            {formatCountdown(contact.followUpDate)}
+                          </p>
                           {contact.followUpNote && <p className="text-[11px] text-muted-foreground">{contact.followUpNote}</p>}
                         </div>
                         <button onClick={clearReminder} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
