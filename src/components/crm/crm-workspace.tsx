@@ -23,7 +23,7 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
 
   return (
     <div className="flex h-[calc(100dvh-9.5rem)] flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className={cn("items-center justify-between gap-2", view === "list" && selectedId ? "hidden md:flex" : "flex")}>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
           <Button
             variant={view === "pipeline" ? "secondary" : "ghost"}
