@@ -56,18 +56,24 @@ export function NotificationBell() {
                 <div key={n.id} className="flex items-start gap-2.5 border-b border-border p-3 last:border-0">
                   <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/crm?contact=${n.contact.id}`} className="text-xs font-medium hover:underline">
-                      {n.contact.name || n.contact.phone}
-                    </Link>
+                    <p className="text-xs font-medium">{n.contact.name || n.contact.phone}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.reason}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
-                      <button
-                        onClick={() => resolve(n.id)}
-                        className="text-[10px] font-medium text-primary hover:underline"
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+                        <button
+                          onClick={() => resolve(n.id)}
+                          className="text-[10px] font-medium text-muted-foreground hover:underline"
+                        >
+                          Mark resolved
+                        </button>
+                      </div>
+                      <Link
+                        href={`/crm?contact=${n.contact.id}`}
+                        className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground hover:opacity-90"
                       >
-                        Mark resolved
-                      </button>
+                        {style.actionLabel} →
+                      </Link>
                     </div>
                   </div>
                 </div>

@@ -60,23 +60,31 @@ export function DashboardAttentionPanel({
             key={n.id}
             className={
               n.type === "BOOKING"
-                ? "flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5"
-                : "flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5"
+                ? "flex flex-col gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5"
+                : "flex flex-col gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5"
             }
           >
-            <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <Link href={`/crm?contact=${n.contact.id}`} className="truncate text-xs font-medium hover:underline">
-                  {n.contact.name || n.contact.phone}
-                </Link>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+            <div className="flex items-start gap-2.5">
+              <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium">{n.contact.name || n.contact.phone}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
             </div>
-            <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
-              Mark resolved
-            </button>
+            <div className="flex items-center justify-end gap-3 pl-6">
+              <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-muted-foreground hover:underline">
+                Mark resolved
+              </button>
+              <Link
+                href={`/crm?contact=${n.contact.id}`}
+                className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-[10px] font-medium text-primary-foreground hover:opacity-90"
+              >
+                {style.actionLabel} →
+              </Link>
+            </div>
           </div>
         );
       })}

@@ -40,7 +40,7 @@ export function BookingAlert() {
       if (!initialized.current) continue; // don't toast the pre-existing backlog on first load
       toast.success(n.reason, {
         duration: 10_000,
-        action: { label: "View", onClick: () => router.push(`/crm?contact=${n.contact.id}`) },
+        action: { label: "View booking", onClick: () => router.push(`/crm?contact=${n.contact.id}`) },
       });
     }
     initialized.current = true;
