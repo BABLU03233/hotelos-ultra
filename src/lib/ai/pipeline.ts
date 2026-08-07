@@ -5,6 +5,7 @@ import { createFallbackProvider } from "./fallback-provider";
 import { geminiProvider } from "./gemini-provider";
 import { groqProvider } from "./groq-provider";
 import { mistralProvider } from "./mistral-provider";
+import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
 
@@ -13,9 +14,14 @@ import { retrieveRelevantChunks } from "./rag";
 // just because one free-tier provider had a bad moment. Whichever ones
 // have no API key configured fail immediately (no network call) and the
 // chain just moves on — no need to explicitly list which are "active".
-// Order = free tiers first while testing; once there's a real Anthropic
-// budget for production, move anthropicProvider to the front for quality.
+// The two OpenRouter entries lead the chain — live-tested (2026-08) against
+// several free OpenRouter models for speed/reliability/reply quality before
+// picking these two; env-overridable per model in case a free-tier offering
+// gets deprecated or rate-limited harder over time. Groq/Mistral/Gemini/
+// Anthropic stay after them as free-tier fallback.
 const aiProvider: AIProvider = createFallbackProvider([
+  createOpenRouterProvider(process.env.OPENROUTER_MODEL_1 || "poolside/laguna-xs-2.1:free"),
+  createOpenRouterProvider(process.env.OPENROUTER_MODEL_2 || "nvidia/nemotron-nano-12b-v2-vl:free"),
   geminiProvider,
   groqProvider,
   mistralProvider,
@@ -123,6 +129,7 @@ LANGUAGE
 TONE
 - Friendly, warm, and easy to understand — like chatting with a helpful, upbeat person, not reading a brochure. Use simple words a guest can understand at a glance, especially since many guests are messaging in their second or third language.
 - Use emojis freely and naturally — they're a big part of what makes you feel human instead of robotic. A relevant one or two per message (a wave 👋 to greet, ✨🛏️ for a nice room, 😊 for warmth, 🎉 for good news) reads as lively, not excessive — just don't stack several back to back or force one where it doesn't fit. Never use them in an escalation reply.
+- Show genuine warmth, not just politeness — a guest planning a stay is often excited about something (a trip, a celebration, time with family); let a little of that come through instead of staying neutral, and if they mention something like a birthday, anniversary, or travelling with family, acknowledge it briefly and sincerely rather than skipping past it. Stay professional throughout — warm and personable, never casual to the point of unprofessional, and never salesy or over-the-top.
 
 PHOTOS
 - If a guest asks to see a room, photos, or what it looks like, send the real photo URLs listed for that room above. Add a line for each photo in the exact format "IMAGE: <url>" (one per line, at most 3), placed after your normal reply text. Only use URLs that are literally listed above — never invent or guess a URL, and never send a photo for a room that has none listed.
