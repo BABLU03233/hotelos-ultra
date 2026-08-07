@@ -111,10 +111,16 @@ export default async function MarketingPage() {
             </p>
           </div>
           <div className="flex flex-col items-center gap-3 sm:flex-row md:justify-start">
-            <Button size="lg" className="h-11 w-full px-6 text-base sm:w-auto" render={<Link href="/register" />}>
+            <Button size="lg" className="h-11 w-full px-6 text-base sm:w-auto" nativeButton={false} render={<Link href="/register" />}>
               Start free trial
             </Button>
-            <Button size="lg" variant="outline" className="h-11 w-full px-6 text-base sm:w-auto" render={<a href="#features" />}>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-11 w-full px-6 text-base sm:w-auto"
+              nativeButton={false}
+              render={<a href="#features" />}
+            >
               See how it works
             </Button>
           </div>
@@ -275,7 +281,7 @@ export default async function MarketingPage() {
                   </li>
                 ))}
               </ul>
-              <Button size="lg" className="h-11 text-base" render={<Link href="/register" />}>
+              <Button size="lg" className="h-11 text-base" nativeButton={false} render={<Link href="/register" />}>
                 Start free trial
               </Button>
               <p className="text-center text-xs text-muted-foreground">No card required to get started.</p>

@@ -31,13 +31,13 @@ export function SiteNav({ loggedIn }: { loggedIn: boolean }) {
 
       <div className="flex items-center gap-2">
         {loggedIn ? (
-          <Button render={<Link href="/dashboard" />}>Go to dashboard</Button>
+          <Button nativeButton={false} render={<Link href="/dashboard" />}>Go to dashboard</Button>
         ) : (
           <>
-            <Button variant="ghost" render={<Link href="/login" />} className="hidden sm:inline-flex">
+            <Button variant="ghost" nativeButton={false} render={<Link href="/login" />} className="hidden sm:inline-flex">
               Log in
             </Button>
-            <Button render={<Link href="/register" />}>Start free trial</Button>
+            <Button nativeButton={false} render={<Link href="/register" />}>Start free trial</Button>
           </>
         )}
       </div>

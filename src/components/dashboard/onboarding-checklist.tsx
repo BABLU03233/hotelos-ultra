@@ -67,7 +67,7 @@ export function OnboardingChecklist({ setup, agentName = "Anushka" }: { setup: D
             <span className="flex items-center gap-2 text-sm font-medium">
               <PartyPopper className="size-4 text-[var(--color-chart-2)]" /> Setup complete — {agentName}&apos;s ready to go.
             </span>
-            <Button size="sm" variant="ghost" render={<Link href="/settings" />}>
+            <Button size="sm" variant="ghost" nativeButton={false} render={<Link href="/settings" />}>
               Review setup
             </Button>
           </CardContent>
@@ -127,6 +127,7 @@ export function OnboardingChecklist({ setup, agentName = "Anushka" }: { setup: D
                       ? "shrink-0 border-[#25D366] text-[#128C4A] hover:bg-[#25D366]/10"
                       : "shrink-0 border-primary text-primary"
                   }
+                  nativeButton={false}
                   render={<Link href={item.href} />}
                 >
                   {item.cta} →
