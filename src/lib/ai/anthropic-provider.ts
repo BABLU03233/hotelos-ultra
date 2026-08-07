@@ -18,6 +18,7 @@ function getClient(): Anthropic {
 }
 
 export const anthropicProvider: AIProvider = {
+  name: "anthropic",
   async chat({ systemPrompt, messages }) {
     const response = await getClient().messages.create({
       model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",

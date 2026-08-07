@@ -14,6 +14,7 @@ function getClient(): GoogleGenAI {
 
 /** Free-tier alternative to anthropicProvider — same AIProvider contract, tried first in the fallback chain (see pipeline.ts). */
 export const geminiProvider: AIProvider = {
+  name: "gemini",
   async chat({ systemPrompt, messages }) {
     const response = await getClient().models.generateContent({
       // "-latest" alias tracks Google's current flash-tier model — pinned

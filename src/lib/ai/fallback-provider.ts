@@ -12,10 +12,16 @@ export function createFallbackProvider(providers: AIProvider[]): AIProvider {
     async chat(params) {
       const errors: string[] = [];
       for (const provider of providers) {
+        const label = provider.name ?? "unnamed-provider";
+        const started = Date.now();
         try {
-          return await provider.chat(params);
+          const reply = await provider.chat(params);
+          console.log(`[ai-provider] ${label} replied in ${Date.now() - started}ms`);
+          return reply;
         } catch (err) {
-          errors.push(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(`[ai-provider] ${label} failed after ${Date.now() - started}ms: ${message}`);
+          errors.push(`${label}: ${message}`);
         }
       }
       throw new Error(`All AI providers failed: ${errors.join(" | ")}`);

@@ -2,6 +2,7 @@ import { AIProvider } from "./provider";
 
 /** Mistral's chat completions endpoint is OpenAI-compatible — plain fetch, no SDK needed. */
 export const mistralProvider: AIProvider = {
+  name: "mistral",
   async chat({ systemPrompt, messages }) {
     const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) throw new Error("MISTRAL_API_KEY is not set");

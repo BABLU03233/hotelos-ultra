@@ -5,6 +5,8 @@ export interface ChatMessage {
 
 /** Swappable chat-completion backend — default implementation is Anthropic (see anthropic-provider.ts). */
 export interface AIProvider {
+  /** For fallback-chain logging (see fallback-provider.ts) — which provider/model actually answered, and how long it took. */
+  name?: string;
   chat(params: { systemPrompt: string; messages: ChatMessage[] }): Promise<string>;
 }
 

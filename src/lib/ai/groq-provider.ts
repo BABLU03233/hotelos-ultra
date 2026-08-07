@@ -2,6 +2,7 @@ import { AIProvider } from "./provider";
 
 /** Groq's chat completions endpoint is OpenAI-compatible — plain fetch, no SDK needed. */
 export const groqProvider: AIProvider = {
+  name: "groq",
   async chat({ systemPrompt, messages }) {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error("GROQ_API_KEY is not set");
