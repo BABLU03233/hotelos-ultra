@@ -31,7 +31,7 @@ const ACTION_DESCRIPTIONS: Record<FollowUpAction, string> = {
   REMINDER: "A gentle nudge that they were looking at booking.",
   OFFER: "Mentions a current discount or promotion to re-spark interest.",
   PACKAGE: "Highlights a specific room or package that fits what they asked about.",
-  LAST: "The final message in this sequence — sent once, never repeated.",
+  LAST: "The final message in this sequence — turn on Repeat daily below to keep sending it every 24h until they reply.",
 };
 
 type DelayUnit = "minutes" | "hours" | "days";
@@ -142,6 +142,15 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
                 <Trash2 className="text-destructive" />
               </Button>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch checked={rule.repeatDaily} onCheckedChange={(checked) => patch({ repeatDaily: checked })} />
+            <span className="text-xs text-muted-foreground">
+              {rule.repeatDaily
+                ? "Repeat daily — resends this message every 24h until they reply, book, or the lead is closed"
+                : "Repeat daily (off) — sends once, then this rule is done"}
+            </span>
           </div>
 
           <div className="flex flex-col gap-1.5">

@@ -225,8 +225,8 @@ async function main() {
             order: 4,
             delayMinutes: 60 * 24 * 7,
             action: "LAST",
-            messageBody:
-              "Just following up one last time — whenever you're ready to book, we'd love to host you. Let us know!",
+            messageBody: "Just wanted to check in again — whenever you're ready to book, we'd love to host you. Let us know anytime!",
+            repeatDaily: true,
           },
         ],
       },

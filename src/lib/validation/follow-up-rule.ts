@@ -7,6 +7,7 @@ export const followUpRuleSchema = z.object({
   templateName: z.string().max(200).nullable().optional(),
   messageBody: z.string().max(2000).nullable().optional(),
   active: z.boolean().optional(),
+  repeatDaily: z.boolean().optional(),
 });
 export type FollowUpRuleInput = z.infer<typeof followUpRuleSchema>;
 

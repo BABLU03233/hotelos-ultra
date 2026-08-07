@@ -377,6 +377,10 @@ model FollowUpRule {
   templateName String?
   messageBody  String?
   active       Boolean        @default(true)
+  // When true, each time this rule fires (sent or skipped — see sweep.ts)
+  // it re-arms itself 24h later instead of stopping, until the guest
+  // replies (cancels all PENDING rows) or the lead is BOOKED/CLOSED.
+  repeatDaily  Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 

@@ -55,6 +55,7 @@ export interface FollowUpRule {
   templateName: string | null;
   messageBody: string | null;
   active: boolean;
+  repeatDaily: boolean;
 }
 
 export type ScheduledFollowUpStatus = "PENDING" | "SENT" | "CANCELLED" | "SKIPPED";

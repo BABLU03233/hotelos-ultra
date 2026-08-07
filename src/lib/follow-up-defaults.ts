@@ -1,8 +1,10 @@
 /**
  * Default follow-up cadence from the spec: +1h reminder, +24h offer,
- * +3d weekend package, +7d last follow-up. Seeded for every new tenant
- * (self-service register, and the seed script); fully editable afterwards
- * in Settings → Follow-ups.
+ * +3d weekend package, +7d last follow-up — then the last one repeats
+ * every 24h indefinitely (repeatDaily) until the guest replies or the
+ * lead is booked/closed. Seeded for every new tenant (self-service
+ * register, and the seed script); fully editable afterwards in
+ * Settings → Follow-ups.
  */
 export const DEFAULT_FOLLOW_UP_RULES = [
   {
@@ -28,7 +30,7 @@ export const DEFAULT_FOLLOW_UP_RULES = [
     order: 4,
     delayMinutes: 60 * 24 * 7,
     action: "LAST" as const,
-    messageBody:
-      "Just following up one last time — whenever you're ready to book, we'd love to host you. Let us know!",
+    messageBody: "Just wanted to check in again — whenever you're ready to book, we'd love to host you. Let us know anytime!",
+    repeatDaily: true,
   },
 ];

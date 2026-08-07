@@ -4,6 +4,7 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/tenant-credentials";
 
 const BATCH_SIZE = 50;
+const REPEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Sends every ScheduledFollowUp that's come due and is still PENDING.
@@ -39,6 +40,17 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
     if (decision.type === "skip") {
       await prisma.scheduledFollowUp.update({ where: { id: scheduled.id }, data: { status: "SKIPPED" } });
       skipped++;
+      if (rule.repeatDaily) {
+        await prisma.scheduledFollowUp.create({
+          data: {
+            tenantId: scheduled.tenantId,
+            contactId: contact.id,
+            ruleId: rule.id,
+            runAt: new Date(now.getTime() + REPEAT_INTERVAL_MS),
+            status: "PENDING",
+          },
+        });
+      }
       continue;
     }
 
@@ -86,6 +98,19 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
           },
         }),
         prisma.scheduledFollowUp.update({ where: { id: scheduled.id }, data: { status: "SENT" } }),
+        ...(rule.repeatDaily
+          ? [
+              prisma.scheduledFollowUp.create({
+                data: {
+                  tenantId: scheduled.tenantId,
+                  contactId: contact.id,
+                  ruleId: rule.id,
+                  runAt: new Date(now.getTime() + REPEAT_INTERVAL_MS),
+                  status: "PENDING" as const,
+                },
+              }),
+            ]
+          : []),
       ]);
       sent++;
     } catch (err) {
