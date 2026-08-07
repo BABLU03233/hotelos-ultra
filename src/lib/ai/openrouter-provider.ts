@@ -29,7 +29,11 @@ export function createOpenRouterProvider(model: string): AIProvider {
           max_tokens: 1024,
           messages: [{ role: "system", content: systemPrompt }, ...messages],
         }),
-        signal: AbortSignal.timeout(15_000),
+        // Shorter than the other providers' 15s: these are free-tier models
+        // further down the fallback chain now, so a slow/rate-limited one
+        // should hand off quickly rather than stack its own 15s wait on top
+        // of whatever the earlier providers in the chain already spent.
+        signal: AbortSignal.timeout(8_000),
       });
 
       if (!res.ok) {

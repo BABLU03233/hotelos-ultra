@@ -14,16 +14,20 @@ import { retrieveRelevantChunks } from "./rag";
 // just because one free-tier provider had a bad moment. Whichever ones
 // have no API key configured fail immediately (no network call) and the
 // chain just moves on — no need to explicitly list which are "active".
-// The two OpenRouter entries lead the chain — live-tested (2026-08) against
-// several free OpenRouter models for speed/reliability/reply quality before
-// picking these two; env-overridable per model in case a free-tier offering
-// gets deprecated or rate-limited harder over time. Groq/Mistral/Gemini/
-// Anthropic stay after them as free-tier fallback.
+// Groq leads the chain: the two free OpenRouter models originally picked
+// here (2026-08 live-testing) drifted — one now rate-limits on the shared
+// free pool, the other times out under a real system prompt — reproduced
+// live via the [ai-provider] logs below (each attempt eating up to its own
+// timeout before falling through added ~16s to every single reply). Groq's
+// free tier answered in under 500ms in that same test, so it goes first
+// now; the OpenRouter models stay as free-tier fallback in case Groq itself
+// has a bad moment, env-overridable per model if a free-tier offering gets
+// deprecated or rate-limited harder over time.
 const aiProvider: AIProvider = createFallbackProvider([
+  groqProvider,
   createOpenRouterProvider(process.env.OPENROUTER_MODEL_1 || "poolside/laguna-xs-2.1:free"),
   createOpenRouterProvider(process.env.OPENROUTER_MODEL_2 || "nvidia/nemotron-nano-12b-v2-vl:free"),
   geminiProvider,
-  groqProvider,
   mistralProvider,
   anthropicProvider,
 ]);
