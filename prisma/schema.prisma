@@ -115,6 +115,12 @@ enum CampaignRecipientStatus {
   INTERESTED
   BOOKED
   FAILED
+  CANCELLED
+}
+
+enum CampaignSendPacing {
+  ALL_AT_ONCE
+  SPACED
 }
 
 // ─── Tenant & auth ──────────────────────────────────────────────────────
@@ -436,6 +442,14 @@ model Campaign {
   mediaUrl     String?
   createdAt    DateTime            @default(now())
   sentAt       DateTime?
+
+  // ALL_AT_ONCE relies on the worker's existing global rate limiter
+  // (10/s, shared across every tenant) — today's default behavior.
+  // SPACED staggers each recipient's send by sendIntervalSeconds via a
+  // per-job BullMQ delay, for large batches the owner wants paced out
+  // rather than blasted.
+  sendPacing         CampaignSendPacing @default(ALL_AT_ONCE)
+  sendIntervalSeconds Int?
 
   metaTemplateId         String?
   metaTemplate           MetaTemplate? @relation(fields: [metaTemplateId], references: [id], onDelete: SetNull)

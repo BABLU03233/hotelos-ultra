@@ -30,7 +30,15 @@ import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
-import { CampaignMessageType, Contact, LeadSource, LeadStatus } from "@/types";
+import { CampaignMessageType, CampaignSendPacing, Contact, LeadSource, LeadStatus } from "@/types";
+
+type IntervalUnit = "seconds" | "minutes" | "hours";
+
+function intervalToSeconds(value: number, unit: IntervalUnit): number {
+  if (unit === "hours") return value * 3600;
+  if (unit === "minutes") return value * 60;
+  return value;
+}
 
 const MESSAGE_TYPE_LABELS: Record<CampaignMessageType, string> = {
   TEXT: "Text",
@@ -68,6 +76,9 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [mediaUrl, setMediaUrl] = React.useState("");
   const [metaTemplateId, setMetaTemplateId] = React.useState<string | null>(null);
   const [templateVariableValues, setTemplateVariableValues] = React.useState<Record<string, string>>({});
+  const [sendPacing, setSendPacing] = React.useState<CampaignSendPacing>("ALL_AT_ONCE");
+  const [intervalValue, setIntervalValue] = React.useState(1);
+  const [intervalUnit, setIntervalUnit] = React.useState<IntervalUnit>("minutes");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = React.useState(false);
   const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
@@ -112,6 +123,8 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           mediaUrl: mediaUrl || null,
           metaTemplateId,
           templateVariableValues: Object.keys(templateVariableValues).length ? templateVariableValues : null,
+          sendPacing,
+          sendIntervalSeconds: sendPacing === "SPACED" ? intervalToSeconds(intervalValue, intervalUnit) : null,
           contactIds: [...selectedIds],
         }),
       });
@@ -120,6 +133,9 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setBody("");
       setMetaTemplateId(null);
       setTemplateVariableValues({});
+      setSendPacing("ALL_AT_ONCE");
+      setIntervalValue(1);
+      setIntervalUnit("minutes");
       setSelectedIds(new Set());
       onCreated();
     } finally {
@@ -250,6 +266,55 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                 )}
               </div>
             </ScrollArea>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Sending speed</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {(["ALL_AT_ONCE", "SPACED"] as const).map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setSendPacing(p)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    sendPacing === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  )}
+                >
+                  {p === "ALL_AT_ONCE" ? "All at once" : "Spaced out"}
+                </button>
+              ))}
+            </div>
+            {sendPacing === "ALL_AT_ONCE" ? (
+              <p className="text-[11px] text-muted-foreground">Every recipient is queued immediately — fastest option, good for smaller lists.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Send one every</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={intervalValue}
+                    onChange={(e) => setIntervalValue(Number(e.target.value))}
+                    className="w-16"
+                  />
+                  <Select value={intervalUnit} onValueChange={(v) => v && setIntervalUnit(v as IntervalUnit)}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="seconds">Seconds</SelectItem>
+                      <SelectItem value="minutes">Minutes</SelectItem>
+                      <SelectItem value="hours">Hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Staggers each recipient by this interval, up to 6h total spread. You can cancel remaining sends from the campaign
+                  detail view once it&apos;s running. Meta&apos;s own template pacing limits are separate and still apply.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

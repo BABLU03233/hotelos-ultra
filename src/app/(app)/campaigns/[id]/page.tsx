@@ -29,6 +29,11 @@ export default function CampaignDetailPage() {
     reload();
   }
 
+  async function cancelRemaining() {
+    await apiFetch(`/api/campaigns/${params.id}/cancel`, { method: "POST" });
+    reload();
+  }
+
   if (loading || !data) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -61,6 +66,11 @@ export default function CampaignDetailPage() {
           {!campaign.sentAt && (
             <Button onClick={send} disabled={report.totalContacts === 0}>
               Send now
+            </Button>
+          )}
+          {campaign.sentAt && campaign.sendPacing === "SPACED" && report.pending > 0 && (
+            <Button variant="outline" onClick={cancelRemaining}>
+              Cancel remaining sends
             </Button>
           )}
         </div>

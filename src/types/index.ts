@@ -97,6 +97,7 @@ export interface MetaTemplate {
 }
 
 export type CampaignMessageType = "TEXT" | "IMAGE" | "TEMPLATE";
+export type CampaignSendPacing = "ALL_AT_ONCE" | "SPACED";
 
 export interface Campaign {
   id: string;
@@ -108,6 +109,8 @@ export interface Campaign {
   templateVariableValues: Record<string, string> | null;
   body: string | null;
   mediaUrl: string | null;
+  sendPacing: CampaignSendPacing;
+  sendIntervalSeconds: number | null;
   createdAt: string;
   sentAt: string | null;
   _count?: { recipients: number };
@@ -133,7 +136,8 @@ export type CampaignRecipientStatus =
   | "REPLIED"
   | "INTERESTED"
   | "BOOKED"
-  | "FAILED";
+  | "FAILED"
+  | "CANCELLED";
 
 export interface CampaignRecipient {
   id: string;

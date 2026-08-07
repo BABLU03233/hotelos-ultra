@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<CampaignRecipientStatus | "ALL", string> = {
   INTERESTED: "Interested",
   BOOKED: "Booked",
   FAILED: "Failed",
+  CANCELLED: "Cancelled",
 };
 
 const STATUS_TONE: Record<CampaignRecipientStatus, string> = {
@@ -36,6 +37,7 @@ const STATUS_TONE: Record<CampaignRecipientStatus, string> = {
   INTERESTED: "bg-amber-500/10 text-amber-600",
   BOOKED: "bg-emerald-500/10 text-emerald-600",
   FAILED: "bg-destructive/10 text-destructive",
+  CANCELLED: "bg-muted text-muted-foreground",
 };
 
 export function RecipientTable({ campaignId }: { campaignId: string }) {
