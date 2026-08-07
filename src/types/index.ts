@@ -76,6 +76,24 @@ export interface StaffNotification {
   contact: { id: string; name: string | null; phone: string };
 }
 
+export type MetaTemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
+
+export interface MetaTemplate {
+  id: string;
+  name: string;
+  category: MetaTemplateCategory;
+  language: string;
+  status: string;
+  rejectionReason: string | null;
+  metaTemplateId: string | null;
+  components: Record<string, unknown>[];
+  headerType: string | null;
+  headerMediaUrl: string | null;
+  bodyVariableSlots: { source: "guest_name" | "hotel_name" | "custom"; label: string }[];
+  lastStatusCheckAt: string | null;
+  createdAt: string;
+}
+
 export type CampaignMessageType = "TEXT" | "IMAGE" | "TEMPLATE";
 
 export interface Campaign {

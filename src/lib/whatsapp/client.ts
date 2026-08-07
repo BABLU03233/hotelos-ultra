@@ -3,6 +3,7 @@ const GRAPH_VERSION = "v21.0";
 export interface WhatsAppCredentials {
   phoneNumberId: string;
   accessToken: string;
+  wabaId?: string;
 }
 
 type OutboundMessage =

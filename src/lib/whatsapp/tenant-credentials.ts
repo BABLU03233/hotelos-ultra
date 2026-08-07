@@ -8,6 +8,7 @@ export async function getWhatsAppCredentials(tenantId: string): Promise<WhatsApp
   return {
     phoneNumberId: tenant.whatsappPhoneNumberId,
     accessToken: decryptSecret(tenant.whatsappAccessToken),
+    wabaId: tenant.whatsappWabaId ?? undefined,
   };
 }
 

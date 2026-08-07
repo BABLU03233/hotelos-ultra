@@ -100,6 +100,12 @@ enum CampaignMessageType {
   TEMPLATE
 }
 
+enum MetaTemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
 enum CampaignRecipientStatus {
   PENDING
   SENT
@@ -146,6 +152,7 @@ model Tenant {
   scheduledFollowUps ScheduledFollowUp[]
   campaigns          Campaign[]
   staffNotifications StaffNotification[]
+  metaTemplates      MetaTemplate[]
 }
 
 model User {
@@ -439,4 +446,42 @@ model CampaignRecipient {
 
   @@unique([campaignId, contactId])
   @@index([campaignId, status])
+}
+
+// ─── WhatsApp Meta-approved templates ───────────────────────────────────
+
+// A template this tenant created (or synced) through the in-app builder,
+// tracked against Meta's own Message Templates API — separate from
+// wa-templates.ts, which is static starter copy with no connection to Meta
+// at all. `status` deliberately stores whatever raw string Meta returns
+// rather than a hardcoded enum, since Meta's real status vocabulary is
+// richer than a simple APPROVED/REJECTED pair and can change server-side
+// independent of anything this app does.
+model MetaTemplate {
+  id                String               @id @default(cuid())
+  tenantId          String
+  name              String
+  category          MetaTemplateCategory @default(MARKETING)
+  language          String
+  status            String               @default("PENDING")
+  rejectionReason   String?              @db.Text
+  // Meta's own numeric template id, once known (from the create response or a status refresh).
+  metaTemplateId    String?
+  // The exact `components` array as submitted to Meta — source of truth for
+  // the preview and for resolving variables at send time.
+  components        Json
+  headerType        String?
+  // Our own S3 copy of a header image, reused as the `image.link` value at send time.
+  headerMediaUrl    String?
+  // Ordered [{ source: "guest_name" | "hotel_name" | "custom", label }] describing
+  // each {{n}} placeholder in the body, in position order.
+  bodyVariableSlots Json                 @default("[]")
+  lastStatusCheckAt DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name, language])
+  @@index([tenantId, status])
 }
