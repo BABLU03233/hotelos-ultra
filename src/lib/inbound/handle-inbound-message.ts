@@ -126,7 +126,15 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     data: { status: "REPLIED" },
   });
 
-  await messageQueue.add("process", { tenantId: tenant.id, contactId: contact.id, messageId: messageRow.id });
+  // jobId keyed to the inbound message: if this same message is ever
+  // enqueued twice (e.g. a Meta webhook retry that got past the
+  // whatsappMessageId dedup check above via a race), BullMQ treats a
+  // duplicate jobId as a no-op instead of processing it a second time.
+  await messageQueue.add(
+    "process",
+    { tenantId: tenant.id, contactId: contact.id, messageId: messageRow.id },
+    { jobId: messageRow.id }
+  );
 }
 
 function mapStatus(status: StatusUpdate["status"]): MessageStatus {

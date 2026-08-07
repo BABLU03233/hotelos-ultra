@@ -103,58 +103,69 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     return;
   }
 
-  await prisma.message.create({
-    data: {
-      tenantId,
-      contactId,
-      direction: "OUT",
-      type: "TEXT",
-      content: reply,
-      whatsappMessageId,
-      status: "SENT",
-    },
-  });
-
-  for (const url of imageUrls) {
-    try {
-      const imageMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "image", link: url });
-      await prisma.message.create({
-        data: {
-          tenantId,
-          contactId,
-          direction: "OUT",
-          type: "IMAGE",
-          mediaUrl: url,
-          whatsappMessageId: imageMessageId,
-          status: "SENT",
-        },
-      });
-    } catch (err) {
-      // Non-fatal: the guest already has Anushka's text reply, a missed photo isn't worth escalating over.
-      console.error(`Failed to send room photo for tenant ${tenantId}, contact ${contactId}:`, err);
-    }
-  }
-
-  if (shouldEscalate) {
-    await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: escalationReason || "Anushka couldn't answer confidently" },
+  // Anushka's reply is already on WhatsApp at this point — everything below
+  // is bookkeeping (persisting the record, notifying staff, updating contact
+  // state, scheduling follow-ups). None of it may ever throw past this try:
+  // an uncaught error here would make BullMQ retry the whole job (up to
+  // `attempts: 3`, see queues.ts), which would call generateReply and
+  // sendWhatsAppMessage again — a second, differently-worded reply to a
+  // guest who already got one.
+  try {
+    await prisma.message.create({
+      data: {
+        tenantId,
+        contactId,
+        direction: "OUT",
+        type: "TEXT",
+        content: reply,
+        whatsappMessageId,
+        status: "SENT",
+      },
     });
-  }
 
-  const summary = await summarizeConversation([...history, { role: "user", content: latestInbound.content }, { role: "assistant", content: reply }]).catch(
-    () => contact.aiSummary ?? ""
-  );
+    for (const url of imageUrls) {
+      try {
+        const imageMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "image", link: url });
+        await prisma.message.create({
+          data: {
+            tenantId,
+            contactId,
+            direction: "OUT",
+            type: "IMAGE",
+            mediaUrl: url,
+            whatsappMessageId: imageMessageId,
+            status: "SENT",
+          },
+        });
+      } catch (err) {
+        // Non-fatal: the guest already has Anushka's text reply, a missed photo isn't worth escalating over.
+        console.error(`Failed to send room photo for tenant ${tenantId}, contact ${contactId}:`, err);
+      }
+    }
 
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      lastMessage: reply,
-      aiSummary: summary,
-      leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
-    },
-  });
+    if (shouldEscalate) {
+      await prisma.staffNotification.create({
+        data: { tenantId, contactId, reason: escalationReason || "Anushka couldn't answer confidently" },
+      });
+    }
 
-  if (contact.leadStatus !== "BOOKED" && contact.leadStatus !== "CLOSED") {
-    await scheduleFollowUps(tenantId, contactId);
+    const summary = await summarizeConversation([...history, { role: "user", content: latestInbound.content }, { role: "assistant", content: reply }]).catch(
+      () => contact.aiSummary ?? ""
+    );
+
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        lastMessage: reply,
+        aiSummary: summary,
+        leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
+      },
+    });
+
+    if (contact.leadStatus !== "BOOKED" && contact.leadStatus !== "CLOSED") {
+      await scheduleFollowUps(tenantId, contactId);
+    }
+  } catch (err) {
+    console.error(`Post-send bookkeeping failed for tenant ${tenantId}, contact ${contactId}:`, err);
   }
 }
