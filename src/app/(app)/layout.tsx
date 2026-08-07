@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { AuthHydrator } from "@/components/app-shell/auth-hydrator";
+import { BookingAlert } from "@/components/app-shell/booking-alert";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { WhatsAppBanner } from "@/components/app-shell/whatsapp-banner";
 import { getSessionFromCookies } from "@/lib/auth/session";
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         user={{ id: user.id, name: user.name, email: user.email, role: user.role }}
         tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug, aiAgentName: agentName }}
       />
+      <BookingAlert />
       <Sidebar hotelName={tenant.name} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader hotelName={tenant.name} userName={user.name} userEmail={user.email} />

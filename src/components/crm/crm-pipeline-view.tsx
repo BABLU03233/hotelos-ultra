@@ -42,7 +42,8 @@ function PipelineCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: contact.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const unread = !!contact.lastInboundAt && (!contact.lastReadAt || new Date(contact.lastInboundAt) > new Date(contact.lastReadAt));
+  const unreadCount = contact.unreadCount ?? 0;
+  const unread = unreadCount > 0;
 
   return (
     <button
@@ -64,7 +65,11 @@ function PipelineCard({
         <p className={cn("min-w-0 flex-1 truncate text-xs", unread ? "font-semibold" : "font-medium")}>
           {contact.name || contact.phone}
         </p>
-        {unread && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
+        {unread && (
+          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </div>
       <p className="line-clamp-2 text-[11px] text-muted-foreground">{contact.lastMessage || "No messages yet"}</p>
       {contact.tags.length > 0 && (

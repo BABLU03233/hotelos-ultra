@@ -53,6 +53,7 @@ export const POST = apiRoute(async (req: NextRequest) => {
       mediaUrl: body.mediaUrl,
       sendPacing: body.sendPacing,
       sendIntervalSeconds: body.sendPacing === "SPACED" ? body.sendIntervalSeconds : null,
+      scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       recipients: {
         createMany: { data: validContacts.map((c) => ({ contactId: c.id })) },
       },

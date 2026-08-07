@@ -1,12 +1,16 @@
 "use client";
 
+import * as React from "react";
 import { useParams } from "next/navigation";
+import { CalendarClock } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecipientTable } from "@/components/campaigns/recipient-table";
 import { Reveal } from "@/components/motion/reveal";
+import { formatDateTime } from "@/lib/format";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { Campaign, CampaignReport } from "@/types";
@@ -23,6 +27,8 @@ const FUNNEL_COLORS = [
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const { data, loading, reload } = useFetch<{ campaign: Campaign; report: CampaignReport }>(`/api/campaigns/${params.id}`);
+  const [rescheduleValue, setRescheduleValue] = React.useState("");
+  const [rescheduling, setRescheduling] = React.useState(false);
 
   async function send() {
     await apiFetch(`/api/campaigns/${params.id}/send`, { method: "POST" });
@@ -32,6 +38,26 @@ export default function CampaignDetailPage() {
   async function cancelRemaining() {
     await apiFetch(`/api/campaigns/${params.id}/cancel`, { method: "POST" });
     reload();
+  }
+
+  async function cancelSchedule() {
+    await apiFetch(`/api/campaigns/${params.id}`, { method: "PATCH", body: JSON.stringify({ scheduledAt: null }) });
+    reload();
+  }
+
+  async function updateSchedule() {
+    if (!rescheduleValue) return;
+    setRescheduling(true);
+    try {
+      await apiFetch(`/api/campaigns/${params.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ scheduledAt: new Date(rescheduleValue).toISOString() }),
+      });
+      setRescheduleValue("");
+      reload();
+    } finally {
+      setRescheduling(false);
+    }
   }
 
   if (loading || !data) {
@@ -75,6 +101,33 @@ export default function CampaignDetailPage() {
           )}
         </div>
       </Reveal>
+
+      {!campaign.sentAt && campaign.scheduledAt && (
+        <Reveal>
+          <Card>
+            <CardContent className="flex flex-col gap-2">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <CalendarClock className="size-4 shrink-0 text-primary" />
+                Scheduled to send automatically on {formatDateTime(campaign.scheduledAt)}
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Input
+                  type="datetime-local"
+                  value={rescheduleValue}
+                  onChange={(e) => setRescheduleValue(e.target.value)}
+                  className="w-56"
+                />
+                <Button size="sm" variant="outline" disabled={!rescheduleValue || rescheduling} onClick={updateSchedule}>
+                  Reschedule
+                </Button>
+                <Button size="sm" variant="ghost" onClick={cancelSchedule}>
+                  Cancel schedule
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
+      )}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
         {[

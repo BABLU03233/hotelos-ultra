@@ -5,7 +5,9 @@
 import "dotenv/config";
 import { createServer } from "http";
 import { Worker } from "bullmq";
+import { sweepDueCampaigns } from "@/lib/campaigns/send";
 import { sendCampaignToRecipient } from "@/lib/campaigns/send-recipient";
+import { sweepDueFollowUpReminders } from "@/lib/contacts/reminder-sweep";
 import { sweepDueFollowUps } from "@/lib/follow-ups/sweep";
 import { processMessageJob } from "@/lib/inbound/process-message-job";
 import { redisConnection } from "@/lib/queue/redis";
@@ -48,7 +50,7 @@ const campaignWorker = new Worker<CampaignSendJob>(
 messageWorker.on("failed", (job, err) => console.error(`message-processing job ${job?.id} failed:`, err));
 campaignWorker.on("failed", (job, err) => console.error(`campaign-send job ${job?.id} failed:`, err));
 
-const FOLLOW_UP_SWEEP_INTERVAL_MS = 60_000;
+const SWEEP_INTERVAL_MS = 60_000;
 
 async function runFollowUpSweep() {
   try {
@@ -61,10 +63,36 @@ async function runFollowUpSweep() {
   }
 }
 
-runFollowUpSweep();
-const sweepInterval = setInterval(runFollowUpSweep, FOLLOW_UP_SWEEP_INTERVAL_MS);
+// Same lightweight polling pattern as the follow-up sweep — a scheduled
+// campaign is a single row check, not worth a dedicated BullMQ delayed job.
+async function runCampaignScheduleSweep() {
+  try {
+    const sent = await sweepDueCampaigns();
+    if (sent) console.log(`Campaign schedule sweep: sent ${sent} scheduled campaign(s)`);
+  } catch (err) {
+    console.error("Campaign schedule sweep failed:", err);
+  }
+}
 
-console.log("HotelOS Ultra worker started — message-processing, campaign-send, follow-up sweep (every 60s).");
+async function runReminderSweep() {
+  try {
+    const count = await sweepDueFollowUpReminders();
+    if (count) console.log(`Follow-up reminder sweep: notified staff about ${count} due reminder(s)`);
+  } catch (err) {
+    console.error("Follow-up reminder sweep failed:", err);
+  }
+}
+
+async function runSweeps() {
+  await runFollowUpSweep();
+  await runCampaignScheduleSweep();
+  await runReminderSweep();
+}
+
+runSweeps();
+const sweepInterval = setInterval(runSweeps, SWEEP_INTERVAL_MS);
+
+console.log("HotelOS Ultra worker started — message-processing, campaign-send, follow-up + campaign-schedule + reminder sweep (every 60s).");
 
 async function shutdown() {
   clearInterval(sweepInterval);

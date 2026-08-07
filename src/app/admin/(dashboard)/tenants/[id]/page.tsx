@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminContactList } from "@/components/admin/admin-contact-list";
 import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
 import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
@@ -223,6 +224,15 @@ export default function AdminTenantDetailPage() {
               <Badge variant="outline">{u.role === "OWNER" ? "Owner" : "Staff"}</Badge>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Guests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AdminContactList tenantId={tenant.id} />
         </CardContent>
       </Card>
     </div>

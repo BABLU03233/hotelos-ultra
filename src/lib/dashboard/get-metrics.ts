@@ -123,6 +123,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     recentNotifications: recentNotifications.map((n) => ({
       id: n.id,
       reason: n.reason,
+      type: n.type,
       resolved: n.resolved,
       createdAt: n.createdAt.toISOString(),
       contact: n.contact,

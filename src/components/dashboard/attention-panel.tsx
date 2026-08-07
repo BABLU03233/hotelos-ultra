@@ -2,12 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CircleCheck, TriangleAlert } from "lucide-react";
+import { CalendarClock, CircleCheck, PartyPopper, TriangleAlert } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatRelativeTime } from "@/lib/format";
+import { NOTIFICATION_STYLE } from "@/lib/notification-style";
 import { useAuthStore } from "@/store/use-auth-store";
 import { StaffNotification } from "@/types";
+
+const ICONS = { PartyPopper, CalendarClock, TriangleAlert };
 
 const POLL_MS = 20_000;
 const DISPLAY_LIMIT = 5;
@@ -49,23 +52,34 @@ export function DashboardAttentionPanel({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {visible.map((n) => (
-        <div key={n.id} className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <Link href={`/crm?contact=${n.contact.id}`} className="truncate text-xs font-medium hover:underline">
-                {n.contact.name || n.contact.phone}
-              </Link>
-              <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+      {visible.map((n) => {
+        const style = NOTIFICATION_STYLE[n.type];
+        const Icon = ICONS[style.icon];
+        return (
+          <div
+            key={n.id}
+            className={
+              n.type === "BOOKING"
+                ? "flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5"
+                : "flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5"
+            }
+          >
+            <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <Link href={`/crm?contact=${n.contact.id}`} className="truncate text-xs font-medium hover:underline">
+                  {n.contact.name || n.contact.phone}
+                </Link>
+                <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
+            <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
+              Mark resolved
+            </button>
           </div>
-          <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
-            Mark resolved
-          </button>
-        </div>
-      ))}
+        );
+      })}
       {count > visible.length && (
         <p className="pt-1 text-center text-[11px] text-muted-foreground">+{count - visible.length} more</p>
       )}

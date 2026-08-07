@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, TriangleAlert } from "lucide-react";
+import { Bell, CalendarClock, PartyPopper, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,8 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/format";
+import { NOTIFICATION_STYLE } from "@/lib/notification-style";
 import { useAuthStore } from "@/store/use-auth-store";
 import { StaffNotification } from "@/types";
+
+const ICONS = { PartyPopper, CalendarClock, TriangleAlert };
 
 export function NotificationBell() {
   const { data, reload } = useFetch<{ notifications: StaffNotification[] }>("/api/notifications", 20_000);
@@ -46,9 +49,12 @@ export function NotificationBell() {
             <p className="p-6 text-center text-xs text-muted-foreground">{agentName}&apos;s handling everything — nothing needs you right now.</p>
           ) : (
             <div className="flex flex-col">
-              {notifications.map((n) => (
+              {notifications.map((n) => {
+                const style = NOTIFICATION_STYLE[n.type];
+                const Icon = ICONS[style.icon];
+                return (
                 <div key={n.id} className="flex items-start gap-2.5 border-b border-border p-3 last:border-0">
-                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                  <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
                   <div className="min-w-0 flex-1">
                     <Link href={`/crm?contact=${n.contact.id}`} className="text-xs font-medium hover:underline">
                       {n.contact.name || n.contact.phone}
@@ -65,7 +71,8 @@ export function NotificationBell() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>

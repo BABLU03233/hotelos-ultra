@@ -19,6 +19,7 @@ export interface Contact {
   aiSummary: string | null;
   aiPaused: boolean;
   followUpDate: string | null;
+  followUpNote: string | null;
   notes: string | null;
   tags: string[];
   lastReadAt: string | null;
@@ -28,6 +29,9 @@ export interface Contact {
   sourceDetail: string | null;
   optedOutAt: string | null;
   updatedAt: string;
+  // Only populated by GET /api/contacts (the list endpoint) — a real count
+  // of inbound messages since lastReadAt, not just a boolean unread flag.
+  unreadCount?: number;
 }
 
 export type MessageDirection = "IN" | "OUT";
@@ -71,9 +75,12 @@ export interface ScheduledFollowUp {
   contact?: { id: string; name: string | null; phone: string };
 }
 
+export type StaffNotificationType = "ESCALATION" | "BOOKING" | "REMINDER";
+
 export interface StaffNotification {
   id: string;
   reason: string;
+  type: StaffNotificationType;
   resolved: boolean;
   createdAt: string;
   contact: { id: string; name: string | null; phone: string };
@@ -112,6 +119,7 @@ export interface Campaign {
   mediaUrl: string | null;
   sendPacing: CampaignSendPacing;
   sendIntervalSeconds: number | null;
+  scheduledAt: string | null;
   createdAt: string;
   sentAt: string | null;
   _count?: { recipients: number };

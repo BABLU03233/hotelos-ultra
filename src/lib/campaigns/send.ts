@@ -37,3 +37,23 @@ export async function queueCampaignSend(campaignId: string): Promise<number> {
 
   return pending.length;
 }
+
+/**
+ * Picks up campaigns whose scheduledAt has come due and haven't been sent
+ * yet, and fires them off exactly like clicking "Send now" would. Called on
+ * a fixed interval by the worker process (src/worker/index.ts), the same
+ * polling-sweep pattern as sweepDueFollowUps — a scheduled campaign is a
+ * single row check, not worth a dedicated BullMQ delayed job.
+ */
+export async function sweepDueCampaigns(now = new Date()): Promise<number> {
+  const due = await prisma.campaign.findMany({
+    where: { scheduledAt: { lte: now }, sentAt: null },
+    select: { id: true },
+  });
+
+  for (const campaign of due) {
+    await queueCampaignSend(campaign.id);
+  }
+
+  return due.length;
+}

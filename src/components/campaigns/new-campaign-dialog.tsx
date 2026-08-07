@@ -79,6 +79,8 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [sendPacing, setSendPacing] = React.useState<CampaignSendPacing>("ALL_AT_ONCE");
   const [intervalValue, setIntervalValue] = React.useState(1);
   const [intervalUnit, setIntervalUnit] = React.useState<IntervalUnit>("minutes");
+  const [sendTiming, setSendTiming] = React.useState<"now" | "scheduled">("now");
+  const [scheduledAt, setScheduledAt] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = React.useState(false);
   const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
@@ -125,6 +127,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           templateVariableValues: Object.keys(templateVariableValues).length ? templateVariableValues : null,
           sendPacing,
           sendIntervalSeconds: sendPacing === "SPACED" ? intervalToSeconds(intervalValue, intervalUnit) : null,
+          scheduledAt: sendTiming === "scheduled" && scheduledAt ? new Date(scheduledAt).toISOString() : null,
           contactIds: [...selectedIds],
         }),
       });
@@ -136,6 +139,8 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setSendPacing("ALL_AT_ONCE");
       setIntervalValue(1);
       setIntervalUnit("minutes");
+      setSendTiming("now");
+      setScheduledAt("");
       setSelectedIds(new Set());
       onCreated();
     } finally {
@@ -143,7 +148,11 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
     }
   }
 
-  const canSubmit = name.trim() && selectedIds.size > 0 && (messageType !== "TEMPLATE" || !!metaTemplateId);
+  const canSubmit =
+    name.trim() &&
+    selectedIds.size > 0 &&
+    (messageType !== "TEMPLATE" || !!metaTemplateId) &&
+    (sendTiming !== "scheduled" || !!scheduledAt);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -269,6 +278,38 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <Label>When to send</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {(["now", "scheduled"] as const).map((t) => (
+                <button
+                  type="button"
+                  key={t}
+                  onClick={() => setSendTiming(t)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    sendTiming === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  )}
+                >
+                  {t === "now" ? "Manual — I'll hit send" : "Schedule for later"}
+                </button>
+              ))}
+            </div>
+            {sendTiming === "scheduled" && (
+              <div className="flex flex-col gap-1.5">
+                <Input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Sends automatically at this date/time — no need to come back and click send. You can reschedule or cancel it from the
+                  campaign detail view any time before it fires.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label>Sending speed</Label>
             <div className="flex flex-wrap gap-1.5">
               {(["ALL_AT_ONCE", "SPACED"] as const).map((p) => (
@@ -320,7 +361,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
 
         <DialogFooter>
           <Button disabled={!canSubmit || submitting} onClick={submit}>
-            {submitting ? "Creating…" : "Create campaign"}
+            {submitting ? "Creating…" : sendTiming === "scheduled" ? "Schedule campaign" : "Create campaign"}
           </Button>
         </DialogFooter>
       </DialogContent>

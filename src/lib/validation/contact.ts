@@ -6,6 +6,7 @@ export const contactUpdateSchema = z.object({
   bookingStatus: z.enum(["NONE", "PENDING", "CONFIRMED", "CANCELLED"]).optional(),
   notes: z.string().max(5000).nullable().optional(),
   followUpDate: z.string().datetime().nullable().optional(),
+  followUpNote: z.string().max(500).nullable().optional(),
   aiPaused: z.boolean().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   assignedToId: z.string().nullable().optional(),

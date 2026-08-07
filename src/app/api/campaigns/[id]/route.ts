@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiRoute, notFound } from "@/lib/api-error";
+import { z } from "zod";
+import { ApiError, apiRoute, notFound } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+const patchSchema = z.object({
+  // null cancels the schedule (campaign goes back to manual "Send now"); a
+  // future ISO datetime reschedules it.
+  scheduledAt: z.string().datetime().nullable(),
+});
 
 export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const { db } = requireTenantDb(req);
@@ -34,4 +41,23 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   };
 
   return NextResponse.json({ campaign, report });
+});
+
+export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
+  const { db } = requireTenantDb(req);
+  const { id } = await ctx.params;
+  const body = patchSchema.parse(await req.json());
+
+  const existing = await db.campaign.findUnique({ where: { id } });
+  if (!existing) throw notFound("Campaign not found");
+  if (existing.sentAt) throw new ApiError(400, "This campaign has already been sent.");
+  if (body.scheduledAt && new Date(body.scheduledAt).getTime() <= Date.now()) {
+    throw new ApiError(400, "scheduledAt must be in the future");
+  }
+
+  const campaign = await db.campaign.update({
+    where: { id },
+    data: { scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null },
+  });
+  return NextResponse.json({ campaign });
 });

@@ -314,7 +314,14 @@ model Contact {
   // Set true the moment staff sends a manual reply — pauses the AI for this
   // contact until a staff member flips it back off (see M3 in the spec).
   aiPaused       Boolean       @default(false)
+  // A manually scheduled reminder (calendar date/time picker in the CRM) —
+  // separate from the automated FollowUpRule ladder. When followUpDate
+  // comes due, the worker's reminder sweep creates a REMINDER-type
+  // StaffNotification prompting staff to personally reach out, then clears
+  // both fields — it's a nudge to a human, not an automatic WhatsApp send,
+  // since a one-off manual follow-up usually needs personal context.
   followUpDate   DateTime?
+  followUpNote   String?
   notes          String?       @db.Text
   // CRM tags (free-form labels, e.g. "VIP", "Corporate") and read-state /
   // ownership for the team inbox view.
@@ -372,13 +379,25 @@ model Message {
   @@index([tenantId, contactId, createdAt])
 }
 
+// ESCALATION: the AI couldn't handle something confidently (existing default
+// behavior, unchanged). BOOKING: a contact's leadStatus just moved to BOOKED
+// — rendered as a more insistent popup + flashing tab title on the
+// dashboard, not just the passive notification list. REMINDER: a manually
+// scheduled follow-up (Contact.followUpDate) has come due.
+enum StaffNotificationType {
+  ESCALATION
+  BOOKING
+  REMINDER
+}
+
 model StaffNotification {
-  id        String   @id @default(cuid())
+  id        String                @id @default(cuid())
   tenantId  String
   contactId String
   reason    String
-  resolved  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  type      StaffNotificationType @default(ESCALATION)
+  resolved  Boolean               @default(false)
+  createdAt DateTime              @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -449,6 +468,12 @@ model Campaign {
   mediaUrl     String?
   createdAt    DateTime            @default(now())
   sentAt       DateTime?
+  // Set to send this campaign automatically at a future date/time instead
+  // of immediately — the worker's campaign-schedule sweep (see
+  // sweepDueCampaigns in send.ts) picks it up once scheduledAt has passed
+  // and sentAt is still null, exactly like the follow-up sweep does for
+  // ScheduledFollowUp rows.
+  scheduledAt  DateTime?
 
   // ALL_AT_ONCE relies on the worker's existing global rate limiter
   // (10/s, shared across every tenant) — today's default behavior.

@@ -8,7 +8,8 @@ import { Contact } from "@/types";
 import { cn } from "@/lib/utils";
 
 export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
-  const unread = !!contact.lastInboundAt && (!contact.lastReadAt || new Date(contact.lastInboundAt) > new Date(contact.lastReadAt));
+  const unreadCount = contact.unreadCount ?? 0;
+  const unread = unreadCount > 0;
 
   return (
     <button
@@ -55,7 +56,11 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
               {t}
             </span>
           ))}
-          {unread && <span className="ml-auto size-2 shrink-0 rounded-full bg-primary" />}
+          {unread && (
+            <span className="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-semibold text-primary-foreground">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </div>
       </div>
     </button>

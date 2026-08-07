@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, BellOff, Bot, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, BellOff, Bot, CalendarClock, Clock, History, MessagesSquare, Target, TriangleAlert, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -134,6 +134,8 @@ function ContactDetailPane({
 }) {
   const [notes, setNotes] = React.useState(contact.notes ?? "");
   const [tagInput, setTagInput] = React.useState("");
+  const [reminderAt, setReminderAt] = React.useState("");
+  const [reminderNote, setReminderNote] = React.useState("");
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
@@ -174,6 +176,17 @@ function ContactDetailPane({
 
   function removeTag(tag: string) {
     updateContact({ tags: contact.tags.filter((t) => t !== tag) });
+  }
+
+  async function setReminder() {
+    if (!reminderAt) return;
+    await updateContact({ followUpDate: new Date(reminderAt).toISOString(), followUpNote: reminderNote || null });
+    setReminderAt("");
+    setReminderNote("");
+  }
+
+  async function clearReminder() {
+    await updateContact({ followUpDate: null, followUpNote: null });
   }
 
   return (
@@ -332,7 +345,41 @@ function ContactDetailPane({
             />
           </TabsContent>
 
-          <TabsContent value="automation" className="flex flex-col gap-1.5">
+          <TabsContent value="automation" className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5 rounded-md border border-border p-2.5">
+              <p className="flex items-center gap-1.5 text-xs font-semibold">
+                <CalendarClock className="size-3.5 shrink-0 text-primary" />
+                Personal reminder
+              </p>
+              {contact.followUpDate ? (
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">{formatCountdown(contact.followUpDate)}</p>
+                    {contact.followUpNote && <p className="text-[11px] text-muted-foreground">{contact.followUpNote}</p>}
+                  </div>
+                  <button onClick={clearReminder} className="shrink-0 text-[10px] font-medium text-primary hover:underline">
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <Input type="datetime-local" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
+                  <Input
+                    value={reminderNote}
+                    onChange={(e) => setReminderNote(e.target.value)}
+                    placeholder="What's this about? (optional)"
+                    className="text-xs"
+                  />
+                  <Button size="sm" variant="outline" disabled={!reminderAt} onClick={setReminder}>
+                    Schedule reminder
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground">
+                    Notifies you when it&apos;s time — separate from the automated follow-up steps below.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {upcomingFollowUps.length === 0 ? (
               <p className="py-3 text-center text-xs text-muted-foreground">
                 No follow-ups scheduled — {contact.aiPaused ? "AI is paused for this contact." : "nothing pending right now."}
