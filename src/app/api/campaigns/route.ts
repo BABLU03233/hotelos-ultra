@@ -16,11 +16,20 @@ export const POST = apiRoute(async (req: NextRequest) => {
   const { session, db } = requireTenantDb(req);
   const body = campaignCreateSchema.parse(await req.json());
 
-  if (body.messageType === "TEMPLATE" && !body.templateName) {
-    throw new ApiError(400, "templateName is required for template campaigns");
+  if (body.messageType === "TEMPLATE" && !body.templateName && !body.metaTemplateId) {
+    throw new ApiError(400, "Select a template for template campaigns");
   }
   if (body.messageType === "IMAGE" && !body.mediaUrl) {
     throw new ApiError(400, "mediaUrl is required for image campaigns");
+  }
+
+  // Server-side ownership check — db is tenant-scoped, so this naturally
+  // returns null (not another tenant's template) if the id doesn't belong
+  // to this tenant, closing the gap where a client-supplied id could
+  // otherwise reference any template in the database.
+  if (body.metaTemplateId) {
+    const template = await db.metaTemplate.findUnique({ where: { id: body.metaTemplateId } });
+    if (!template) throw new ApiError(400, "That template wasn't found for this hotel.");
   }
 
   // contactIds are tenant-scoped independently since createMany's nested
@@ -38,6 +47,8 @@ export const POST = apiRoute(async (req: NextRequest) => {
       type: body.type,
       messageType: body.messageType,
       templateName: body.templateName,
+      metaTemplateId: body.metaTemplateId,
+      templateVariableValues: body.templateVariableValues ?? undefined,
       body: body.body,
       mediaUrl: body.mediaUrl,
       recipients: {

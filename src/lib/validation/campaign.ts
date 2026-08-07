@@ -5,6 +5,8 @@ export const campaignCreateSchema = z.object({
   type: z.string().min(1).max(100),
   messageType: z.enum(["TEXT", "IMAGE", "TEMPLATE"]),
   templateName: z.string().max(200).nullable().optional(),
+  metaTemplateId: z.string().nullable().optional(),
+  templateVariableValues: z.record(z.string(), z.string()).nullable().optional(),
   body: z.string().max(2000).nullable().optional(),
   mediaUrl: z.string().url().nullable().optional(),
   contactIds: z.array(z.string()).min(1),

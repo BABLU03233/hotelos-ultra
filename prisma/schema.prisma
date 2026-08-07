@@ -381,6 +381,8 @@ model FollowUpRule {
   order        Int
   delayMinutes Int
   action       FollowUpAction
+  // Legacy free-text template name — fallback path for a template approved
+  // directly in Meta Business Manager and never imported into this app.
   templateName String?
   messageBody  String?
   active       Boolean        @default(true)
@@ -390,6 +392,10 @@ model FollowUpRule {
   repeatDaily  Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+
+  metaTemplateId         String?
+  metaTemplate           MetaTemplate? @relation(fields: [metaTemplateId], references: [id], onDelete: SetNull)
+  templateVariableValues Json?
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   scheduledFollowUps ScheduledFollowUp[]
@@ -421,11 +427,22 @@ model Campaign {
   name         String
   type         String
   messageType  CampaignMessageType
+  // Legacy free-text template name — still the fallback path for a
+  // template approved directly in Meta Business Manager and never
+  // imported into this app. When metaTemplateId is set, that takes
+  // precedence and this is derived from it server-side, not client-trusted.
   templateName String?
   body         String?
   mediaUrl     String?
   createdAt    DateTime            @default(now())
   sentAt       DateTime?
+
+  metaTemplateId         String?
+  metaTemplate           MetaTemplate? @relation(fields: [metaTemplateId], references: [id], onDelete: SetNull)
+  // Campaign-wide values for the template's "custom" variable slots (e.g. a
+  // discount %) — the same value for every recipient of this one send.
+  // { [slotLabel]: value }
+  templateVariableValues Json?
 
   tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   recipients CampaignRecipient[]
@@ -480,7 +497,9 @@ model MetaTemplate {
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns     Campaign[]
+  followUpRules FollowUpRule[]
 
   @@unique([tenantId, name, language])
   @@index([tenantId, status])

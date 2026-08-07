@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 
 interface ImportResponse {
   imported: number;
@@ -32,14 +33,16 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
   const [file, setFile] = React.useState<File | null>(null);
   const [manualText, setManualText] = React.useState("");
   const [sendNow, setSendNow] = React.useState(false);
-  const [templateName, setTemplateName] = React.useState("");
+  const [metaTemplateId, setMetaTemplateId] = React.useState<string | null>(null);
+  const [templateVariableValues, setTemplateVariableValues] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
 
   function reset() {
     setFile(null);
     setManualText("");
     setSendNow(false);
-    setTemplateName("");
+    setMetaTemplateId(null);
+    setTemplateVariableValues({});
   }
 
   async function submit() {
@@ -48,7 +51,10 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
       const form = new FormData();
       if (mode === "file" && file) form.set("file", file);
       if (mode === "manual" && manualText.trim()) form.set("manualText", manualText);
-      if (sendNow && templateName.trim()) form.set("templateName", templateName.trim());
+      if (sendNow && metaTemplateId) {
+        form.set("metaTemplateId", metaTemplateId);
+        if (Object.keys(templateVariableValues).length) form.set("templateVariableValues", JSON.stringify(templateVariableValues));
+      }
 
       const res = await fetch("/api/contacts/import", { method: "POST", body: form });
       const body = (await res.json().catch(() => null)) as ImportResponse | { error: string } | null;
@@ -74,7 +80,7 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
   }
 
   const canSubmit =
-    (mode === "file" ? !!file : manualText.trim().length > 0) && (!sendNow || templateName.trim().length > 0);
+    (mode === "file" ? !!file : manualText.trim().length > 0) && (!sendNow || !!metaTemplateId);
 
   return (
     <Dialog open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
@@ -128,8 +134,15 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
             </div>
             {sendNow && (
               <div className="flex flex-col gap-1.5">
-                <Label>Approved template name</Label>
-                <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="re_engagement_v1" />
+                <Label>Meta-approved template</Label>
+                <MetaTemplatePicker
+                  metaTemplateId={metaTemplateId}
+                  templateVariableValues={templateVariableValues}
+                  onChange={(next) => {
+                    setMetaTemplateId(next.metaTemplateId);
+                    setTemplateVariableValues(next.templateVariableValues);
+                  }}
+                />
               </div>
             )}
           </div>

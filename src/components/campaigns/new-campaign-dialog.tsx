@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
@@ -65,7 +66,8 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [messageType, setMessageType] = React.useState<CampaignMessageType>("TEXT");
   const [body, setBody] = React.useState("");
   const [mediaUrl, setMediaUrl] = React.useState("");
-  const [templateName, setTemplateName] = React.useState("");
+  const [metaTemplateId, setMetaTemplateId] = React.useState<string | null>(null);
+  const [templateVariableValues, setTemplateVariableValues] = React.useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = React.useState(false);
   const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
@@ -108,13 +110,16 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           messageType,
           body: body || null,
           mediaUrl: mediaUrl || null,
-          templateName: templateName || null,
+          metaTemplateId,
+          templateVariableValues: Object.keys(templateVariableValues).length ? templateVariableValues : null,
           contactIds: [...selectedIds],
         }),
       });
       setOpen(false);
       setName("");
       setBody("");
+      setMetaTemplateId(null);
+      setTemplateVariableValues({});
       setSelectedIds(new Set());
       onCreated();
     } finally {
@@ -122,7 +127,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
     }
   }
 
-  const canSubmit = name.trim() && selectedIds.size > 0 && (messageType !== "TEMPLATE" || templateName.trim());
+  const canSubmit = name.trim() && selectedIds.size > 0 && (messageType !== "TEMPLATE" || !!metaTemplateId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -164,11 +169,18 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
 
           {messageType === "TEMPLATE" ? (
             <div className="flex flex-col gap-1.5">
-              <Label>Meta-approved template name</Label>
+              <Label>Meta-approved template</Label>
               <p className="-mt-1 text-[11px] text-muted-foreground">
-                Different from the Templates tab&apos;s starter copy — must match one already approved in Meta Business Manager.
+                Different from the Templates tab&apos;s starter copy — created and approved in the Templates tab&apos;s Meta templates section.
               </p>
-              <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="weekend_offer_v1" />
+              <MetaTemplatePicker
+                metaTemplateId={metaTemplateId}
+                templateVariableValues={templateVariableValues}
+                onChange={(next) => {
+                  setMetaTemplateId(next.metaTemplateId);
+                  setTemplateVariableValues(next.templateVariableValues);
+                }}
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">

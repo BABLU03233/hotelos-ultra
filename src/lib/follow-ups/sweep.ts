@@ -2,6 +2,7 @@ import { decideFollowUpAction } from "./decide";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/tenant-credentials";
+import { BodyVariableSlot, buildTemplateComponents } from "@/lib/whatsapp/template-variables";
 
 const BATCH_SIZE = 50;
 const REPEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -18,7 +19,7 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
     where: { status: "PENDING", runAt: { lte: now } },
     orderBy: { runAt: "asc" },
     take: BATCH_SIZE,
-    include: { contact: true, rule: true },
+    include: { contact: true, rule: { include: { metaTemplate: true } } },
   });
 
   let sent = 0;
@@ -28,8 +29,9 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
   for (const scheduled of due) {
     const { contact, rule } = scheduled;
 
+    const effectiveTemplateName = rule.metaTemplate?.name ?? rule.templateName;
     const decision = decideFollowUpAction(
-      { ruleActive: rule.active, ruleTemplateName: rule.templateName, leadStatus: contact.leadStatus, lastInboundAt: contact.lastInboundAt },
+      { ruleActive: rule.active, ruleTemplateName: effectiveTemplateName, leadStatus: contact.leadStatus, lastInboundAt: contact.lastInboundAt },
       now
     );
 
@@ -68,15 +70,32 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
     }
 
     try {
-      const whatsappMessageId = withinWindow
-        ? await sendWhatsAppMessage(creds, contact.whatsappNumber, {
-            type: "text",
-            text: rule.messageBody || "Just checking in — still interested in booking with us?",
-          })
-        : await sendWhatsAppMessage(creds, contact.whatsappNumber, {
-            type: "template",
-            templateName: rule.templateName!,
-          });
+      let whatsappMessageId: string;
+      if (withinWindow) {
+        whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "text",
+          text: rule.messageBody || "Just checking in — still interested in booking with us?",
+        });
+      } else if (rule.metaTemplate) {
+        const hotelProfile = await prisma.hotelProfile.findUnique({ where: { tenantId: scheduled.tenantId } });
+        const components = buildTemplateComponents(
+          (rule.metaTemplate.bodyVariableSlots as unknown as BodyVariableSlot[]) ?? [],
+          contact,
+          hotelProfile,
+          (rule.templateVariableValues as unknown as Record<string, string>) ?? {}
+        );
+        whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "template",
+          templateName: rule.metaTemplate.name,
+          languageCode: rule.metaTemplate.language,
+          components,
+        });
+      } else {
+        whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "template",
+          templateName: rule.templateName!,
+        });
+      }
 
       await prisma.$transaction([
         prisma.message.create({
@@ -85,7 +104,7 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
             contactId: contact.id,
             direction: "OUT",
             type: withinWindow ? "TEXT" : "TEMPLATE",
-            content: withinWindow ? rule.messageBody : `[template: ${rule.templateName}]`,
+            content: withinWindow ? rule.messageBody : `[template: ${effectiveTemplateName}]`,
             whatsappMessageId,
             status: "SENT",
           },
@@ -93,7 +112,7 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
         prisma.contact.update({
           where: { id: contact.id },
           data: {
-            lastMessage: withinWindow ? rule.messageBody : `[template: ${rule.templateName}]`,
+            lastMessage: withinWindow ? rule.messageBody : `[template: ${effectiveTemplateName}]`,
             leadStatus: contact.leadStatus === "NEW" ? "FOLLOW_UP" : contact.leadStatus,
           },
         }),

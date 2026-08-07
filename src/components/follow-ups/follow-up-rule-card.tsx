@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { apiFetch } from "@/lib/api-client";
@@ -53,7 +54,6 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
   const [delayValue, setDelayValue] = React.useState(initialDelay.value);
   const [delayUnit, setDelayUnit] = React.useState<DelayUnit>(initialDelay.unit);
   const [messageBody, setMessageBody] = React.useState(rule.messageBody ?? "");
-  const [templateName, setTemplateName] = React.useState(rule.templateName ?? "");
 
   async function patch(body: Partial<FollowUpRule>) {
     await apiFetch(`/api/follow-up-rules/${rule.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -177,18 +177,14 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`template-${rule.id}`} className="text-xs text-muted-foreground">
-              Meta-approved template name
-            </Label>
+            <Label className="text-xs text-muted-foreground">Meta-approved template</Label>
             <p className="-mt-1 text-[11px] text-muted-foreground">
-              Different from the Templates tab — must match one already approved in Meta Business Manager.
+              Different from the Templates tab — created and approved in the Templates tab&apos;s Meta templates section.
             </p>
-            <Input
-              id={`template-${rule.id}`}
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              onBlur={() => templateName !== (rule.templateName ?? "") && patch({ templateName: templateName || null })}
-              placeholder="e.g. follow_up_reminder"
+            <MetaTemplatePicker
+              metaTemplateId={rule.metaTemplateId}
+              templateVariableValues={rule.templateVariableValues ?? {}}
+              onChange={(next) => patch({ metaTemplateId: next.metaTemplateId, templateVariableValues: next.templateVariableValues })}
             />
           </div>
         </CardContent>

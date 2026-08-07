@@ -56,6 +56,8 @@ export interface FollowUpRule {
   messageBody: string | null;
   active: boolean;
   repeatDaily: boolean;
+  metaTemplateId: string | null;
+  templateVariableValues: Record<string, string> | null;
 }
 
 export type ScheduledFollowUpStatus = "PENDING" | "SENT" | "CANCELLED" | "SKIPPED";
@@ -102,6 +104,8 @@ export interface Campaign {
   type: string;
   messageType: CampaignMessageType;
   templateName: string | null;
+  metaTemplateId: string | null;
+  templateVariableValues: Record<string, string> | null;
   body: string | null;
   mediaUrl: string | null;
   createdAt: string;
