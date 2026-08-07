@@ -92,10 +92,12 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       (c) => (segment === "ALL" || c.leadStatus === segment) && (source === "ALL" || c.leadSource === source)
     ) ?? [];
 
+  const selectableContacts = visibleContacts.filter((c) => !c.optedOutAt);
+
   function selectSegment() {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      for (const c of visibleContacts) next.add(c.id);
+      for (const c of selectableContacts) next.add(c.id);
       return next;
     });
   }
@@ -229,7 +231,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
               <Label>Recipients ({selectedIds.size} selected)</Label>
               <button type="button" onClick={selectSegment} className="text-xs font-medium text-primary hover:underline">
                 Select all {segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase()} (
-                {visibleContacts.length})
+                {selectableContacts.length})
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -265,9 +267,20 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
             <ScrollArea className="h-40 rounded-lg border border-border p-2">
               <div className="flex flex-col gap-1.5">
                 {visibleContacts.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted">
-                    <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggle(c.id)} />
+                  <label
+                    key={c.id}
+                    className={cn(
+                      "flex items-center gap-2 rounded px-1 py-1 text-sm",
+                      c.optedOutAt ? "text-muted-foreground" : "hover:bg-muted"
+                    )}
+                  >
+                    <Checkbox
+                      checked={selectedIds.has(c.id)}
+                      onCheckedChange={() => toggle(c.id)}
+                      disabled={!!c.optedOutAt}
+                    />
                     {c.name || c.phone}
+                    {c.optedOutAt && <span className="text-[10px] font-medium text-amber-600">Opted out</span>}
                   </label>
                 ))}
                 {data && visibleContacts.length === 0 && (
