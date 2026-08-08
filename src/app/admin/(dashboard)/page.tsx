@@ -4,11 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { Building2, MessagesSquare, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NewTenantDialog } from "@/components/admin/new-tenant-dialog";
-import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
+import { MessageVolumeChart } from "@/components/dashboard/message-volume-chart";
 import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,9 @@ export default function AdminTenantsPage() {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<SubscriptionStatus | "ALL">("ALL");
   const { data, loading, reload } = useFetch<{ tenants: AdminTenantSummary[] }>("/api/admin/tenants");
-  const { data: statsData } = useFetch<{ messageVolumeTrend: { date: string; count: number }[] }>("/api/admin/stats");
+  const { data: statsData } = useFetch<{ messageVolumeTrend: { date: string; inbound: number; ai: number; staff: number }[] }>(
+    "/api/admin/stats"
+  );
 
   const filtered = (data?.tenants ?? []).filter((t) => {
     if (status !== "ALL" && t.subscriptionStatus !== status) return false;
@@ -93,9 +95,10 @@ export default function AdminTenantsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Platform message volume — last 14 days</CardTitle>
+          <CardDescription>Every tenant combined — who&apos;s talking: guests, AI agents, or staff.</CardDescription>
         </CardHeader>
         <CardContent className="h-48">
-          {statsData ? <PlatformVolumeChart trend={statsData.messageVolumeTrend} /> : <Skeleton className="h-full w-full" />}
+          {statsData ? <MessageVolumeChart trend={statsData.messageVolumeTrend} agentName="AI" /> : <Skeleton className="h-full w-full" />}
         </CardContent>
       </Card>
 

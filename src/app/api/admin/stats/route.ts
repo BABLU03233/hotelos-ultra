@@ -14,20 +14,24 @@ export const GET = apiRoute(async (req: NextRequest) => {
 
   const messages = await prisma.message.findMany({
     where: { createdAt: { gte: trendStart } },
-    select: { createdAt: true },
+    select: { createdAt: true, direction: true, senderUserId: true },
   });
 
-  const buckets = new Map<string, number>();
+  const buckets = new Map<string, { inbound: number; ai: number; staff: number }>();
   for (let i = 0; i < TREND_DAYS; i++) {
     const d = new Date(trendStart.getTime() + i * 24 * 60 * 60 * 1000);
-    buckets.set(d.toISOString().slice(0, 10), 0);
+    buckets.set(d.toISOString().slice(0, 10), { inbound: 0, ai: 0, staff: 0 });
   }
   for (const m of messages) {
     const key = m.createdAt.toISOString().slice(0, 10);
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+    if (m.direction === "IN") bucket.inbound++;
+    else if (m.senderUserId) bucket.staff++;
+    else bucket.ai++;
   }
 
   return NextResponse.json({
-    messageVolumeTrend: Array.from(buckets.entries()).map(([date, count]) => ({ date, count })),
+    messageVolumeTrend: Array.from(buckets.entries()).map(([date, counts]) => ({ date, ...counts })),
   });
 });

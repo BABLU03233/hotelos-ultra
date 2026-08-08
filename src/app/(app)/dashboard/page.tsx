@@ -1,5 +1,5 @@
 import { Bot, CalendarCheck, Clock, Megaphone, MessagesSquare, PieChart, UserPlus } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/components/motion/reveal";
 import { StaggerItem } from "@/components/motion/stagger-item";
@@ -66,6 +66,14 @@ export default async function DashboardPage() {
             <CardHeader>
               <CardTitle>Message volume — last 14 days</CardTitle>
               <CardDescription>Who&apos;s actually doing the talking: guests, {metrics.aiAgentName}, or your team.</CardDescription>
+              <CardAction className="text-right text-xs text-muted-foreground">
+                <p>
+                  Today: <span className="font-semibold text-foreground tabular-nums">{metrics.aiMessagesToday}</span> by {metrics.aiAgentName}
+                </p>
+                <p>
+                  <span className="font-semibold text-foreground tabular-nums">{metrics.staffMessagesToday}</span> by staff
+                </p>
+              </CardAction>
             </CardHeader>
             <CardContent className="h-64">
               {hasMessageVolume ? (

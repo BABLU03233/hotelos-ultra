@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminContactList } from "@/components/admin/admin-contact-list";
-import { PlatformVolumeChart } from "@/components/admin/platform-volume-chart";
+import { MessageVolumeChart } from "@/components/dashboard/message-volume-chart";
 import { Reveal } from "@/components/motion/reveal";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
@@ -44,8 +44,10 @@ interface TenantDetail {
     knowledgeDocCount: number;
     bookedCount: number;
     messageCount: number;
+    aiMessageCount: number;
+    staffMessageCount: number;
   };
-  messageVolumeTrend: { date: string; count: number }[];
+  messageVolumeTrend: { date: string; inbound: number; ai: number; staff: number }[];
 }
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -130,6 +132,8 @@ export default function AdminTenantDetailPage() {
           ["Contacts", stats.contactCount],
           ["Booked", stats.bookedCount],
           ["Messages", stats.messageCount],
+          ["AI replies", stats.aiMessageCount],
+          ["Staff replies", stats.staffMessageCount],
           ["Rooms", stats.roomCount],
           ["Campaigns", stats.campaignCount],
           ["KB docs", stats.knowledgeDocCount],
@@ -148,7 +152,7 @@ export default function AdminTenantDetailPage() {
           <CardTitle>Message volume — last 14 days</CardTitle>
         </CardHeader>
         <CardContent className="h-48">
-          <PlatformVolumeChart trend={data.messageVolumeTrend} />
+          <MessageVolumeChart trend={data.messageVolumeTrend} agentName="AI" />
         </CardContent>
       </Card>
 

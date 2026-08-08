@@ -226,6 +226,8 @@ export interface DashboardMetrics {
   pendingFollowUps: number;
   aiConversationsToday: number;
   aiConversationsPrev: number;
+  aiMessagesToday: number;
+  staffMessagesToday: number;
   leadFunnel: Record<LeadStatus, number>;
   leadsBySource: Record<LeadSource, number>;
   messageVolumeTrend: { date: string; inbound: number; ai: number; staff: number }[];

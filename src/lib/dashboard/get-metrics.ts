@@ -106,6 +106,11 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     else bucket.ai++;
   }
   const messageVolumeTrend = Array.from(trendBuckets.entries()).map(([date, counts]) => ({ date, ...counts }));
+  // Reuses the trend data already fetched above rather than a separate
+  // query — the last bucket built is always today's, since trendBuckets
+  // spans trendStart..startOfToday inclusive in order.
+  const todayKey = startOfToday.toISOString().slice(0, 10);
+  const todayCounts = trendBuckets.get(todayKey) ?? { ai: 0, staff: 0 };
 
   return {
     aiAgentName: hotelProfile?.aiAgentName?.trim() || "Anushka",
@@ -116,6 +121,8 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     pendingFollowUps,
     aiConversationsToday: aiConversationsToday.length,
     aiConversationsPrev: aiConversationsYesterday.length,
+    aiMessagesToday: todayCounts.ai,
+    staffMessagesToday: todayCounts.staff,
     leadFunnel,
     leadsBySource,
     messageVolumeTrend,
