@@ -443,7 +443,7 @@ function ContactDetailPane({
                           <p
                             className={cn(
                               "text-xs font-medium",
-                              new Date(contact.followUpDate) <= new Date() && "text-amber-600"
+                              formatCountdown(contact.followUpDate) === "due now" && "text-amber-600"
                             )}
                           >
                             {formatCountdown(contact.followUpDate)}
