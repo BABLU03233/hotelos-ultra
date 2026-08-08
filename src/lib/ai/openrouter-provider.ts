@@ -4,9 +4,9 @@ import { AIProvider } from "./provider";
  * OpenRouter's chat completions endpoint is OpenAI-compatible — plain
  * fetch, no SDK needed, same shape as groq-provider.ts/mistral-provider.ts.
  * A factory (not a single fixed provider) so the fallback chain in
- * pipeline.ts can try two different free models before falling through to
- * the other providers — a single free model can be individually
- * rate-limited or briefly flaky, so two independent attempts is real
+ * pipeline.ts can try several different free models before falling through
+ * to the other providers — any single free model can be individually
+ * rate-limited or briefly flaky, so multiple independent attempts is real
  * redundancy, not just a nicer default.
  */
 export function createOpenRouterProvider(model: string): AIProvider {
@@ -29,11 +29,13 @@ export function createOpenRouterProvider(model: string): AIProvider {
           max_tokens: 1024,
           messages: [{ role: "system", content: systemPrompt }, ...messages],
         }),
-        // Shorter than the other providers' 15s: these are free-tier models
-        // further down the fallback chain now, so a slow/rate-limited one
-        // should hand off quickly rather than stack its own 15s wait on top
-        // of whatever the earlier providers in the chain already spent.
-        signal: AbortSignal.timeout(8_000),
+        // Shorter than the other providers' 15s, and shorter than this file's
+        // own earlier 8s: six of these are now chained in pipeline.ts, so a
+        // slow/rate-limited one needs to hand off fast — at 8s each, several
+        // failing in a row could stack to 40s+ before a guest sees a reply,
+        // which fails the "instant reply" goal even though every individual
+        // provider is technically still "working."
+        signal: AbortSignal.timeout(5_000),
       });
 
       if (!res.ok) {

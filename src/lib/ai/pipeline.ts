@@ -9,24 +9,43 @@ import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
 
+// Curated OpenRouter free-tier models for the fallback tier below —
+// smallest-active-param / established-provider models first, since guests
+// expect an instant reply and a 550B-parameter free model is not that.
+// Verified live against OpenRouter's `/models` API (2026-08-08, filtered to
+// pricing.prompt === "0") rather than assumed — free-tier lineups drift as
+// models get deprecated or added. Excludes narrow specialists (a
+// content-safety classifier, a code-only model) that aren't suited to a
+// general conversational reply. The whole list is env-overridable
+// (comma-separated `OPENROUTER_FREE_MODELS`) so a deprecated/rate-limited
+// entry can be swapped without a code change.
+const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
+  .map((m) => m.trim())
+  .filter(Boolean) ?? [
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "nvidia/nemotron-nano-9b-v2:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "openai/gpt-oss-20b:free",
+  "nvidia/nemotron-nano-30b-a3b:free",
+  "poolside/laguna-xs-2.1:free",
+];
+
 // Tries each configured provider in order and falls through on failure
 // (rate limit, outage, missing key) so a guest is never left unanswered
 // just because one free-tier provider had a bad moment. Whichever ones
 // have no API key configured fail immediately (no network call) and the
 // chain just moves on — no need to explicitly list which are "active".
-// Groq leads the chain: the two free OpenRouter models originally picked
-// here (2026-08 live-testing) drifted — one now rate-limits on the shared
-// free pool, the other times out under a real system prompt — reproduced
-// live via the [ai-provider] logs below (each attempt eating up to its own
-// timeout before falling through added ~16s to every single reply). Groq's
-// free tier answered in under 500ms in that same test, so it goes first
-// now; the OpenRouter models stay as free-tier fallback in case Groq itself
-// has a bad moment, env-overridable per model if a free-tier offering gets
-// deprecated or rate-limited harder over time.
+// Groq leads: live-tested at under 500ms on its free tier. Once Groq's
+// daily free-tier cap is hit (it has one — confirmed live, ~100k tokens/day),
+// the chain moves through the free OpenRouter models above in order, so a
+// single model's free-tier rate limit or occasional timeout doesn't stall a
+// reply — it just hands off to the next free model instead. Gemini/Mistral
+// stay as further free-tier fallback beneath OpenRouter; Anthropic is the
+// final, paid, safety-net so a guest is *never* left unanswered even if
+// every free tier is simultaneously exhausted.
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
-  createOpenRouterProvider(process.env.OPENROUTER_MODEL_1 || "poolside/laguna-xs-2.1:free"),
-  createOpenRouterProvider(process.env.OPENROUTER_MODEL_2 || "nvidia/nemotron-nano-12b-v2-vl:free"),
+  ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   geminiProvider,
   mistralProvider,
   anthropicProvider,
