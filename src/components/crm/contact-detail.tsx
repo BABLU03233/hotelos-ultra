@@ -102,7 +102,7 @@ export function ContactDetail({
 
   if (!contactId) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
         <MessagesSquare className="size-8" />
         <p className="text-sm">Select a contact to view the conversation.</p>
       </div>
@@ -111,7 +111,7 @@ export function ContactDetail({
 
   if (!contact) {
     return (
-      <div className="flex h-full flex-1 flex-col gap-3 p-4">
+      <div className="flex h-full min-w-0 flex-1 flex-col gap-3 p-4">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-full w-full" />
       </div>
@@ -206,7 +206,7 @@ function ContactDetailPane({
   }
 
   return (
-    <div className="flex h-full flex-1 flex-col">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
       <div className="flex flex-col gap-2 border-b border-border p-3">
         <div className="flex items-center gap-3">
           {onBack && (
@@ -231,7 +231,7 @@ function ContactDetailPane({
           </button>
           {contact.aiPaused ? (
             <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 sm:flex">
+              <span className="hidden items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 lg:flex">
                 <Bot className="size-3" /> AI paused
               </span>
               <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
@@ -240,7 +240,7 @@ function ContactDetailPane({
             </div>
           ) : (
             <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary sm:flex">
+              <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary lg:flex">
                 <Bot className="size-3" /> {agentName} active
               </span>
               <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
