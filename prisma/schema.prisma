@@ -199,6 +199,7 @@ model HotelProfile {
   tenantId           String   @id
   name               String
   address            String?
+  googleMapsUrl      String?
   lat                Float?
   lng                Float?
   checkInTime        String?

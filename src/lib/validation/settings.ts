@@ -3,6 +3,7 @@ import { z } from "zod";
 export const hotelProfileSchema = z.object({
   name: z.string().min(1).max(200),
   address: z.string().max(500).nullable().optional(),
+  googleMapsUrl: z.string().max(500).nullable().optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   checkInTime: z.string().max(20).nullable().optional(),

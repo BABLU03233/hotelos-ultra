@@ -244,6 +244,7 @@ export interface HotelProfile {
   tenantId: string;
   name: string;
   address: string | null;
+  googleMapsUrl: string | null;
   lat: number | null;
   lng: number | null;
   checkInTime: string | null;
