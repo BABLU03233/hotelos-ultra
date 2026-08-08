@@ -1,11 +1,12 @@
 "use client";
 
-import { BellOff, BotOff, History, Target } from "lucide-react";
+import { History, Target } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { LEAD_STATUS_DOT } from "@/lib/lead-status-colors";
 import { Contact } from "@/types";
 import { cn } from "@/lib/utils";
+import { ContactStatusBadges } from "./contact-status-badges";
 
 export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
   const unreadCount = contact.unreadCount ?? 0;
@@ -51,16 +52,7 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
               <History className="size-2.5 shrink-0 text-muted-foreground" />
             </span>
           )}
-          {contact.aiPaused && (
-            <span title="AI paused — replies aren't automated right now">
-              <BotOff className="size-2.5 shrink-0 text-amber-600" />
-            </span>
-          )}
-          {contact.optedOutAt && (
-            <span title="Opted out of promotions">
-              <BellOff className="size-2.5 shrink-0 text-amber-600" />
-            </span>
-          )}
+          <ContactStatusBadges contact={contact} />
           {contact.tags.slice(0, 2).map((t) => (
             <span key={t} className="truncate rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
               {t}
