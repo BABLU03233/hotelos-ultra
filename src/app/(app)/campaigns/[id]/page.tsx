@@ -131,19 +131,21 @@ export default function CampaignDetailPage() {
       )}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-        {[
-          ["Total contacts", report.totalContacts],
-          ["Sent", report.sent],
-          ["Delivered", report.delivered],
-          ["Read", report.read],
-          ["Replies", report.replies],
-          ["Interested", report.interested],
-          ["Booked", report.booked],
-          ["Failed", report.failed],
-        ].map(([label, value]) => {
-          const isFailed = label === "Failed" && (value as number) > 0;
+        {(
+          [
+            { label: "Total contacts", value: report.totalContacts },
+            { label: "Sent", value: report.sent },
+            { label: "Delivered", value: report.delivered },
+            { label: "Read", value: report.read },
+            { label: "Replies", value: report.replies },
+            { label: "Interested", value: report.interested },
+            { label: "Booked", value: report.booked },
+            { label: "Failed", value: report.failed },
+          ] satisfies { label: string; value: number }[]
+        ).map(({ label, value }) => {
+          const isFailed = label === "Failed" && value > 0;
           return (
-            <Card key={label as string} className={isFailed ? "border-destructive/30" : undefined}>
+            <Card key={label} className={isFailed ? "border-destructive/30" : undefined}>
               <CardContent>
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className={cn("mt-1 text-xl font-semibold tabular-nums", isFailed && "text-destructive")}>{value}</p>
