@@ -36,6 +36,15 @@ export function createGeminiProvider(apiKeyEnvVar: string, label: string): AIPro
         config: {
           systemInstruction: systemPrompt,
           maxOutputTokens: 1024,
+          // The model this alias currently resolves to (gemini-3.6-flash)
+          // does "dynamic thinking" by default (thinkingBudget: -1) — live
+          // testing showed every reply spending 55-73 hidden reasoning
+          // tokens even on a trivial "say OK", and real guest replies taking
+          // 4-11s as a direct result. thinkingBudget: 0 disables thinking
+          // entirely (per the SDK's own type comment: "0 is DISABLED"),
+          // which is the right tradeoff here — a hotel concierge reply
+          // doesn't need multi-step reasoning, it needs to be fast.
+          thinkingConfig: { thinkingBudget: 0 },
           // No retries: our own fallback chain (pipeline.ts) already moves to
           // the next provider on failure. The SDK's default (5 attempts,
           // exponential backoff up to 60s between tries) was silently adding
