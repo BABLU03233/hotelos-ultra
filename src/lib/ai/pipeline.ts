@@ -1,6 +1,7 @@
 import { LeadSource } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
+import { cerebrasProvider } from "./cerebras-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { geminiProvider } from "./gemini-provider";
 import { groqProvider } from "./groq-provider";
@@ -8,6 +9,7 @@ import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
+import { sambanovaProvider } from "./sambanova-provider";
 
 // Curated OpenRouter free-tier models for the fallback tier below, ordered
 // by actual observed speed/reliability across two live test runs against
@@ -42,18 +44,41 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // just because one free-tier provider had a bad moment. Whichever ones
 // have no API key configured fail immediately (no network call) and the
 // chain just moves on — no need to explicitly list which are "active".
-// Groq leads: live-tested at under 500ms on its free tier. Once Groq's
-// daily free-tier cap is hit (it has one — confirmed live, ~100k tokens/day),
-// the chain moves through the free OpenRouter models above in order, so a
-// single model's free-tier rate limit or occasional timeout doesn't stall a
-// reply — it just hands off to the next free model instead. Gemini/Mistral
-// stay as further free-tier fallback beneath OpenRouter; Anthropic is the
-// final, paid, safety-net so a guest is *never* left unanswered even if
-// every free tier is simultaneously exhausted.
+//
+// Order, and why (live-verified 2026-08-08/09, not assumed):
+// 1. Groq — fastest, live-tested under 500ms, ~100k tokens/day free.
+// 2. Gemini — genuinely the most generous no-card free tier of everything
+//    here (~1,000-1,500 requests/day on gemini-2.5-flash-lite), and its
+//    quota is fully independent of every other provider's, so it's real
+//    redundancy, not a shared bucket. Moved ahead of OpenRouter for exactly
+//    that reason (see #4).
+// 3. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
+//    disagree on whether the entry free tier needs a card; ships anyway
+//    since a missing key just skips it instantly, same as every other slot.
+// 4. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
+//    and discovered these do NOT have independent per-model quotas the way
+//    this was originally designed around. OpenRouter caps free-model usage
+//    at 50 requests/day for the *whole account*, shared across every free
+//    model — so when it's exhausted, all four models here fail in the same
+//    second (reproduced live: identical 429 "free-models-per-day" from all
+//    four in one test run). Kept for genuine model-level diversity when
+//    quota remains, just no longer treated as "4 independent fallbacks."
+// 5. SambaNova — real redundancy but a thin free tier (20 requests/day per
+//    SambaNova's published limits), so it's a last-resort free attempt
+//    rather than a workhorse.
+// 6. Mistral — free tier, no card, exact quota undocumented.
+// 7. Anthropic — final paid safety net. This is the only non-free step in
+//    the whole chain, and exists so a guest is *never* left unanswered even
+//    if every free tier above is simultaneously exhausted (confirmed this
+//    can genuinely happen: Groq + OpenRouter were both exhausted
+//    simultaneously during testing tonight, with nothing configured below
+//    them at the time — the gap this whole reordering closes).
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
-  ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   geminiProvider,
+  cerebrasProvider,
+  ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
+  sambanovaProvider,
   mistralProvider,
   anthropicProvider,
 ]);
