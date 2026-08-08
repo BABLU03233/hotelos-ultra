@@ -151,6 +151,7 @@ function ContactDetailPane({
   const [reminderAt, setReminderAt] = React.useState("");
   const [reminderNote, setReminderNote] = React.useState("");
   const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const [detailsTab, setDetailsTab] = React.useState<"details" | "automation">("details");
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
@@ -222,10 +223,10 @@ function ContactDetailPane({
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{contact.name || contact.phone}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {contact.whatsappNumber}
-                {contact.optedOutAt && <span className="ml-1.5 font-medium text-amber-600">· Opted out</span>}
-              </p>
+              <p className="truncate text-xs text-muted-foreground">{contact.whatsappNumber}</p>
+              {contact.optedOutAt && (
+                <p className="text-xs font-medium text-amber-600">Opted out</p>
+              )}
             </div>
           </button>
           {contact.aiPaused ? (
@@ -258,7 +259,7 @@ function ContactDetailPane({
           </Button>
         </div>
 
-        {contact.aiSummary && <p className="truncate text-xs text-muted-foreground italic">{contact.aiSummary}</p>}
+        {contact.aiSummary && <p className="text-xs text-muted-foreground italic">{contact.aiSummary}</p>}
 
         {escalation && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
@@ -338,7 +339,10 @@ function ContactDetailPane({
                 </p>
               )}
 
-              <Tabs defaultValue="details">
+              <Tabs
+                value={detailsTab}
+                onValueChange={(v) => v && setDetailsTab(v as "details" | "automation")}
+              >
                 <TabsList className="w-full">
                   <TabsTrigger value="details" className="flex-1">
                     Details
