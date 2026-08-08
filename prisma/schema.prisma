@@ -44,8 +44,8 @@ enum LeadStatus {
 }
 
 enum LeadSource {
-  DIRECT      // messaged in organically
-  META_AD     // arrived via a Click-to-WhatsApp ad referral
+  DIRECT // messaged in organically
+  META_AD // arrived via a Click-to-WhatsApp ad referral
   COLD_IMPORT // owner-uploaded old number
 }
 
@@ -163,6 +163,7 @@ model Tenant {
   campaigns          Campaign[]
   staffNotifications StaffNotification[]
   metaTemplates      MetaTemplate[]
+  bookings           Booking[]
 }
 
 model User {
@@ -217,6 +218,10 @@ model HotelProfile {
   businessHours      String?
   aiSystemPrompt     String?  @db.Text
   aiAgentName        String   @default("Anushka")
+  // Optional owner override for the "IVR-4821"-style booking reference code
+  // prefix — auto-derived from the hotel name when unset (see
+  // src/lib/booking/reference-code.ts).
+  bookingCodePrefix  String?
   updatedAt          DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -235,7 +240,8 @@ model Room {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings Booking[]
 
   @@index([tenantId])
 }
@@ -297,7 +303,8 @@ model Offer {
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings Booking[]
 
   @@index([tenantId])
 }
@@ -348,17 +355,54 @@ model Contact {
   optedOutAt     DateTime?
   updatedAt      DateTime      @updatedAt
 
-  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignedTo         User?                @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo         User?               @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages           Message[]
   scheduledFollowUps ScheduledFollowUp[]
   campaignRecipients CampaignRecipient[]
   staffNotifications StaffNotification[]
+  bookings           Booking[]
 
   @@unique([tenantId, whatsappNumber])
   @@index([tenantId, leadStatus])
   @@index([tenantId, leadSource])
   @@index([assignedToId])
+}
+
+// A completed WhatsApp-negotiated booking — separate from Contact (which is
+// a durable per-phone-number record a repeat guest reuses across stays;
+// single-booking fields there would overwrite history on a second booking).
+// Contact.bookingStatus mirrors the latest Booking.status for this contact.
+model Booking {
+  id               String        @id @default(cuid())
+  tenantId         String
+  contactId        String
+  // e.g. "IVR-4821" — see src/lib/booking/reference-code.ts. The guest
+  // quotes this at the counter; staff looks it up to confirm it's a real
+  // Anushka-negotiated booking and see the agreed room/dates/price.
+  referenceCode    String
+  status           BookingStatus @default(PENDING)
+  // Snapshot of Contact.aiSummary at the moment of booking — kept fresh by
+  // summarizeConversation() after every AI turn, so this is a free,
+  // always-current "what the guest wants and where things stand" record.
+  summary          String?       @db.Text
+  // Room/Offer snapshots, not live references only — those rows can change
+  // or be deleted later, and a booking should always reflect what was
+  // actually agreed at the time, not whatever the room/offer looks like now.
+  offerId          String?
+  offerSnapshot    String?
+  roomId           String?
+  roomNameSnapshot String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  offer   Offer?  @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  room    Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, referenceCode])
+  @@index([tenantId, contactId])
 }
 
 model Message {
@@ -438,7 +482,7 @@ model FollowUpRule {
   metaTemplate           MetaTemplate? @relation(fields: [metaTemplateId], references: [id], onDelete: SetNull)
   templateVariableValues Json?
 
-  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   scheduledFollowUps ScheduledFollowUp[]
 
   @@index([tenantId])
@@ -489,7 +533,7 @@ model Campaign {
   // SPACED staggers each recipient's send by sendIntervalSeconds via a
   // per-job BullMQ delay, for large batches the owner wants paced out
   // rather than blasted.
-  sendPacing         CampaignSendPacing @default(ALL_AT_ONCE)
+  sendPacing          CampaignSendPacing @default(ALL_AT_ONCE)
   sendIntervalSeconds Int?
 
   metaTemplateId         String?
@@ -506,12 +550,12 @@ model Campaign {
 }
 
 model CampaignRecipient {
-  id         String                   @id @default(cuid())
+  id         String                  @id @default(cuid())
   campaignId String
   contactId  String
-  status     CampaignRecipientStatus  @default(PENDING)
+  status     CampaignRecipientStatus @default(PENDING)
   sentAt     DateTime?
-  updatedAt  DateTime                 @updatedAt
+  updatedAt  DateTime                @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)

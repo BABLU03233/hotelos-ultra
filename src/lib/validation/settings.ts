@@ -17,6 +17,10 @@ export const hotelProfileSchema = z.object({
   businessHours: z.string().max(1000).nullable().optional(),
   aiSystemPrompt: z.string().max(4000).nullable().optional(),
   aiAgentName: z.string().trim().min(1).max(50).optional(),
+  bookingCodePrefix: z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+    z.string().trim().toUpperCase().regex(/^[A-Z]{2,6}$/).nullable().optional()
+  ),
 });
 export type HotelProfileInput = z.infer<typeof hotelProfileSchema>;
 

@@ -1,5 +1,8 @@
 import { MessageStatus, MessageType } from "@/generated/prisma/enums";
+import { CONFIRM_BOOKING_BUTTON_ID } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
+import { completeBooking } from "@/lib/booking/complete-booking";
+import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { downloadMedia, getMediaUrl, sendWhatsAppMessage } from "@/lib/whatsapp/client";
@@ -161,6 +164,49 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
         });
       } catch (err) {
         console.error(`Failed to send opt-out confirmation for tenant ${tenant.id}, contact ${contact.id}:`, err);
+      }
+    }
+    return;
+  }
+
+  // "Confirm booking" is a fixed, code-owned button id, never inferred from
+  // free text — mirrors the opt-out short-circuit above for the same reason:
+  // a booking completion is business-critical and must not depend on a weak
+  // fallback model's interpretation of a typed "yes, confirm".
+  if (msg.interactiveId === CONFIRM_BOOKING_BUTTON_ID) {
+    if (contact.aiPaused) {
+      // Staff has taken this conversation over manually — don't auto-complete
+      // or auto-reply behind their back, just flag it so they can finish it
+      // personally, mirroring how process-message-job.ts fully silences the
+      // AI whenever aiPaused is set.
+      await fireBookingNotification(
+        prisma,
+        tenant.id,
+        contact.id,
+        `${contact.name || contact.phone} tapped "Confirm booking" — AI is paused, needs manual completion.`
+      );
+      return;
+    }
+
+    const booking = await completeBooking(prisma, tenant.id, contact.id);
+    const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
+    const creds = await getWhatsAppCredentials(tenant.id);
+    if (creds) {
+      try {
+        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: confirmationText });
+        await prisma.message.create({
+          data: {
+            tenantId: tenant.id,
+            contactId: contact.id,
+            direction: "OUT",
+            type: "TEXT",
+            content: confirmationText,
+            whatsappMessageId,
+            status: "SENT",
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to send booking confirmation for tenant ${tenant.id}, contact ${contact.id}:`, err);
       }
     }
     return;

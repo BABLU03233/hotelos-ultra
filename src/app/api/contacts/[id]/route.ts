@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiRoute, notFound } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
+import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { contactUpdateSchema } from "@/lib/validation/contact";
 
 interface RouteParams {
@@ -50,14 +51,7 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   // title on the dashboard (see notification-bell.tsx/attention-panel.tsx),
   // not just the passive resolved/unresolved list.
   if (body.leadStatus === "BOOKED" && existing.leadStatus !== "BOOKED") {
-    await db.staffNotification.create({
-      data: {
-        tenantId: existing.tenantId,
-        contactId: id,
-        type: "BOOKING",
-        reason: `${contact.name || contact.phone} just booked! 🎉`,
-      },
-    });
+    await fireBookingNotification(db, existing.tenantId, id, `${contact.name || contact.phone} just booked! 🎉`);
   }
 
   return NextResponse.json({ contact });

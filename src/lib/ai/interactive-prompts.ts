@@ -29,6 +29,12 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt> = {
       { id: "room_question", title: "I have a question" },
     ],
   },
+  CONFIRM_BOOKING: {
+    buttons: [
+      { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
+      { id: "not_yet", title: "Not yet" },
+    ],
+  },
 };
 
 const BUTTONS_LINE = /^BUTTONS:\s*(\S+)\s*$/gim;

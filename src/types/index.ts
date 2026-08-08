@@ -261,4 +261,5 @@ export interface HotelProfile {
   businessHours: string | null;
   aiSystemPrompt: string | null;
   aiAgentName: string;
+  bookingCodePrefix: string | null;
 }

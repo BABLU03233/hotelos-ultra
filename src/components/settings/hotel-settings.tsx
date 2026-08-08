@@ -69,6 +69,15 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
               maxLength={50}
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Booking reference code prefix</Label>
+            <Input
+              value={form.bookingCodePrefix ?? ""}
+              onChange={(e) => setForm({ ...form, bookingCodePrefix: e.target.value.toUpperCase() })}
+              placeholder="e.g. IVR — leave blank to auto-generate from hotel name"
+              maxLength={6}
+            />
+          </div>
         </CardContent>
       </Card>
 

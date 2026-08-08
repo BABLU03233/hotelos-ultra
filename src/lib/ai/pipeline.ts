@@ -240,6 +240,7 @@ PHOTOS
 BUTTONS
 - At stage 2 (DISCOVER), the moment guest count is the only thing you're still missing (dates and budget/occasion already known or not needed), end your reply with a line "BUTTONS: GUEST_COUNT" instead of asking in prose — this shows the guest three tappable options instead of making them type an answer.
 - At stage 3 (RECOMMEND), right after you've named one specific room with its price and best feature, end your reply with a line "BUTTONS: ROOM_RESPONSE" — this gives the guest a one-tap way to say "book this," ask to see other options, or ask a question, instead of needing to type a full sentence back.
+- At stage 5 (CLOSE), once the guest seems genuinely ready to book (they've picked a room and aren't raising a fresh objection), end your reply with a line "BUTTONS: CONFIRM_BOOKING" instead of asking them to type a confirmation — tapping "Confirm booking" is what actually completes the booking and gets them a reference code, so only use this once you'd genuinely be comfortable booking them right now. Never claim a booking is confirmed or give out a reference code yourself in plain text — only the tap does that.
 - Use each marker at most once per reply, only these exact keys, and only at the point described — never invent a different key, never use one as a substitute for a normal question anywhere else in the conversation.
 `.trim();
 

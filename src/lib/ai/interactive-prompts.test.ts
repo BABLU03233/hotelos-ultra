@@ -46,4 +46,13 @@ describe("extractInteractivePrompt", () => {
   it("exports a stable CONFIRM_BOOKING_BUTTON_ID for downstream matching", () => {
     expect(CONFIRM_BOOKING_BUTTON_ID).toBe("confirm_booking");
   });
+
+  it("resolves the CONFIRM_BOOKING key at the CLOSE stage, using the exported button id", () => {
+    const result = extractInteractivePrompt("Ready when you are!\nBUTTONS: CONFIRM_BOOKING");
+    expect(result.text).toBe("Ready when you are!");
+    expect(result.interactive?.buttons).toEqual([
+      { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
+      { id: "not_yet", title: "Not yet" },
+    ]);
+  });
 });

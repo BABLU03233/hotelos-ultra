@@ -18,6 +18,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "ScheduledFollowUp",
   "Campaign",
   "StaffNotification",
+  "Booking",
 ]);
 
 /**
