@@ -35,7 +35,7 @@ export interface Contact {
 }
 
 export type MessageDirection = "IN" | "OUT";
-export type MessageType = "TEXT" | "IMAGE" | "DOCUMENT" | "LOCATION" | "TEMPLATE";
+export type MessageType = "TEXT" | "IMAGE" | "DOCUMENT" | "LOCATION" | "TEMPLATE" | "INTERACTIVE";
 export type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "REPLIED";
 
 export interface Message {
@@ -45,6 +45,7 @@ export interface Message {
   type: MessageType;
   content: string | null;
   mediaUrl: string | null;
+  interactiveId: string | null;
   status: MessageStatus;
   senderUserId: string | null;
   createdAt: string;

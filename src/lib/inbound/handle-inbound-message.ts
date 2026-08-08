@@ -18,6 +18,9 @@ function mapMessageType(type: InboundMessage["type"]): MessageType {
       return "IMAGE";
     case "location":
       return "LOCATION";
+    case "button":
+    case "interactive":
+      return "INTERACTIVE";
     // WhatsApp also sends audio/video/sticker; the schema keeps message
     // types to the ones the spec calls out and treats other media as a
     // generic document attachment.
@@ -114,6 +117,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       direction: "IN",
       type: mapMessageType(msg.type),
       content: content ?? msg.buttonText,
+      interactiveId: msg.interactiveId,
       mediaUrl,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",

@@ -196,10 +196,10 @@ describe("parseWebhookPayload", () => {
     };
 
     const { messages } = parseWebhookPayload(payload);
-    expect(messages[0]).toMatchObject({ type: "button", text: null, buttonText: "Stop promos" });
+    expect(messages[0]).toMatchObject({ type: "button", text: null, buttonText: "Stop promos", interactiveId: "STOP_PROMOS" });
   });
 
-  it("extracts an interactive button_reply's title", () => {
+  it("extracts an interactive button_reply's title and id", () => {
     const payload = {
       entry: [
         {
@@ -213,7 +213,7 @@ describe("parseWebhookPayload", () => {
                     id: "wamid.INT1",
                     timestamp: "1700000000",
                     type: "interactive",
-                    interactive: { type: "button_reply", button_reply: { id: "stop", title: "Stop promos" } },
+                    interactive: { type: "button_reply", button_reply: { id: "confirm_booking", title: "Confirm booking" } },
                   },
                 ],
               },
@@ -224,7 +224,27 @@ describe("parseWebhookPayload", () => {
     };
 
     const { messages } = parseWebhookPayload(payload);
-    expect(messages[0]).toMatchObject({ type: "interactive", buttonText: "Stop promos" });
+    expect(messages[0]).toMatchObject({ type: "interactive", buttonText: "Confirm booking", interactiveId: "confirm_booking" });
+  });
+
+  it("leaves interactiveId null for a plain text message", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [{ from: "919876543210", id: "wamid.TXT1", timestamp: "1700000000", type: "text", text: { body: "Hi" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].interactiveId).toBeNull();
   });
 
   it("leaves referral null for an ordinary organic message", () => {

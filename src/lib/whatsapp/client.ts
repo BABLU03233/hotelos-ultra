@@ -11,7 +11,12 @@ type OutboundMessage =
   | { type: "image"; link: string; caption?: string }
   | { type: "document"; link: string; filename: string; caption?: string }
   | { type: "location"; latitude: number; longitude: number; name?: string; address?: string }
-  | { type: "template"; templateName: string; languageCode?: string; components?: unknown[] };
+  | { type: "template"; templateName: string; languageCode?: string; components?: unknown[] }
+  // Reply-button interactive message — max 3 buttons, title <=20 chars, id
+  // <=256 chars (WhatsApp Cloud API limits, verified against Meta's current
+  // docs). Body text lives in this same payload, unlike IMAGE which is a
+  // genuinely separate follow-up message.
+  | { type: "interactive"; body: string; buttons: { id: string; title: string }[] };
 
 function buildPayload(to: string, message: OutboundMessage): Record<string, unknown> {
   const base = { messaging_product: "whatsapp", to };
@@ -45,6 +50,18 @@ function buildPayload(to: string, message: OutboundMessage): Record<string, unkn
           name: message.templateName,
           language: { code: message.languageCode ?? "en" },
           components: message.components ?? [],
+        },
+      };
+    case "interactive":
+      return {
+        ...base,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: message.body },
+          action: {
+            buttons: message.buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title } })),
+          },
         },
       };
   }

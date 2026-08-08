@@ -67,6 +67,10 @@ enum MessageType {
   DOCUMENT
   LOCATION
   TEMPLATE
+  // An outbound WhatsApp interactive (reply-button) message we sent, or an
+  // inbound tap on one — see Message.interactiveId for the tapped option's
+  // machine-readable id (the tapped label text is still just `content`).
+  INTERACTIVE
 }
 
 enum MessageStatus {
@@ -365,6 +369,10 @@ model Message {
   type              MessageType      @default(TEXT)
   content           String?          @db.Text
   mediaUrl          String?
+  // Machine-readable id from an interactive button/list tap (button_reply.id
+  // / list_reply.id) — set on inbound INTERACTIVE messages only. The tapped
+  // label text still lives in `content` via the existing fallback.
+  interactiveId     String?
   // WhatsApp's wamid — unique across the whole platform, used to dedupe
   // webhook retries idempotently. Nullable (draft/failed-before-send rows).
   whatsappMessageId String?          @unique

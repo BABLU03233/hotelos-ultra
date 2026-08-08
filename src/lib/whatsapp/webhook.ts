@@ -29,6 +29,11 @@ export interface InboundMessage {
   // list/button-reply message ("interactive") — the visible label text of
   // whichever option the guest tapped (e.g. "Stop promos").
   buttonText: string | null;
+  // The machine-readable id of the tapped option (template button "payload",
+  // or interactive button_reply.id/list_reply.id) — distinct from buttonText,
+  // which is only the human-readable label. Used to detect specific actions
+  // (e.g. the booking-confirmation button) without depending on label text.
+  interactiveId: string | null;
   mediaId: string | null;
   mediaMimeType: string | null;
   location: { latitude: number; longitude: number } | null;
@@ -80,13 +85,17 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
         // Template quick-reply click: { type: "button", button: { text, payload } }.
         // Interactive list/button message: { type: "interactive", interactive: { type: "button_reply"|"list_reply", button_reply|list_reply: { id, title } } }.
         let buttonText: string | null = null;
+        let interactiveId: string | null = null;
         if (type === "button") {
-          buttonText = (raw.button as { text?: string } | undefined)?.text ?? null;
+          const btn = raw.button as { text?: string; payload?: string } | undefined;
+          buttonText = btn?.text ?? null;
+          interactiveId = btn?.payload ?? null;
         } else if (type === "interactive") {
           const interactive = raw.interactive as
-            | { button_reply?: { title?: string }; list_reply?: { title?: string } }
+            | { button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string } }
             | undefined;
           buttonText = interactive?.button_reply?.title ?? interactive?.list_reply?.title ?? null;
+          interactiveId = interactive?.button_reply?.id ?? interactive?.list_reply?.id ?? null;
         }
 
         messages.push({
@@ -98,6 +107,7 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           type,
           text: textBody,
           buttonText,
+          interactiveId,
           mediaId: media?.id ?? null,
           mediaMimeType: media?.mime_type ?? null,
           location:
