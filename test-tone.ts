@@ -1,3 +1,7 @@
+// Lives at repo root (not scripts/) so its relative imports work unchanged
+// both here and when copied flat into the running container's /app/ root —
+// see README.md "Deployment" for the docker cp pattern this is meant for.
+// Run with: docker cp test-tone.ts hotelos-web:/app/test-tone.ts && docker exec hotelos-web npx tsx /app/test-tone.ts
 import "dotenv/config";
 import { PrismaClient } from "./src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
