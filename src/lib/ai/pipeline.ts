@@ -9,25 +9,31 @@ import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
 
-// Curated OpenRouter free-tier models for the fallback tier below —
-// smallest-active-param / established-provider models first, since guests
-// expect an instant reply and a 550B-parameter free model is not that.
-// Verified live against OpenRouter's `/models` API (2026-08-08, filtered to
-// pricing.prompt === "0") rather than assumed — free-tier lineups drift as
-// models get deprecated or added. Excludes narrow specialists (a
-// content-safety classifier, a code-only model) that aren't suited to a
-// general conversational reply. The whole list is env-overridable
+// Curated OpenRouter free-tier models for the fallback tier below, ordered
+// by actual observed speed/reliability — not just catalog listing. First
+// verified live against OpenRouter's `/models` API (2026-08-08, filtered to
+// pricing.prompt === "0"), then test-fired against production's real key
+// (scripts/test-openrouter-models.ts) to confirm each one actually answers:
+// "nvidia/nemotron-nano-30b-a3b:free" turned out to be an invalid model ID
+// (400 from OpenRouter, despite being listed) and "openai/gpt-oss-20b:free"
+// came back slow *and* empty (a reasoning model that burned its whole token
+// budget on hidden reasoning before writing a visible answer) — both
+// dropped. "nvidia/nemotron-nano-9b-v2:free" also came back empty in that
+// same test but answered in well under a second, so it stays as a cheap
+// last attempt (openrouter-provider.ts now throws on empty content instead
+// of treating "200 OK, blank message" as success, so this fails over fast
+// rather than silently sending a guest nothing). Excludes narrow
+// specialists (a content-safety classifier, a code-only model) unsuited to
+// a general conversational reply. The whole list is env-overridable
 // (comma-separated `OPENROUTER_FREE_MODELS`) so a deprecated/rate-limited
 // entry can be swapped without a code change.
 const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
   .map((m) => m.trim())
   .filter(Boolean) ?? [
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "openai/gpt-oss-20b:free",
-  "nvidia/nemotron-nano-30b-a3b:free",
   "poolside/laguna-xs-2.1:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-nano-9b-v2:free",
 ];
 
 // Tries each configured provider in order and falls through on failure

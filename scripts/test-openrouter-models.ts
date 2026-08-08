@@ -1,12 +1,10 @@
 import "dotenv/config";
 
 const MODELS = (process.env.OPENROUTER_FREE_MODELS?.split(",").map((m) => m.trim()).filter(Boolean)) ?? [
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "openai/gpt-oss-20b:free",
-  "nvidia/nemotron-nano-30b-a3b:free",
   "poolside/laguna-xs-2.1:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-nano-9b-v2:free",
 ];
 
 async function testModel(model: string) {
@@ -24,7 +22,7 @@ async function testModel(model: string) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 100,
+      max_tokens: 1024, // matches openrouter-provider.ts — a lower cap here previously made reasoning models look empty when they'd actually have answered
       messages: [
         { role: "system", content: "You are a friendly hotel WhatsApp concierge. Reply in one short sentence." },
         { role: "user", content: "Hi, do you have a room for this weekend?" },
@@ -40,6 +38,10 @@ async function testModel(model: string) {
   }
   const json = (await res.json()) as { choices: { message: { content: string } }[] };
   const reply = json.choices[0]?.message?.content ?? "";
+  if (!reply.trim()) {
+    console.log(`EMPTY ${model} (${ms}ms) — 200 OK but blank content`);
+    return;
+  }
   console.log(`OK    ${model} (${ms}ms) — "${reply.slice(0, 80)}"`);
 }
 

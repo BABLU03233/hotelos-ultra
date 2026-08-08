@@ -43,7 +43,14 @@ export function createOpenRouterProvider(model: string): AIProvider {
       }
 
       const json = (await res.json()) as { choices: { message: { content: string } }[] };
-      return json.choices[0]?.message?.content ?? "";
+      const content = json.choices[0]?.message?.content ?? "";
+      // A 200 with blank content happens on some free reasoning models when
+      // the whole token budget gets eaten by hidden reasoning tokens before
+      // any visible answer is written — live-observed on this exact chain.
+      // Treating it as success would let the fallback chain hand a guest a
+      // blank WhatsApp message; throwing instead sends it to the next model.
+      if (!content.trim()) throw new Error(`OpenRouter returned empty content (model=${model})`);
+      return content;
     },
   };
 }
