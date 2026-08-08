@@ -2,6 +2,8 @@ import { LeadSource } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { cerebrasProvider } from "./cerebras-provider";
+import { cloudflareProvider } from "./cloudflare-provider";
+import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
@@ -50,16 +52,20 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 //    ~100k tokens/day free *per key*, independently verified live. A second
 //    key sits right behind the first: same speed/quality, genuinely separate
 //    quota, so this is the highest-value redundancy in the whole chain.
-// 3-4. Gemini (two accounts) — the most generous no-card free tier here in
-//    practice (its real constraint turned out to be a 5-requests/*minute*
-//    burst limit per key, not a low daily cap as originally assumed —
-//    irrelevant for real guest traffic, only hit by rapid-fire testing).
-//    Each key's quota is independent, so a second one doubles the effective
-//    burst ceiling. Moved ahead of OpenRouter for the reason in #5.
+// 3-4. Gemini (two accounts) — live-verified real constraint is only 20
+//    requests/day *per key* (much lower than early research suggested —
+//    corrected after live-hitting "GenerateRequestsPerDayPerProjectPerModel
+//    -FreeTier, quotaValue: 20"), not the 1,000+/day originally assumed. A
+//    second key doubles that to ~40/day combined (see gemini-provider.ts for
+//    why the 2nd key needs a request-shape retry to actually work). Still
+//    genuinely fast per-reply now that thinking mode is disabled.
 // 5. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
 //    disagree on whether the entry free tier needs a card; ships anyway
 //    since a missing key just skips it instantly, same as every other slot.
-// 6. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
+// 6. Cloudflare Workers AI — 10,000 Neurons/day (Cloudflare's own compute
+//    unit, not a 1:1 request count, so exact message capacity varies by
+//    model/prompt size) — a real independent quota, OpenAI-compatible.
+// 7. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
 //    and discovered these do NOT have independent per-model quotas the way
 //    this was originally designed around. OpenRouter caps free-model usage
 //    at 50 requests/day for the *whole account*, shared across every free
@@ -67,11 +73,13 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 //    second (reproduced live: identical 429 "free-models-per-day" from all
 //    four in one test run). Kept for genuine model-level diversity when
 //    quota remains, just no longer treated as "4 independent fallbacks."
-// 7. SambaNova — real redundancy but a thin free tier (20 requests/day per
+// 8. SambaNova — real redundancy but a thin free tier (20 requests/day per
 //    SambaNova's published limits), so it's a last-resort free attempt
 //    rather than a workhorse.
-// 8. Mistral — free tier, no card, exact quota undocumented.
-// 9. Anthropic — final paid safety net. This is the only non-free step in
+// 9. Cohere — thinnest of all: 1,000 calls/*month* total (~33/day average),
+//    but a genuinely independent quota, so still worth the free extra shot.
+// 10. Mistral — free tier, no card, exact quota undocumented.
+// 11. Anthropic — final paid safety net. This is the only non-free step in
 //    the whole chain, and exists so a guest is *never* left unanswered even
 //    if every free tier above is simultaneously exhausted (confirmed this
 //    can genuinely happen: Groq + OpenRouter were both exhausted
@@ -83,8 +91,10 @@ const aiProvider: AIProvider = createFallbackProvider([
   geminiProvider,
   createGeminiProvider("GEMINI_API_KEY_2", "gemini-2"),
   cerebrasProvider,
+  cloudflareProvider,
   ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   sambanovaProvider,
+  cohereProvider,
   mistralProvider,
   anthropicProvider,
 ]);
