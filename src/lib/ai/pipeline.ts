@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { cerebrasProvider } from "./cerebras-provider";
 import { createFallbackProvider } from "./fallback-provider";
-import { geminiProvider } from "./gemini-provider";
-import { groqProvider } from "./groq-provider";
+import { createGeminiProvider, geminiProvider } from "./gemini-provider";
+import { createGroqProvider, groqProvider } from "./groq-provider";
 import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
@@ -46,16 +46,20 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // chain just moves on — no need to explicitly list which are "active".
 //
 // Order, and why (live-verified 2026-08-08/09, not assumed):
-// 1. Groq — fastest, live-tested under 500ms, ~100k tokens/day free.
-// 2. Gemini — genuinely the most generous no-card free tier of everything
-//    here (~1,000-1,500 requests/day on gemini-2.5-flash-lite), and its
-//    quota is fully independent of every other provider's, so it's real
-//    redundancy, not a shared bucket. Moved ahead of OpenRouter for exactly
-//    that reason (see #4).
-// 3. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
+// 1-2. Groq (two accounts) — fastest, live-tested under 500ms each,
+//    ~100k tokens/day free *per key*, independently verified live. A second
+//    key sits right behind the first: same speed/quality, genuinely separate
+//    quota, so this is the highest-value redundancy in the whole chain.
+// 3-4. Gemini (two accounts) — the most generous no-card free tier here in
+//    practice (its real constraint turned out to be a 5-requests/*minute*
+//    burst limit per key, not a low daily cap as originally assumed —
+//    irrelevant for real guest traffic, only hit by rapid-fire testing).
+//    Each key's quota is independent, so a second one doubles the effective
+//    burst ceiling. Moved ahead of OpenRouter for the reason in #5.
+// 5. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
 //    disagree on whether the entry free tier needs a card; ships anyway
 //    since a missing key just skips it instantly, same as every other slot.
-// 4. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
+// 6. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
 //    and discovered these do NOT have independent per-model quotas the way
 //    this was originally designed around. OpenRouter caps free-model usage
 //    at 50 requests/day for the *whole account*, shared across every free
@@ -63,11 +67,11 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 //    second (reproduced live: identical 429 "free-models-per-day" from all
 //    four in one test run). Kept for genuine model-level diversity when
 //    quota remains, just no longer treated as "4 independent fallbacks."
-// 5. SambaNova — real redundancy but a thin free tier (20 requests/day per
+// 7. SambaNova — real redundancy but a thin free tier (20 requests/day per
 //    SambaNova's published limits), so it's a last-resort free attempt
 //    rather than a workhorse.
-// 6. Mistral — free tier, no card, exact quota undocumented.
-// 7. Anthropic — final paid safety net. This is the only non-free step in
+// 8. Mistral — free tier, no card, exact quota undocumented.
+// 9. Anthropic — final paid safety net. This is the only non-free step in
 //    the whole chain, and exists so a guest is *never* left unanswered even
 //    if every free tier above is simultaneously exhausted (confirmed this
 //    can genuinely happen: Groq + OpenRouter were both exhausted
@@ -75,7 +79,9 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 //    them at the time — the gap this whole reordering closes).
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
+  createGroqProvider("GROQ_API_KEY_2", "groq-2"),
   geminiProvider,
+  createGeminiProvider("GEMINI_API_KEY_2", "gemini-2"),
   cerebrasProvider,
   ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   sambanovaProvider,
