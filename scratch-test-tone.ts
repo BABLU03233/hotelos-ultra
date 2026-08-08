@@ -31,6 +31,26 @@ async function main() {
       msg: "what time is checkout",
       ctx: { isFirstReply: false, daysSinceLastInbound: 0, leadSource: "DIRECT", sourceDetail: null },
     },
+    {
+      label: "Hindi, Devanagari script",
+      msg: "नमस्ते, इस वीकेंड के लिए कमरा है क्या? कितना rate है?",
+      ctx: { isFirstReply: true, daysSinceLastInbound: null, leadSource: "DIRECT", sourceDetail: null },
+    },
+    {
+      label: "Hindi, Roman/Latin script (Hinglish)",
+      msg: "bhai weekend ke liye room available hai kya, rate kitna hai",
+      ctx: { isFirstReply: true, daysSinceLastInbound: null, leadSource: "DIRECT", sourceDetail: null },
+    },
+    {
+      label: "Telugu, native script",
+      msg: "నమస్తే, ఈ వీకెండ్ కి రూమ్ ఉందా? రేట్ ఎంత?",
+      ctx: { isFirstReply: true, daysSinceLastInbound: null, leadSource: "DIRECT", sourceDetail: null },
+    },
+    {
+      label: "Telugu, Roman/Latin script (Tenglish)",
+      msg: "ee weekend ki room undha, rate entha untundi",
+      ctx: { isFirstReply: true, daysSinceLastInbound: null, leadSource: "DIRECT", sourceDetail: null },
+    },
   ];
 
   for (const c of cases) {
