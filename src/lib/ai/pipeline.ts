@@ -2,7 +2,7 @@ import { LeadSource } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { cerebrasProvider } from "./cerebras-provider";
-import { cloudflareProvider } from "./cloudflare-provider";
+import { cloudflareProvider, createCloudflareProvider } from "./cloudflare-provider";
 import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
@@ -62,9 +62,14 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // 5. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
 //    disagree on whether the entry free tier needs a card; ships anyway
 //    since a missing key just skips it instantly, same as every other slot.
-// 6. Cloudflare Workers AI — 10,000 Neurons/day (Cloudflare's own compute
-//    unit, not a 1:1 request count, so exact message capacity varies by
-//    model/prompt size) — a real independent quota, OpenAI-compatible.
+// 6. Cloudflare Workers AI (two accounts) — 10,000 Neurons/day *per account*
+//    (Cloudflare's own compute unit, not a 1:1 request count — live-measured
+//    at ~29 neurons per real reply here, so ~340/day per account). The
+//    10,000/day cap is per Cloudflare account, not per token, so a second
+//    account's credentials (not just a second token on the same account)
+//    genuinely doubles this — far and away the best throughput of anything
+//    added tonight, and 5/5 succeeded in a rapid-fire burst test with no
+//    throttling at all.
 // 7. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
 //    and discovered these do NOT have independent per-model quotas the way
 //    this was originally designed around. OpenRouter caps free-model usage
@@ -92,6 +97,7 @@ const aiProvider: AIProvider = createFallbackProvider([
   createGeminiProvider("GEMINI_API_KEY_2", "gemini-2"),
   cerebrasProvider,
   cloudflareProvider,
+  createCloudflareProvider("CLOUDFLARE_ACCOUNT_ID_2", "CLOUDFLARE_API_TOKEN_2", "cloudflare-2"),
   ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   sambanovaProvider,
   cohereProvider,
