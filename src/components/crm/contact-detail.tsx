@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GlossaryTerm } from "@/components/shared/glossary-term";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { formatCountdown, formatRelativeTime, hoursSince, initials } from "@/lib/format";
@@ -102,9 +103,8 @@ export function ContactDetail({
 
   if (!contactId) {
     return (
-      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-        <MessagesSquare className="size-8" />
-        <p className="text-sm">Select a contact to view the conversation.</p>
+      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center">
+        <EmptyState icon={MessagesSquare} title="Select a contact to view the conversation." />
       </div>
     );
   }

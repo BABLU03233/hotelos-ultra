@@ -4,6 +4,7 @@ import { BookOpen, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UploadKnowledgeDialog } from "@/components/knowledge/upload-knowledge-dialog";
 import { Reveal } from "@/components/motion/reveal";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
@@ -78,11 +79,12 @@ export default function KnowledgePage() {
           </div>
         </SkeletonSwap>
         {!loading && data?.docs.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-            <BookOpen className="size-8" />
-            <p className="text-sm font-medium text-foreground">{agentName}&apos;s knowledge base is empty</p>
-            <p className="max-w-xs text-xs">Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means {agentName} escalates almost everything.</p>
-          </div>
+          <EmptyState
+            icon={BookOpen}
+            title={`${agentName}'s knowledge base is empty`}
+            description={`Upload a PDF, brochure, or paste in text/FAQs — an empty knowledge base means ${agentName} escalates almost everything.`}
+            className="py-16"
+          />
         )}
       </div>
     </div>

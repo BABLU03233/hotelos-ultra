@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
@@ -88,7 +89,11 @@ export function ContactList({
             </div>
           </SkeletonSwap>
           {!loading && data?.contacts.length === 0 && (
-            <p className="px-2 py-8 text-center text-sm text-muted-foreground">No contacts yet.</p>
+            <EmptyState
+              icon={Users}
+              title="No contacts yet"
+              description={search || status !== "ALL" ? "Try a different search or filter." : "Contacts show up here as guests message in."}
+            />
           )}
         </div>
       </ScrollArea>

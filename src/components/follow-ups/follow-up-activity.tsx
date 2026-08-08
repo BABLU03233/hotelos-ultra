@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, CircleSlash, XCircle } from "lucide-react";
+import { CheckCircle2, CircleSlash, History, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatDateTime } from "@/lib/format";
@@ -36,7 +37,7 @@ export function FollowUpActivity() {
       }
     >
       {data?.activity.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">No follow-ups have run yet.</p>
+        <EmptyState icon={History} title="No follow-ups have run yet" className="py-8" />
       ) : (
         <div className="flex flex-col">
           {data?.activity.map((f) => {

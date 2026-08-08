@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { RefreshCw, RotateCw, Trash2 } from "lucide-react";
+import { LayoutTemplate, RefreshCw, RotateCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { InfoCallout } from "@/components/shared/info-callout";
 import { MetaTemplateBuilderDialog } from "@/components/templates/meta-template-builder-dialog";
 import { StaggerItem } from "@/components/motion/stagger-item";
@@ -74,7 +75,12 @@ export function MetaTemplateList() {
       </div>
 
       {data?.templates.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">No Meta templates yet — create one, or sync if you already approved one directly in Meta Business Manager.</p>
+        <EmptyState
+          icon={LayoutTemplate}
+          title="No Meta templates yet"
+          description="Create one, or sync if you already approved one directly in Meta Business Manager."
+          className="py-8"
+        />
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

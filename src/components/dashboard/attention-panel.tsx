@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatRelativeTime } from "@/lib/format";
 import { NOTIFICATION_STYLE } from "@/lib/notification-style";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAuthStore } from "@/store/use-auth-store";
 import { StaffNotification } from "@/types";
 
@@ -42,11 +43,12 @@ export function DashboardAttentionPanel({
 
   if (count === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-        <CircleCheck className="size-6 text-emerald-600" />
-        <p className="text-sm font-medium">All clear</p>
-        <p className="text-xs text-muted-foreground">{agentName} hasn&apos;t needed to escalate anything.</p>
-      </div>
+      <EmptyState
+        icon={CircleCheck}
+        title="All clear"
+        description={`${agentName} hasn't needed to escalate anything.`}
+        className="[&>div:first-child]:bg-emerald-500/10 [&_svg]:text-emerald-600"
+      />
     );
   }
 

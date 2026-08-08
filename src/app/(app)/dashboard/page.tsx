@@ -1,5 +1,6 @@
-import { Bot, CalendarCheck, Clock, MessagesSquare, UserPlus } from "lucide-react";
+import { Bot, CalendarCheck, Clock, Megaphone, MessagesSquare, PieChart, UserPlus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/components/motion/reveal";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { DashboardAttentionPanel } from "@/components/dashboard/attention-panel";
@@ -70,10 +71,11 @@ export default async function DashboardPage() {
               {hasMessageVolume ? (
                 <MessageVolumeChart trend={metrics.messageVolumeTrend} agentName={metrics.aiAgentName} />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-                  <p className="text-sm font-medium">No messages yet</p>
-                  <p className="text-xs text-muted-foreground">Once guests start messaging in, activity shows up here.</p>
-                </div>
+                <EmptyState
+                  icon={MessagesSquare}
+                  title="No messages yet"
+                  description="Once guests start messaging in, activity shows up here."
+                />
               )}
             </CardContent>
           </Card>
@@ -101,10 +103,7 @@ export default async function DashboardPage() {
               {hasLeadFunnel ? (
                 <LeadFunnelChart funnel={metrics.leadFunnel} />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-                  <p className="text-sm font-medium">No leads yet</p>
-                  <p className="text-xs text-muted-foreground">New contacts show up here by stage.</p>
-                </div>
+                <EmptyState icon={UserPlus} title="No leads yet" description="New contacts show up here by stage." />
               )}
             </CardContent>
           </Card>
@@ -118,10 +117,11 @@ export default async function DashboardPage() {
               {hasLeadSources ? (
                 <LeadSourceChart bySource={metrics.leadsBySource} />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-                  <p className="text-sm font-medium">No leads yet</p>
-                  <p className="text-xs text-muted-foreground">See where they came from once they start coming in.</p>
-                </div>
+                <EmptyState
+                  icon={PieChart}
+                  title="No leads yet"
+                  description="See where they came from once they start coming in."
+                />
               )}
             </CardContent>
           </Card>
@@ -132,10 +132,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="h-56">
               {metrics.campaignPerformance.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-                  <p className="text-sm font-medium">No campaigns sent yet</p>
-                  <p className="text-xs text-muted-foreground">Broadcast one from the Campaigns tab to see performance here.</p>
-                </div>
+                <EmptyState
+                  icon={Megaphone}
+                  title="No campaigns sent yet"
+                  description="Broadcast one from the Campaigns tab to see performance here."
+                />
               ) : (
                 <CampaignPerformanceChart campaigns={metrics.campaignPerformance} />
               )}

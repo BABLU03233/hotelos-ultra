@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Megaphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 import { Reveal } from "@/components/motion/reveal";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
@@ -71,11 +72,12 @@ export default function CampaignsPage() {
           </div>
         </SkeletonSwap>
         {!loading && data?.campaigns.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-            <Megaphone className="size-8" />
-            <p className="text-sm font-medium text-foreground">No campaigns yet</p>
-            <p className="max-w-xs text-xs">Broadcast an offer or update to a segment of your guests — {agentName} handles any replies.</p>
-          </div>
+          <EmptyState
+            icon={Megaphone}
+            title="No campaigns yet"
+            description={`Broadcast an offer or update to a segment of your guests — ${agentName} handles any replies.`}
+            className="py-16"
+          />
         )}
       </div>
     </div>

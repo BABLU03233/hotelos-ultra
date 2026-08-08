@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FollowUpActivity } from "@/components/follow-ups/follow-up-activity";
 import { FollowUpRuleCard } from "@/components/follow-ups/follow-up-rule-card";
 import { Reveal } from "@/components/motion/reveal";
@@ -81,11 +82,12 @@ export default function FollowUpsPage() {
           </div>
         </SkeletonSwap>
         {!loading && data?.rules.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-            <Clock className="size-8" />
-            <p className="text-sm font-medium text-foreground">No follow-up steps yet</p>
-            <p className="max-w-xs text-xs">Add a step to automatically nudge leads who go quiet.</p>
-          </div>
+          <EmptyState
+            icon={Clock}
+            title="No follow-up steps yet"
+            description="Add a step to automatically nudge leads who go quiet."
+            className="py-16"
+          />
         )}
       </div>
 
