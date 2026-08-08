@@ -1,10 +1,10 @@
 import "dotenv/config";
 
 const MODELS = (process.env.OPENROUTER_FREE_MODELS?.split(",").map((m) => m.trim()).filter(Boolean)) ?? [
+  "nvidia/nemotron-nano-9b-v2:free",
+  "google/gemma-4-26b-a4b-it:free",
   "poolside/laguna-xs-2.1:free",
   "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "nvidia/nemotron-nano-9b-v2:free",
 ];
 
 async function testModel(model: string) {
