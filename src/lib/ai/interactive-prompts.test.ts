@@ -22,6 +22,12 @@ describe("extractInteractivePrompt", () => {
     expect(result.interactive?.buttons).toHaveLength(3);
   });
 
+  it("resolves the ROOM_RESPONSE key at the RECOMMEND stage", () => {
+    const result = extractInteractivePrompt("The Deluxe Room is ₹1,299/night with a great view.\nBUTTONS: ROOM_RESPONSE");
+    expect(result.text).toBe("The Deluxe Room is ₹1,299/night with a great view.");
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", "room_other", "room_question"]);
+  });
+
   it("falls back to plain text and warns on an unknown/hallucinated key", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = extractInteractivePrompt("Sure thing!\nBUTTONS: MADE_UP_KEY");

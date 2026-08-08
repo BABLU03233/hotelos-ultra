@@ -239,7 +239,8 @@ PHOTOS
 
 BUTTONS
 - At stage 2 (DISCOVER), the moment guest count is the only thing you're still missing (dates and budget/occasion already known or not needed), end your reply with a line "BUTTONS: GUEST_COUNT" instead of asking in prose — this shows the guest three tappable options instead of making them type an answer.
-- Use this marker at most once per reply, only this exact key, and only when guest count is genuinely the next thing to ask — never invent a different key, never use it as a substitute for a normal question at any other point in the conversation.
+- At stage 3 (RECOMMEND), right after you've named one specific room with its price and best feature, end your reply with a line "BUTTONS: ROOM_RESPONSE" — this gives the guest a one-tap way to say "book this," ask to see other options, or ask a question, instead of needing to type a full sentence back.
+- Use each marker at most once per reply, only these exact keys, and only at the point described — never invent a different key, never use one as a substitute for a normal question anywhere else in the conversation.
 `.trim();
 
   return { prompt, agentName };
