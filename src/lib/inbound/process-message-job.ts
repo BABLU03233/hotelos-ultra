@@ -83,7 +83,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     });
     return;
   }
-  const { reply, imageUrls, shouldEscalate, escalationReason, agentName } = generated;
+  const { reply, imageUrls, interactive, shouldEscalate, escalationReason, agentName } = generated;
 
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
@@ -96,7 +96,12 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
 
   let whatsappMessageId: string;
   try {
-    whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply });
+    // An interactive message carries its body text inside the same payload
+    // as the buttons (unlike IMAGE, which is a genuine separate follow-up
+    // message) — this replaces the text send for the turn, not adds to it.
+    whatsappMessageId = interactive
+      ? await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "interactive", body: reply, buttons: interactive.buttons })
+      : await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply });
   } catch (err) {
     console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({
@@ -118,7 +123,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
         tenantId,
         contactId,
         direction: "OUT",
-        type: "TEXT",
+        type: interactive ? "INTERACTIVE" : "TEXT",
         content: reply,
         whatsappMessageId,
         status: "SENT",

@@ -7,6 +7,7 @@ import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
+import { extractInteractivePrompt, InteractivePrompt } from "./interactive-prompts";
 import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
@@ -235,6 +236,10 @@ TONE
 
 PHOTOS
 - If a guest asks to see a room, photos, or what it looks like, send the real photo URLs listed for that room above. Add a line for each photo in the exact format "IMAGE: <url>" (one per line, at most 3), placed after your normal reply text. Only use URLs that are literally listed above — never invent or guess a URL, and never send a photo for a room that has none listed.
+
+BUTTONS
+- At stage 2 (DISCOVER), the moment guest count is the only thing you're still missing (dates and budget/occasion already known or not needed), end your reply with a line "BUTTONS: GUEST_COUNT" instead of asking in prose — this shows the guest three tappable options instead of making them type an answer.
+- Use this marker at most once per reply, only this exact key, and only when guest count is genuinely the next thing to ask — never invent a different key, never use it as a substitute for a normal question at any other point in the conversation.
 `.trim();
 
   return { prompt, agentName };
@@ -243,6 +248,7 @@ PHOTOS
 export interface GenerateReplyResult {
   reply: string;
   imageUrls: string[];
+  interactive?: InteractivePrompt;
   shouldEscalate: boolean;
   escalationReason?: string;
   agentName: string;
@@ -282,8 +288,9 @@ export async function generateReply(
     };
   }
 
-  const { text, imageUrls } = extractImageUrls(trimmed);
-  return { reply: text, imageUrls, shouldEscalate: false, agentName };
+  const { text: withoutImages, imageUrls } = extractImageUrls(trimmed);
+  const { text, interactive } = extractInteractivePrompt(withoutImages);
+  return { reply: text, imageUrls, interactive, shouldEscalate: false, agentName };
 }
 
 /** One-sentence CRM summary of a conversation so far, refreshed after each inbound message. */
