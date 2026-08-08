@@ -47,6 +47,18 @@ describe("extractInteractivePrompt", () => {
     expect(CONFIRM_BOOKING_BUTTON_ID).toBe("confirm_booking");
   });
 
+  it("resolves a marker that shares a line with prose, keeping the prose", () => {
+    const result = extractInteractivePrompt("Awesome, you're going to love it there! BUTTONS: CONFIRM_BOOKING");
+    expect(result.text).toBe("Awesome, you're going to love it there!");
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+  });
+
+  it("resolves a key even with trailing punctuation right after it", () => {
+    const result = extractInteractivePrompt("Great choice!\nBUTTONS: ROOM_RESPONSE.");
+    expect(result.text).toBe("Great choice!");
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", "room_other", "room_question"]);
+  });
+
   it("resolves the CONFIRM_BOOKING key at the CLOSE stage, using the exported button id", () => {
     const result = extractInteractivePrompt("Ready when you are!\nBUTTONS: CONFIRM_BOOKING");
     expect(result.text).toBe("Ready when you are!");
@@ -54,5 +66,17 @@ describe("extractInteractivePrompt", () => {
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
       { id: "not_yet", title: "Not yet" },
     ]);
+  });
+
+  it("substitutes a non-empty fallback body when the model emits a bare marker with no sentence in front of it", () => {
+    const result = extractInteractivePrompt("BUTTONS: CONFIRM_BOOKING");
+    expect(result.text.length).toBeGreaterThan(0);
+    expect(result.interactive?.buttons).toHaveLength(2);
+  });
+
+  it("substitutes a fallback body when only whitespace is left after stripping the marker", () => {
+    const result = extractInteractivePrompt("   \n BUTTONS: GUEST_COUNT \n  ");
+    expect(result.text.length).toBeGreaterThan(0);
+    expect(result.interactive?.buttons).toHaveLength(3);
   });
 });

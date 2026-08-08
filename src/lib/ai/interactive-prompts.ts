@@ -14,8 +14,14 @@ export interface InteractivePrompt {
   buttons: { id: string; title: string }[];
 }
 
-const BUTTON_CATALOG: Record<string, InteractivePrompt> = {
+// fallbackBody: WhatsApp's interactive-button API requires non-empty body
+// text — live testing showed the AI sometimes emits a bare "BUTTONS: KEY"
+// line with no sentence in front of it (nothing left to strip after
+// removing the marker), which would otherwise reach Meta as an empty body
+// and fail to send. Used only when the AI's own text is empty/whitespace.
+const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string }> = {
   GUEST_COUNT: {
+    fallbackBody: "How many guests will be staying? 😊",
     buttons: [
       { id: "guests_1", title: "Just me" },
       { id: "guests_2", title: "2 guests" },
@@ -23,6 +29,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt> = {
     ],
   },
   ROOM_RESPONSE: {
+    fallbackBody: "Would you like to go ahead with this room?",
     buttons: [
       { id: "room_book", title: "Book this room" },
       { id: "room_other", title: "See other options" },
@@ -30,6 +37,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt> = {
     ],
   },
   CONFIRM_BOOKING: {
+    fallbackBody: "Ready to confirm your booking? 🎉",
     buttons: [
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
       { id: "not_yet", title: "Not yet" },
@@ -37,12 +45,24 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt> = {
   },
 };
 
-const BUTTONS_LINE = /^BUTTONS:\s*(\S+)\s*$/gim;
+// Deliberately NOT anchored to "start of its own line" — live testing showed
+// weak/fast models sometimes tack "BUTTONS: KEY" onto the same line as the
+// preceding sentence instead of putting it on its own line as instructed.
+// Matching anywhere and trimming only the marker itself (not the whole line)
+// means that formatting drift doesn't silently swallow the guest's buttons.
+// [A-Za-z_]+ (not \S+) also stops at trailing punctuation like a period or
+// "!" the model might append, so "BUTTONS: ROOM_RESPONSE." still resolves.
+const BUTTONS_MARKER = /BUTTONS:\s*([A-Za-z_]+)[.!]?/gi;
 
-/** Strips a "BUTTONS: <KEY>" marker line (if present) and resolves it against the catalog — same idiom as extractImageUrls. */
+/** Strips any "BUTTONS: <KEY>" marker(s) and resolves the first one against the catalog — same idiom as extractImageUrls. */
 export function extractInteractivePrompt(text: string): { text: string; interactive?: InteractivePrompt } {
-  const matches = [...text.matchAll(BUTTONS_LINE)];
-  const cleaned = text.replace(BUTTONS_LINE, "").trim();
+  const matches = [...text.matchAll(BUTTONS_MARKER)];
+  const cleaned = text
+    .replace(BUTTONS_MARKER, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (!matches.length) return { text: cleaned };
 
   const key = matches[0][1].toUpperCase();
@@ -51,5 +71,5 @@ export function extractInteractivePrompt(text: string): { text: string; interact
     console.warn(`Anushka emitted an unknown BUTTONS key: "${key}"`);
     return { text: cleaned };
   }
-  return { text: cleaned, interactive: prompt };
+  return { text: cleaned || prompt.fallbackBody, interactive: { buttons: prompt.buttons } };
 }
