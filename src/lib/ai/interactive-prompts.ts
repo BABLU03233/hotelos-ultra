@@ -9,6 +9,11 @@
  * reply — it never reaches Meta malformed.
  */
 export const CONFIRM_BOOKING_BUTTON_ID = "confirm_booking";
+// Handled deterministically in handle-inbound-message.ts (bypasses the AI
+// entirely) — sends a code-generated List Message of the tenant's real
+// rooms, rather than trusting a free-tier model to relay room names/prices
+// accurately in prose a second time.
+export const SEE_OTHER_ROOMS_BUTTON_ID = "room_other";
 
 export interface InteractivePrompt {
   buttons: { id: string; title: string }[];
@@ -32,7 +37,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     fallbackBody: "Would you like to go ahead with this room?",
     buttons: [
       { id: "room_book", title: "Book this room" },
-      { id: "room_other", title: "See other options" },
+      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other options" },
       { id: "room_question", title: "I have a question" },
     ],
   },
@@ -41,6 +46,14 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     buttons: [
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
       { id: "not_yet", title: "Not yet" },
+    ],
+  },
+  LANGUAGE_SELECT: {
+    fallbackBody: "Which language would you like to chat in? 😊",
+    buttons: [
+      { id: "lang_en", title: "English" },
+      { id: "lang_hi", title: "हिंदी" },
+      { id: "lang_te", title: "తెలుగు" },
     ],
   },
 };

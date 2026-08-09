@@ -16,9 +16,16 @@ type OutboundMessage =
   // <=256 chars (WhatsApp Cloud API limits, verified against Meta's current
   // docs). Body text lives in this same payload, unlike IMAGE which is a
   // genuinely separate follow-up message.
-  | { type: "interactive"; body: string; buttons: { id: string; title: string }[] };
+  | { type: "interactive"; body: string; buttons: { id: string; title: string }[] }
+  // List message — for choosing among more than 3 options (e.g. a hotel
+  // with more than 3 room types), which reply-buttons can't fit. Max 10
+  // rows total across all sections, row title <=24 chars, row description
+  // <=72 chars, id <=200 chars, button (the text on the "open list" tab)
+  // <=20 chars (WhatsApp Cloud API limits, verified against Meta's current
+  // docs).
+  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] };
 
-function buildPayload(to: string, message: OutboundMessage): Record<string, unknown> {
+export function buildPayload(to: string, message: OutboundMessage): Record<string, unknown> {
   const base = { messaging_product: "whatsapp", to };
   switch (message.type) {
     case "text":
@@ -61,6 +68,22 @@ function buildPayload(to: string, message: OutboundMessage): Record<string, unkn
           body: { text: message.body },
           action: {
             buttons: message.buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title } })),
+          },
+        },
+      };
+    case "list":
+      return {
+        ...base,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          body: { text: message.body },
+          action: {
+            button: message.buttonText,
+            sections: message.sections.map((s) => ({
+              title: s.title,
+              rows: s.rows.map((r) => ({ id: r.id, title: r.title, description: r.description })),
+            })),
           },
         },
       };

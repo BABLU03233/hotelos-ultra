@@ -1,5 +1,5 @@
 import { MessageStatus, MessageType } from "@/generated/prisma/enums";
-import { CONFIRM_BOOKING_BUTTON_ID } from "@/lib/ai/interactive-prompts";
+import { CONFIRM_BOOKING_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
@@ -7,6 +7,7 @@ import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { downloadMedia, getMediaUrl, sendWhatsAppMessage } from "@/lib/whatsapp/client";
 import { isOptOutSignal } from "@/lib/whatsapp/opt-out";
+import { buildRoomListMessage } from "@/lib/whatsapp/room-list-message";
 import { getWhatsAppCredentials, resolveTenantByPhoneNumberId } from "@/lib/whatsapp/tenant-credentials";
 import { InboundMessage, StatusUpdate } from "@/lib/whatsapp/webhook";
 import { uploadObject } from "@/lib/storage/s3";
@@ -210,6 +211,44 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       }
     }
     return;
+  }
+
+  // "See other options" is handled deterministically too — not because it's
+  // business-critical like the two blocks above, but because trusting a
+  // free-tier model to relay real room names/prices in prose a second time
+  // is exactly the kind of thing that goes wrong (a genuine, live-observed
+  // failure mode of the weaker models in the fallback chain); a real DB
+  // query can't hallucinate a price.
+  if (msg.interactiveId === SEE_OTHER_ROOMS_BUTTON_ID) {
+    if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
+
+    const rooms = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
+    if (rooms.length) {
+      const creds = await getWhatsAppCredentials(tenant.id);
+      if (creds) {
+        try {
+          const listMessage = buildRoomListMessage(rooms);
+          const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, listMessage);
+          await prisma.message.create({
+            data: {
+              tenantId: tenant.id,
+              contactId: contact.id,
+              direction: "OUT",
+              type: "INTERACTIVE",
+              content: listMessage.body,
+              whatsappMessageId,
+              status: "SENT",
+            },
+          });
+        } catch (err) {
+          console.error(`Failed to send room list for tenant ${tenant.id}, contact ${contact.id}:`, err);
+        }
+      }
+      return;
+    }
+    // No rooms configured for this tenant (shouldn't happen operationally,
+    // since reaching RECOMMEND requires at least one) — fall through to the
+    // normal AI queue below so the guest still gets *some* reply.
   }
 
   // jobId keyed to the inbound message: if this same message is ever

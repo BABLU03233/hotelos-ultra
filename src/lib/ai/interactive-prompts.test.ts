@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CONFIRM_BOOKING_BUTTON_ID, extractInteractivePrompt } from "./interactive-prompts";
+import { CONFIRM_BOOKING_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, extractInteractivePrompt } from "./interactive-prompts";
 
 describe("extractInteractivePrompt", () => {
   it("returns the text unchanged when no BUTTONS marker is present", () => {
@@ -78,5 +78,14 @@ describe("extractInteractivePrompt", () => {
     const result = extractInteractivePrompt("   \n BUTTONS: GUEST_COUNT \n  ");
     expect(result.text.length).toBeGreaterThan(0);
     expect(result.interactive?.buttons).toHaveLength(3);
+  });
+
+  it("resolves the LANGUAGE_SELECT key, and ROOM_RESPONSE's 'see other options' button matches SEE_OTHER_ROOMS_BUTTON_ID", () => {
+    const result = extractInteractivePrompt("Hi there! 😊\nBUTTONS: LANGUAGE_SELECT");
+    expect(result.interactive?.buttons).toHaveLength(3);
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+
+    const roomResponse = extractInteractivePrompt("Great room!\nBUTTONS: ROOM_RESPONSE");
+    expect(roomResponse.interactive?.buttons.map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
   });
 });
