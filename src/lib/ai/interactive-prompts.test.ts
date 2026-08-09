@@ -14,6 +14,7 @@ import {
   hasStatedGuestCount,
   looksLikeObviousLanguage,
   mentionsRoomPrice,
+  predictedStageInstruction,
   roomResponsePrompt,
   selectDeterministicInteractive,
 } from "./interactive-prompts";
@@ -368,5 +369,51 @@ describe("hasExpressedBookingIntent", () => {
   it("finds intent stated earlier in history, not just the latest message", () => {
     const history = [{ role: "user", content: "hi, I want to book a room" }];
     expect(hasExpressedBookingIntent(history, "sure")).toBe(true);
+  });
+});
+
+describe("predictedStageInstruction", () => {
+  const base = { isFirstReply: false, languageObvious: true, history: [] as { role: string; content: string }[], guestMessage: "" };
+
+  it("gives a LANGUAGE_SELECT instruction on the first reply when language isn't obvious", () => {
+    const result = predictedStageInstruction({ ...base, isFirstReply: true, languageObvious: false });
+    expect(result).toContain("language-selection buttons");
+  });
+
+  it("gives a GREET_MENU instruction on the first reply when language is already obvious", () => {
+    const result = predictedStageInstruction({ ...base, isFirstReply: true, languageObvious: true });
+    expect(result).toContain("Book a room");
+  });
+
+  it("gives a GUEST_COUNT instruction once booking intent is shown but count is unknown", () => {
+    const result = predictedStageInstruction({ ...base, guestMessage: "I'd like to book a room" });
+    expect(result).toContain("how many guests");
+  });
+
+  it("gives a DATE_QUICK_PICK instruction once guest count is known but dates and room are not", () => {
+    const result = predictedStageInstruction({ ...base, guestMessage: "2 guests please" });
+    expect(result).toContain("dates");
+  });
+
+  it("gives a CONFIRM_BOOKING instruction once a room has already come up", () => {
+    const result = predictedStageInstruction({
+      ...base,
+      guestMessage: "sounds good",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result).toContain("Confirm booking");
+  });
+
+  it("gives a heads-up about recommending a room once guest count and dates are both known", () => {
+    const result = predictedStageInstruction({ ...base, guestMessage: "2 guests, this weekend" });
+    expect(result).toContain("recommend");
+  });
+
+  it("returns an empty string for plain small talk with no booking interest yet", () => {
+    const result = predictedStageInstruction({ ...base, guestMessage: "just looking around, thanks" });
+    expect(result).toBe("");
   });
 });

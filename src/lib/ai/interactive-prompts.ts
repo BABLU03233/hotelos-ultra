@@ -243,10 +243,23 @@ export function selectDeterministicInteractive(params: {
   replyText: string;
   aiInteractive?: InteractivePrompt;
 }): InteractivePrompt | undefined {
-  const { isFirstReply, languageObvious, history, guestMessage, replyText, aiInteractive } = params;
+  const key = resolveStageKey(params);
+  return key ? promptForStageKey(key) : params.aiInteractive;
+}
+
+type StageKey = "LANGUAGE_SELECT" | "GREET_MENU" | "GUEST_COUNT" | "ROOM_RESPONSE" | "CONFIRM_BOOKING" | "DATE_QUICK_PICK" | null;
+
+function resolveStageKey(params: {
+  isFirstReply: boolean;
+  languageObvious: boolean;
+  history: { role: string; content: string }[];
+  guestMessage: string;
+  replyText: string;
+}): StageKey {
+  const { isFirstReply, languageObvious, history, guestMessage, replyText } = params;
 
   if (isFirstReply) {
-    return languageObvious ? greetMenuPrompt() : { buttons: BUTTON_CATALOG.LANGUAGE_SELECT.buttons };
+    return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
 
   const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
@@ -257,13 +270,13 @@ export function selectDeterministicInteractive(params: {
   // having come up counts as interest even if this exact turn's keywords
   // don't match hasExpressedBookingIntent's pattern.
   if (!hasExpressedBookingIntent(history, guestMessage) && !roomMentionedEver) {
-    return aiInteractive;
+    return null;
   }
   if (!hasStatedGuestCount(history, guestMessage)) {
-    return guestCountPrompt();
+    return "GUEST_COUNT";
   }
   if (mentionsRoomPrice(replyText)) {
-    return roomResponsePrompt();
+    return "ROOM_RESPONSE";
   }
   // Checked before the dates nudge, not after: dates detection is
   // necessarily broad/imprecise (guests phrase dates far more ways than
@@ -272,10 +285,82 @@ export function selectDeterministicInteractive(params: {
   // book getting stuck being asked for dates on a loop because their
   // phrasing didn't match the pattern.
   if (roomMentionedEver) {
-    return confirmBookingPrompt();
+    return "CONFIRM_BOOKING";
   }
   if (!hasStatedDates(history, guestMessage)) {
-    return dateQuickPickPrompt();
+    return "DATE_QUICK_PICK";
   }
-  return aiInteractive;
+  return null;
+}
+
+function promptForStageKey(key: StageKey): InteractivePrompt | undefined {
+  switch (key) {
+    case "LANGUAGE_SELECT":
+      return { buttons: BUTTON_CATALOG.LANGUAGE_SELECT.buttons };
+    case "GREET_MENU":
+      return greetMenuPrompt();
+    case "GUEST_COUNT":
+      return guestCountPrompt();
+    case "ROOM_RESPONSE":
+      return roomResponsePrompt();
+    case "CONFIRM_BOOKING":
+      return confirmBookingPrompt();
+    case "DATE_QUICK_PICK":
+      return dateQuickPickPrompt();
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The mismatch that made buttons feel "bolted on"/robotic: buttons were
+ * decided purely from state, entirely independent of what the AI actually
+ * wrote, so a reply could ask about dates while ROOM_RESPONSE buttons
+ * showed underneath, or vice versa. Most of the waterfall's state (guest
+ * count known?, dates known?, has a room come up before?) is knowable
+ * *before* calling the AI — only "does THIS reply name a room" genuinely
+ * depends on what the AI is about to write. So the predictable stages are
+ * computed pre-call (passing "" as replyText, same resolver as the real
+ * decision) and turned into a short, explicit instruction for buildSystemPrompt
+ * to inject — telling the AI what this specific reply's job is, so the
+ * text it writes actually leads into whichever buttons will appear, instead
+ * of the two drifting apart. Returns "" for the cases that can't be
+ * predicted (no booking interest yet -> normal open chat; or enough is
+ * already known that the AI might recommend a room this turn -> its own
+ * judgment call, same as before).
+ */
+export function predictedStageInstruction(params: {
+  isFirstReply: boolean;
+  languageObvious: boolean;
+  history: { role: string; content: string }[];
+  guestMessage: string;
+}): string {
+  const key = resolveStageKey({ ...params, replyText: "" });
+  switch (key) {
+    case "LANGUAGE_SELECT":
+      return "This is the guest's very first message. English / हिंदी / తెలుగు language-selection buttons will automatically appear under your reply — don't ask which language they prefer yourself, just write your normal short opener.";
+    case "GREET_MENU":
+      return "This is the guest's very first message and their language is already clear from how they wrote. \"Book a room\" / \"View rooms\" / \"Ask a question\" buttons will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the buttons already are the question.";
+    case "GUEST_COUNT":
+      return "This reply's job: move toward learning how many guests will be staying. \"Just me\" / \"2 guests\" / \"3+ guests\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask about dates or anything else in this same reply.";
+    case "DATE_QUICK_PICK":
+      return "This reply's job: move toward learning their dates. \"This weekend\" / \"Next week\" / \"I'll type dates\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask anything else in this same reply.";
+    case "CONFIRM_BOOKING":
+      return "Confirm booking / Not yet buttons will automatically appear under your reply. Write a short, warm closing line, not a new question — and never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
+    default: {
+      // resolveStageKey returns null both for "no booking interest yet"
+      // (plain open chat, no hint needed) and for "guest count + dates are
+      // both already known, no room discussed yet" (the one moment that's
+      // still genuinely the AI's own judgment call — RECOMMEND). Only the
+      // second case benefits from a heads-up about what happens if it does
+      // recommend a room.
+      const readyToRecommend =
+        !params.isFirstReply &&
+        hasStatedGuestCount(params.history, params.guestMessage) &&
+        hasStatedDates(params.history, params.guestMessage) &&
+        !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
+      if (!readyToRecommend) return "";
+      return "If you recommend a specific room with its price in this reply, Book this room / See other options / View photos buttons will automatically appear underneath — end the reply right after naming the room, don't also ask a follow-up question in the same message.";
+    }
+  }
 }

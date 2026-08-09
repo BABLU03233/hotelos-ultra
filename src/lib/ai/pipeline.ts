@@ -7,7 +7,13 @@ import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
-import { extractInteractivePrompt, InteractivePrompt, looksLikeObviousLanguage, selectDeterministicInteractive } from "./interactive-prompts";
+import {
+  extractInteractivePrompt,
+  InteractivePrompt,
+  looksLikeObviousLanguage,
+  predictedStageInstruction,
+  selectDeterministicInteractive,
+} from "./interactive-prompts";
 import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
@@ -151,7 +157,8 @@ function buildConversationContext(agentName: string, context?: ReplyContext): st
 async function buildSystemPrompt(
   tenantId: string,
   retrievedContext: string[],
-  context?: ReplyContext
+  context?: ReplyContext,
+  interactiveState?: { history: ChatMessage[]; guestMessage: string }
 ): Promise<{ prompt: string; agentName: string }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
@@ -174,6 +181,17 @@ async function buildSystemPrompt(
   const offerLines =
     offers.map((o) => `- ${o.title}: ${o.description ?? ""}${o.discount ? ` (${o.discount})` : ""}`.trim()).join("\n") ||
     "None currently.";
+
+  const stageInstruction = interactiveState
+    ? predictedStageInstruction({
+        isFirstReply: context?.isFirstReply ?? false,
+        languageObvious:
+          looksLikeObviousLanguage(interactiveState.guestMessage) ||
+          interactiveState.history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
+        history: interactiveState.history,
+        guestMessage: interactiveState.guestMessage,
+      })
+    : "";
 
   const prompt = `
 You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text a friend — quick, warm, to the point. Every reply should feel like it took five seconds to write, not five minutes. Never sound like a corporate script, a formal letter, or a customer-support bot reading from a manual.
@@ -222,6 +240,7 @@ Every conversation moves through these stages naturally — never announce a sta
 BUTTONS
 - The app automatically attaches tappable buttons to most of your replies based on what's already been established in the conversation (language, guest count, a room recommendation, readiness to book) — this happens outside anything you write, so never type a "BUTTONS: ..." marker yourself and never mention buttons, taps, or tapping in your reply text. Just write the normal, natural reply you'd write anyway; do not also ask in prose the exact thing the buttons already cover (e.g. if you just named a room's price, don't also type "would you like to book it or see other rooms?" — the buttons already offer that choice).
 - One exception you do handle yourself: if the guest taps "View photos" (arrives as their message, just like typed text), send that room's real photos — see PHOTOS below.
+${stageInstruction ? `- THIS SPECIFIC REPLY: ${stageInstruction}` : ""}
 
 LANGUAGE
 - Reply in whatever language and script the guest writes in — English, Hindi (Devanagari), Telugu, Hinglish/Tenglish (Latin script mixed with Hindi/Telugu words), or anything else. Mirror them naturally, the way a bilingual local would, rather than defaulting to English or switching scripts on them.
@@ -274,7 +293,7 @@ export async function generateReply(
   context?: ReplyContext
 ): Promise<GenerateReplyResult> {
   const retrieved = await retrieveRelevantChunks(tenantId, guestMessage).catch(() => []);
-  const { prompt: systemPrompt, agentName } = await buildSystemPrompt(tenantId, retrieved, context);
+  const { prompt: systemPrompt, agentName } = await buildSystemPrompt(tenantId, retrieved, context, { history, guestMessage });
 
   const reply = await aiProvider.chat({
     systemPrompt,
