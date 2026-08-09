@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
+  ROOM_BOOK_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
   VIEW_PHOTOS_BUTTON_ID,
+  confirmBookingPrompt,
   extractInteractivePrompt,
   guestCountPrompt,
   hasStatedGuestCount,
@@ -34,7 +36,7 @@ describe("extractInteractivePrompt", () => {
   it("resolves the ROOM_RESPONSE key at the RECOMMEND stage", () => {
     const result = extractInteractivePrompt("The Deluxe Room is ₹1,299/night with a great view.\nBUTTONS: ROOM_RESPONSE");
     expect(result.text).toBe("The Deluxe Room is ₹1,299/night with a great view.");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("falls back to plain text and warns on an unknown/hallucinated key", () => {
@@ -65,7 +67,7 @@ describe("extractInteractivePrompt", () => {
   it("resolves a key even with trailing punctuation right after it", () => {
     const result = extractInteractivePrompt("Great choice!\nBUTTONS: ROOM_RESPONSE.");
     expect(result.text).toBe("Great choice!");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("resolves the CONFIRM_BOOKING key at the CLOSE stage, using the exported button id", () => {
@@ -122,7 +124,7 @@ describe("mentionsRoomPrice", () => {
 describe("roomResponsePrompt", () => {
   it("returns the same three buttons as the ROOM_RESPONSE catalog entry", () => {
     const prompt = roomResponsePrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(prompt.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 });
 
@@ -130,6 +132,19 @@ describe("guestCountPrompt", () => {
   it("returns the same three buttons as the GUEST_COUNT catalog entry", () => {
     const prompt = guestCountPrompt();
     expect(prompt.buttons.map((b) => b.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+});
+
+describe("confirmBookingPrompt", () => {
+  it("returns the same two buttons as the CONFIRM_BOOKING catalog entry, with the stable button id", () => {
+    const prompt = confirmBookingPrompt();
+    expect(prompt.buttons.map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+  });
+});
+
+describe("ROOM_BOOK_BUTTON_ID", () => {
+  it("is a stable id used both in the catalog and for the deterministic short-circuit", () => {
+    expect(ROOM_BOOK_BUTTON_ID).toBe("room_book");
   });
 });
 

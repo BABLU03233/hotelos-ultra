@@ -14,6 +14,13 @@ export const CONFIRM_BOOKING_BUTTON_ID = "confirm_booking";
 // rooms, rather than trusting a free-tier model to relay room names/prices
 // accurately in prose a second time.
 export const SEE_OTHER_ROOMS_BUTTON_ID = "room_other";
+// Also handled deterministically — a tap here has zero ambiguity (it always
+// means "move to CLOSE"), so there's nothing for the AI to interpret. Live
+// testing found a real failure mode when this was left to the AI: it
+// sometimes fabricated a phone number and told the guest to call reception
+// instead of using the established button flow at all. Fully sidestepped
+// by never routing this tap through the AI in the first place.
+export const ROOM_BOOK_BUTTON_ID = "room_book";
 // Deliberately routed through the AI, not a deterministic short-circuit like
 // SEE_OTHER_ROOMS — a guest tapping this always taps it right after Anushka
 // named one specific room, so the conversation history alone already tells
@@ -42,7 +49,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
   ROOM_RESPONSE: {
     fallbackBody: "Would you like to go ahead with this room?",
     buttons: [
-      { id: "room_book", title: "Book this room" },
+      { id: ROOM_BOOK_BUTTON_ID, title: "Book this room" },
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other options" },
       { id: VIEW_PHOTOS_BUTTON_ID, title: "View photos" },
     ],
@@ -116,6 +123,10 @@ export function roomResponsePrompt(): InteractivePrompt {
 
 export function guestCountPrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.GUEST_COUNT.buttons };
+}
+
+export function confirmBookingPrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.CONFIRM_BOOKING.buttons };
 }
 
 // A prompt-only "never recommend a room before you know guest count" rule

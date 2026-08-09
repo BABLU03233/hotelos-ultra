@@ -1,5 +1,5 @@
 import { MessageStatus, MessageType } from "@/generated/prisma/enums";
-import { CONFIRM_BOOKING_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID } from "@/lib/ai/interactive-prompts";
+import { CONFIRM_BOOKING_BUTTON_ID, ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, confirmBookingPrompt } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
@@ -249,6 +249,41 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // No rooms configured for this tenant (shouldn't happen operationally,
     // since reaching RECOMMEND requires at least one) — fall through to the
     // normal AI queue below so the guest still gets *some* reply.
+  }
+
+  // "Book this room" is deterministic too — zero ambiguity in what it means
+  // (move to CLOSE), so there's nothing for the AI to interpret. Live
+  // testing found a real failure mode when this was left to the AI: it
+  // sometimes fabricated a phone number and told the guest to call
+  // reception instead of using the established button flow at all.
+  if (msg.interactiveId === ROOM_BOOK_BUTTON_ID) {
+    if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
+
+    const creds = await getWhatsAppCredentials(tenant.id);
+    if (creds) {
+      const body = "Great choice! Ready to confirm your booking? 🎉";
+      try {
+        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "interactive",
+          body,
+          buttons: confirmBookingPrompt().buttons,
+        });
+        await prisma.message.create({
+          data: {
+            tenantId: tenant.id,
+            contactId: contact.id,
+            direction: "OUT",
+            type: "INTERACTIVE",
+            content: body,
+            whatsappMessageId,
+            status: "SENT",
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to send confirm-booking prompt for tenant ${tenant.id}, contact ${contact.id}:`, err);
+      }
+    }
+    return;
   }
 
   // jobId keyed to the inbound message: if this same message is ever
