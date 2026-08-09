@@ -43,6 +43,44 @@ async function downloadInboundMedia(tenantId: string, msg: InboundMessage): Prom
   return { buffer, contentType: contentType || mimeType };
 }
 
+type ShortCircuitMessage =
+  | { type: "text"; text: string }
+  | { type: "interactive"; body: string; buttons: { id: string; title: string }[] }
+  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] };
+
+/**
+ * Shared by every deterministic short-circuit below (opt-out, confirm-
+ * booking, see-other-rooms, room-book): sends one outbound message and
+ * persists the matching Message row, logging (not throwing) on failure — a
+ * short-circuit's send failing shouldn't crash webhook processing, same
+ * principle process-message-job.ts follows for the AI-driven path.
+ */
+async function sendAndPersist(
+  tenant: { id: string },
+  contact: { id: string; whatsappNumber: string },
+  message: ShortCircuitMessage,
+  errorLabel: string
+): Promise<void> {
+  const creds = await getWhatsAppCredentials(tenant.id);
+  if (!creds) return;
+  try {
+    const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, message);
+    await prisma.message.create({
+      data: {
+        tenantId: tenant.id,
+        contactId: contact.id,
+        direction: "OUT",
+        type: message.type === "text" ? "TEXT" : "INTERACTIVE",
+        content: message.type === "text" ? message.text : message.body,
+        whatsappMessageId,
+        status: "SENT",
+      },
+    });
+  } catch (err) {
+    console.error(`${errorLabel} for tenant ${tenant.id}, contact ${contact.id}:`, err);
+  }
+}
+
 /**
  * Fast path, called synchronously from the webhook route: persists the
  * inbound message and upserts the Contact immediately (so a message is
@@ -145,28 +183,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // rather than routing it through the AI pipeline (which might otherwise
   // reply as if the guest just asked a normal question).
   if (optingOut) {
-    const creds = await getWhatsAppCredentials(tenant.id);
-    if (creds) {
-      try {
-        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
-          type: "text",
-          text: OPT_OUT_CONFIRMATION,
-        });
-        await prisma.message.create({
-          data: {
-            tenantId: tenant.id,
-            contactId: contact.id,
-            direction: "OUT",
-            type: "TEXT",
-            content: OPT_OUT_CONFIRMATION,
-            whatsappMessageId,
-            status: "SENT",
-          },
-        });
-      } catch (err) {
-        console.error(`Failed to send opt-out confirmation for tenant ${tenant.id}, contact ${contact.id}:`, err);
-      }
-    }
+    await sendAndPersist(tenant, contact, { type: "text", text: OPT_OUT_CONFIRMATION }, "Failed to send opt-out confirmation");
     return;
   }
 
@@ -191,25 +208,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     const booking = await completeBooking(prisma, tenant.id, contact.id);
     const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    const creds = await getWhatsAppCredentials(tenant.id);
-    if (creds) {
-      try {
-        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: confirmationText });
-        await prisma.message.create({
-          data: {
-            tenantId: tenant.id,
-            contactId: contact.id,
-            direction: "OUT",
-            type: "TEXT",
-            content: confirmationText,
-            whatsappMessageId,
-            status: "SENT",
-          },
-        });
-      } catch (err) {
-        console.error(`Failed to send booking confirmation for tenant ${tenant.id}, contact ${contact.id}:`, err);
-      }
-    }
+    await sendAndPersist(tenant, contact, { type: "text", text: confirmationText }, "Failed to send booking confirmation");
     return;
   }
 
@@ -224,26 +223,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     const rooms = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
     if (rooms.length) {
-      const creds = await getWhatsAppCredentials(tenant.id);
-      if (creds) {
-        try {
-          const listMessage = buildRoomListMessage(rooms);
-          const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, listMessage);
-          await prisma.message.create({
-            data: {
-              tenantId: tenant.id,
-              contactId: contact.id,
-              direction: "OUT",
-              type: "INTERACTIVE",
-              content: listMessage.body,
-              whatsappMessageId,
-              status: "SENT",
-            },
-          });
-        } catch (err) {
-          console.error(`Failed to send room list for tenant ${tenant.id}, contact ${contact.id}:`, err);
-        }
-      }
+      await sendAndPersist(tenant, contact, buildRoomListMessage(rooms), "Failed to send room list");
       return;
     }
     // No rooms configured for this tenant (shouldn't happen operationally,
@@ -259,30 +239,8 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   if (msg.interactiveId === ROOM_BOOK_BUTTON_ID) {
     if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
 
-    const creds = await getWhatsAppCredentials(tenant.id);
-    if (creds) {
-      const body = "Great choice! Ready to confirm your booking? 🎉";
-      try {
-        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
-          type: "interactive",
-          body,
-          buttons: confirmBookingPrompt().buttons,
-        });
-        await prisma.message.create({
-          data: {
-            tenantId: tenant.id,
-            contactId: contact.id,
-            direction: "OUT",
-            type: "INTERACTIVE",
-            content: body,
-            whatsappMessageId,
-            status: "SENT",
-          },
-        });
-      } catch (err) {
-        console.error(`Failed to send confirm-booking prompt for tenant ${tenant.id}, contact ${contact.id}:`, err);
-      }
-    }
+    const body = "Great choice! Ready to confirm your booking? 🎉";
+    await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: confirmBookingPrompt().buttons }, "Failed to send confirm-booking prompt");
     return;
   }
 
