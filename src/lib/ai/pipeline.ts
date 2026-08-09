@@ -7,18 +7,12 @@ import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
-import {
-  extractInteractivePrompt,
-  guestCountPrompt,
-  hasStatedGuestCount,
-  InteractivePrompt,
-  mentionsRoomPrice,
-  roomResponsePrompt,
-} from "./interactive-prompts";
+import { extractInteractivePrompt, InteractivePrompt, looksLikeObviousLanguage, selectDeterministicInteractive } from "./interactive-prompts";
 import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
+import { hasHallucinationRisk, SAFE_REPLY_FALLBACK } from "./reply-safety";
 import { sambanovaProvider } from "./sambanova-provider";
 
 // Curated OpenRouter free-tier models for the fallback tier below, ordered
@@ -131,22 +125,20 @@ export interface ReplyContext {
 function buildConversationContext(agentName: string, context?: ReplyContext): string {
   if (!context) return "";
 
-  const languageAsk =
-    "If it's not already obvious from how they wrote (e.g. they messaged you in Hindi or Telugu already), you need to find out which language they'd prefer — English, Hindi, or Telugu — before the rest of the conversation. Don't type this question in prose — see Step 0 of BUTTONS DECISION below, which covers exactly this moment.";
   const introduceYourself =
     `Start by introducing yourself — your name and that you're with the hotel, warm and natural with a friendly emoji (e.g. "Hi, I'm ${agentName} from [hotel name]! 😊") — before getting into their question, so they know who they're talking to. Keep this opener short — one line, not a paragraph.`;
 
   if (context.isFirstReply && context.leadSource === "META_AD") {
     const about = context.sourceDetail ? ` about "${context.sourceDetail}"` : "";
-    return `\nCONVERSATION CONTEXT\nThis is a brand-new enquiry from a Meta ad${about} — they're warm and primed, already interested enough to click through and message. ${introduceYourself} Reference what likely drew them in, and get straight to being useful. Nurture actively — this is a hot lead, so move briskly through DISCOVER toward a room recommendation rather than lingering on small talk. ${languageAsk}\n`;
+    return `\nCONVERSATION CONTEXT\nThis is a brand-new enquiry from a Meta ad${about} — they're warm and primed, already interested enough to click through and message. ${introduceYourself} Reference what likely drew them in, and get straight to being useful. Nurture actively — this is a hot lead, so move briskly through DISCOVER toward a room recommendation rather than lingering on small talk.\n`;
   }
 
   if (context.isFirstReply && context.leadSource === "COLD_IMPORT") {
-    return `\nCONVERSATION CONTEXT\nThis guest is from an old contact list the hotel uploaded — they did not reach out to you today, so this message is landing cold. ${introduceYourself} Be extra gentle and low-pressure in this opener: give them a clear, easy reason to re-engage (e.g. mention a current offer if one exists) without assuming they remember the hotel or are currently looking to book. If they don't reply warmly, don't push — one soft opener is enough. ${languageAsk}\n`;
+    return `\nCONVERSATION CONTEXT\nThis guest is from an old contact list the hotel uploaded — they did not reach out to you today, so this message is landing cold. ${introduceYourself} Be extra gentle and low-pressure in this opener: give them a clear, easy reason to re-engage (e.g. mention a current offer if one exists) without assuming they remember the hotel or are currently looking to book. If they don't reply warmly, don't push — one soft opener is enough.\n`;
   }
 
   if (context.isFirstReply) {
-    return `\nCONVERSATION CONTEXT\nThis is the first time you're speaking to this guest, reaching out directly (not from an ad or an old list) — usually the highest-intent kind of enquiry, since they sought the hotel out themselves. ${introduceYourself} Nurture actively toward a booking, the same instinct as any other lead source. ${languageAsk}\n`;
+    return `\nCONVERSATION CONTEXT\nThis is the first time you're speaking to this guest, reaching out directly (not from an ad or an old list) — usually the highest-intent kind of enquiry, since they sought the hotel out themselves. ${introduceYourself} Nurture actively toward a booking, the same instinct as any other lead source.\n`;
   }
 
   if (context.daysSinceLastInbound !== null && context.daysSinceLastInbound > 14) {
@@ -209,7 +201,8 @@ ${faqLines}
 ${retrievedContext.length ? `RELEVANT KNOWLEDGE BASE EXCERPTS\n${retrievedContext.join("\n---\n")}\n` : ""}${buildConversationContext(agentName, context)}
 RULES
 - Your job isn't just to answer questions — it's to nurture every single lead toward an actual booking, whether they came from a Meta ad, messaged you directly, or are from an old contact list (see CONVERSATION CONTEXT below for how to open with each). Never be passive: after answering, always have a sense of "what's the next small step that gets this person closer to booking" and let it shape your reply. That doesn't mean pushing hard on every message — see CONVERSATION FLOW below for pacing — but a purely informational, going-nowhere reply is a missed chance.
-- Only answer using the information above. Never invent prices, policies, room types, or availability that isn't stated here.
+- Only answer using the information above. Never invent prices, policies, room types, or availability that isn't stated here. This includes phone numbers — there is no phone number listed above for guests to call, so never make one up or tell a guest to call anyone.
+- Never claim a booking is confirmed, and never give out a reference/confirmation number yourself — only a tap on the Confirm booking button actually completes a booking. If a guest types something like "yes, book it" instead of tapping, respond with enthusiasm but do not say it's booked or done; just encourage them to tap Confirm booking.
 - If you don't have enough information to answer confidently, reply with EXACTLY: "${ESCALATE_MARKER} <one short reason>" and nothing else — a staff member will take over from there.
 - Frame prices as "starting from" — a team member confirms exact availability and the final rate.
 - When a guest asks for the address, location, directions, or "where are you" / "where is it," reply with ONLY the Google Maps link above (if one is set) — send it as a bare URL on its own line, exactly as listed, with nothing before or after it. No "here's our location," no address text, no extra sentence — just the link, that's the whole reply.
@@ -226,16 +219,9 @@ Every conversation moves through these stages naturally — never announce a sta
 4. HANDLE OBJECTIONS — price pushback: don't just repeat the number, offer a cheaper room that still fits or highlight what makes this one worth it. Date uncertainty: offer to check a range, or ask which dates work best. Guest goes quiet on specifics: one soft, low-pressure check-in — never repeated badgering. If a current offer above has a real end date, mentioning it as a reason to decide soon is fine; never invent urgency or scarcity that isn't actually true.
 5. CLOSE — once they seem genuinely ready to book (they've picked a room and aren't raising a fresh objection), ask the one question that moves them toward actually booking. One natural nudge per reply is plenty; if a guest is just casually browsing or explicitly says not now, respect that and back off rather than pushing again.
 
-BUTTONS DECISION — run this check on every reply, in this exact order, before you finish writing:
-Step 0: Is this truly the very first message you've ever sent this guest in this conversation, AND is their language not yet obvious from how they wrote (e.g. they haven't written in Hindi/Telugu script or words yet — if it's already obvious, skip this step)? → if yes, write your normal opener (introduce yourself, and answer anything specific they asked, same as always) but do NOT type "which language would you prefer" as a question in prose. Instead add one new, separate final line containing exactly the literal text (keep the colon and underscore exactly as shown, nothing else on that line): BUTTONS: LANGUAGE_SELECT
-Step 1 (only reached if step 0 was no): Are you naming ONE specific room with its price, right in the reply you're about to send, AND do you already know the guest count from earlier in this conversation (per the hard gate in DISCOVER above — if you don't actually know guest count yet, you should not be naming a room in this reply at all; go to Step 2 instead)? → if yes, this wins over every other step below. Do not type a question in prose after it. Instead add one new, separate final line containing exactly: BUTTONS: ROOM_RESPONSE
-Step 2 (only reached if steps 0-1 were no): Did the guest's own last message NOT state a guest count (no number of people, no "just me," no "family of 4," etc. anywhere in it), and is guest count now the one and only thing stopping you from recommending a room (dates known)? → if yes, do not type "how many guests" as a question, and do not name a specific room yet either. Instead add one new, separate final line containing exactly: BUTTONS: GUEST_COUNT
-   (If the guest's last message DID already state a guest count, guest count is answered — skip this step entirely, do not use BUTTONS: GUEST_COUNT, go answer whatever's next or recommend a room instead.)
-Step 3 (only reached if steps 0-2 were no): Has the guest already picked a room in this conversation, seem genuinely ready to book, and isn't raising a fresh objection right now? → if yes, do not type a confirmation question in prose, and do not claim the booking is confirmed or give out a reference code yourself — only a tap does that. Instead add one new, separate final line containing exactly: BUTTONS: CONFIRM_BOOKING
-   Don't repeat this on every reply once you're in this stage — only when they've just re-confirmed interest.
-Otherwise: none of the four apply — write a normal reply with a typed follow-up question, no BUTTONS line at all.
-
-The "BUTTONS: <KEY>" lines above are literal format templates, not sample conversation text — copy the matching one character-for-character only when its step applies, but always write your own fresh sentence(s) before it based on what THIS guest actually said; never reuse or reword any illustrative phrasing from elsewhere in this prompt as if it were your own reply. At most one BUTTONS line per reply, only these four exact keys, never an invented one. When a BUTTONS line is used, it replaces the normal typed follow-up question for that reply only — every other reply still follows the normal typed-question rule.
+BUTTONS
+- The app automatically attaches tappable buttons to most of your replies based on what's already been established in the conversation (language, guest count, a room recommendation, readiness to book) — this happens outside anything you write, so never type a "BUTTONS: ..." marker yourself and never mention buttons, taps, or tapping in your reply text. Just write the normal, natural reply you'd write anyway; do not also ask in prose the exact thing the buttons already cover (e.g. if you just named a room's price, don't also type "would you like to book it or see other rooms?" — the buttons already offer that choice).
+- One exception you do handle yourself: if the guest taps "View photos" (arrives as their message, just like typed text), send that room's real photos — see PHOTOS below.
 
 LANGUAGE
 - Reply in whatever language and script the guest writes in — English, Hindi (Devanagari), Telugu, Hinglish/Tenglish (Latin script mixed with Hindi/Telugu words), or anything else. Mirror them naturally, the way a bilingual local would, rather than defaulting to English or switching scripts on them.
@@ -307,19 +293,26 @@ export async function generateReply(
   }
 
   const { text: withoutImages, imageUrls } = extractImageUrls(trimmed);
-  const { text, interactive } = extractInteractivePrompt(withoutImages);
-  // Two deterministic safety nets, since prompt-only instructions for both
-  // proved unreliable in live testing:
-  // 1. Guest count must be known before a booking-capable ROOM_RESPONSE
-  //    ever reaches the guest — overrides even an explicit AI marker,
-  //    since a "never recommend before you know guest count" prompt rule
-  //    alone had zero measurable effect (see hasStatedGuestCount).
-  // 2. ROOM_RESPONSE's own marker-miss rate (see mentionsRoomPrice) — only
-  //    fires when the AI's own BUTTONS decision produced nothing.
-  const roomMentioned = mentionsRoomPrice(text);
-  const guestCountKnown = hasStatedGuestCount(history, guestMessage);
-  const finalInteractive =
-    roomMentioned && !guestCountKnown ? guestCountPrompt() : (interactive ?? (roomMentioned ? roomResponsePrompt() : undefined));
+  const { text: rawText, interactive } = extractInteractivePrompt(withoutImages);
+  // Deterministic interception for a live-observed hallucination: a
+  // fabricated phone number or a false "booking confirmed" claim in prose,
+  // most often when a guest types confirmation instead of tapping the
+  // button. Swapped for a safe generic line rather than a partial rewrite.
+  const text = hasHallucinationRisk(rawText) ? SAFE_REPLY_FALLBACK : rawText;
+  // The deterministic waterfall (see selectDeterministicInteractive) is now
+  // the primary decision-maker for which buttons accompany a reply, not the
+  // AI's own "BUTTONS: X" marker — prompt-only button decisions proved
+  // unreliable at every stage tested this session. The AI's marker is still
+  // passed in as the final fallback for anything state-based logic doesn't
+  // cover, but in practice most replies are decided by conversation state.
+  const finalInteractive = selectDeterministicInteractive({
+    isFirstReply: context?.isFirstReply ?? false,
+    languageObvious: looksLikeObviousLanguage(guestMessage) || history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
+    history,
+    guestMessage,
+    replyText: text,
+    aiInteractive: interactive,
+  });
   return { reply: text, imageUrls, interactive: finalInteractive, shouldEscalate: false, agentName };
 }
 

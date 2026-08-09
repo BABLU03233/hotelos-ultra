@@ -5,11 +5,16 @@ import {
   SEE_OTHER_ROOMS_BUTTON_ID,
   VIEW_PHOTOS_BUTTON_ID,
   confirmBookingPrompt,
+  dateQuickPickPrompt,
   extractInteractivePrompt,
+  greetMenuPrompt,
   guestCountPrompt,
+  hasStatedDates,
   hasStatedGuestCount,
+  looksLikeObviousLanguage,
   mentionsRoomPrice,
   roomResponsePrompt,
+  selectDeterministicInteractive,
 } from "./interactive-prompts";
 
 describe("extractInteractivePrompt", () => {
@@ -174,5 +179,151 @@ describe("hasStatedGuestCount", () => {
   it("ignores assistant messages when scanning for a stated count", () => {
     const history = [{ role: "assistant", content: "How many guests, e.g. 2 guests or 3+?" }];
     expect(hasStatedGuestCount(history, "not sure yet")).toBe(false);
+  });
+});
+
+describe("hasStatedDates", () => {
+  it("detects common relative-date phrasing", () => {
+    expect(hasStatedDates([], "this weekend")).toBe(true);
+    expect(hasStatedDates([], "next week works")).toBe(true);
+    expect(hasStatedDates([], "tomorrow night")).toBe(true);
+  });
+
+  it("detects day and month names", () => {
+    expect(hasStatedDates([], "arriving Friday")).toBe(true);
+    expect(hasStatedDates([], "sometime in August")).toBe(true);
+  });
+
+  it("detects numeric date formats", () => {
+    expect(hasStatedDates([], "15/8 to 17/8")).toBe(true);
+    expect(hasStatedDates([], "the 21st")).toBe(true);
+  });
+
+  it("returns false when no date is mentioned anywhere", () => {
+    expect(hasStatedDates([], "2 guests, budget 1500")).toBe(false);
+  });
+
+  it("finds a date stated earlier in history", () => {
+    const history = [{ role: "user", content: "checking in this weekend" }];
+    expect(hasStatedDates(history, "sounds good")).toBe(true);
+  });
+});
+
+describe("looksLikeObviousLanguage", () => {
+  it("detects Devanagari script", () => {
+    expect(looksLikeObviousLanguage("नमस्ते, kya rooms available hai")).toBe(true);
+  });
+
+  it("detects Telugu script", () => {
+    expect(looksLikeObviousLanguage("నమస్కారం, rooms available unna?")).toBe(true);
+  });
+
+  it("does not treat Roman-script Hinglish as obvious", () => {
+    expect(looksLikeObviousLanguage("kya rate hai is weekend ke liye")).toBe(false);
+  });
+
+  it("does not treat plain English as obvious", () => {
+    expect(looksLikeObviousLanguage("Hi, do you have rooms available?")).toBe(false);
+  });
+});
+
+describe("greetMenuPrompt / dateQuickPickPrompt", () => {
+  it("greetMenuPrompt's 'View rooms' button reuses SEE_OTHER_ROOMS_BUTTON_ID for the deterministic room-list handler", () => {
+    const prompt = greetMenuPrompt();
+    expect(prompt.buttons.map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
+  });
+
+  it("dateQuickPickPrompt returns three date-shortcut buttons", () => {
+    const prompt = dateQuickPickPrompt();
+    expect(prompt.buttons.map((b) => b.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
+  });
+});
+
+describe("selectDeterministicInteractive", () => {
+  const base = {
+    isFirstReply: false,
+    languageObvious: true,
+    history: [] as { role: string; content: string }[],
+    guestMessage: "",
+    replyText: "",
+    aiInteractive: undefined as ReturnType<typeof guestCountPrompt> | undefined,
+  };
+
+  it("offers LANGUAGE_SELECT on the first reply when language isn't obvious", () => {
+    const result = selectDeterministicInteractive({ ...base, isFirstReply: true, languageObvious: false });
+    expect(result?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+  });
+
+  it("offers GREET_MENU on the first reply when language is already obvious", () => {
+    const result = selectDeterministicInteractive({ ...base, isFirstReply: true, languageObvious: true });
+    expect(result).toEqual(greetMenuPrompt());
+  });
+
+  it("offers GUEST_COUNT whenever guest count is unknown, regardless of what else is in the reply", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "this weekend, budget 1500" });
+    expect(result).toEqual(guestCountPrompt());
+  });
+
+  it("offers ROOM_RESPONSE when the reply names a room's price and guest count is known", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "2 guests",
+      replyText: "Our Deluxe Room starts from ₹1,299/night",
+    });
+    expect(result).toEqual(roomResponsePrompt());
+  });
+
+  it("offers CONFIRM_BOOKING once a room has been discussed, even on a later turn with no new price mention", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "sounds good",
+      replyText: "Great, glad you like it!",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result).toEqual(confirmBookingPrompt());
+  });
+
+  it("offers DATE_QUICK_PICK only when no room has ever been discussed and dates are unknown", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "2 guests please",
+      replyText: "Got it, thanks!",
+    });
+    expect(result).toEqual(dateQuickPickPrompt());
+  });
+
+  it("does not regress to DATE_QUICK_PICK once a room has already been discussed, even if dates were never stated", () => {
+    // Guards the exact scenario that motivated reordering the waterfall:
+    // guest count known, room already recommended, but hasStatedDates would
+    // still be false -- must not block a guest who's ready to book.
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "yes let's book it",
+      replyText: "Awesome, you're all set to go!",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result).toEqual(confirmBookingPrompt());
+  });
+
+  it("falls back to the AI's own marker when no deterministic condition applies", () => {
+    const aiChoice = guestCountPrompt();
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "2 guests, this weekend",
+      replyText: "Great, noted!",
+      aiInteractive: aiChoice,
+    });
+    expect(result).toBe(aiChoice);
+  });
+
+  it("returns undefined when nothing applies and the AI offered no marker either", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "2 guests, this weekend" });
+    expect(result).toBeUndefined();
   });
 });

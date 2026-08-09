@@ -69,6 +69,26 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
       { id: "lang_te", title: "తెలుగు" },
     ],
   },
+  GREET_MENU: {
+    fallbackBody: "How can I help you today? 😊",
+    buttons: [
+      { id: "greet_book", title: "Book a room" },
+      // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
+      // in handle-inbound-message.ts) — same id, so tapping "View rooms" here
+      // gets the exact same real-data List Message as tapping "See other
+      // options" mid-RECOMMEND, no separate handling needed.
+      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "View rooms" },
+      { id: "greet_question", title: "Ask a question" },
+    ],
+  },
+  DATE_QUICK_PICK: {
+    fallbackBody: "When are you looking to stay? 📅",
+    buttons: [
+      { id: "dates_weekend", title: "This weekend" },
+      { id: "dates_nextweek", title: "Next week" },
+      { id: "dates_custom", title: "I'll type dates" },
+    ],
+  },
 };
 
 // Deliberately NOT anchored to "start of its own line" — live testing showed
@@ -148,4 +168,82 @@ export function hasStatedGuestCount(history: { role: string; content: string }[]
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
     GUEST_COUNT_STATED_PATTERN.test(t)
   );
+}
+
+// Same "broad on purpose" reasoning as guest count — dates are phrased in
+// far more ways than guest count is, so a narrow pattern would re-ask
+// annoyingly often; a broad one occasionally skips the prompt when it
+// technically could have fired, which is the safer failure direction here.
+const DATE_STATED_PATTERN =
+  /\b(weekend|tonight|tomorrow|today|next week|this week|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th)\b)/i;
+
+export function hasStatedDates(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
+  return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
+    DATE_STATED_PATTERN.test(t)
+  );
+}
+
+// Devanagari (Hindi) and Telugu Unicode blocks — a guest typing in either
+// script has unambiguously told us their language already, so LANGUAGE_SELECT
+// would be redundant. A guest typing Hindi/Telugu in Latin/Roman script
+// (e.g. "kya rate hai") is NOT caught by this and still gets offered the
+// buttons — matching the original instruction's own "not already obvious"
+// framing, since Roman-script Hinglish/Tenglish looks identical to English
+// at the character level.
+const NON_ENGLISH_SCRIPT_PATTERN = /[ऀ-ॿఀ-౿]/;
+
+export function looksLikeObviousLanguage(text: string): boolean {
+  return NON_ENGLISH_SCRIPT_PATTERN.test(text);
+}
+
+export function greetMenuPrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.GREET_MENU.buttons };
+}
+
+export function dateQuickPickPrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.DATE_QUICK_PICK.buttons };
+}
+
+// The single deterministic waterfall that decides which buttons (if any)
+// accompany a reply — the real fix for "buttons should show up on nearly
+// every message." Prompt-only BUTTONS DECISION logic proved unreliable
+// across every stage tested this session (ROOM_RESPONSE ~50% miss,
+// guest-count gate 0% compliance, LANGUAGE_SELECT occasional repeats), so
+// this takes over as the primary decision-maker: it reads conversation
+// STATE (what's already known) rather than trusting the model to remember
+// a rule. The AI's own "BUTTONS: X" marker is now only a fallback for
+// whatever this waterfall doesn't cover — most replies won't need it.
+export function selectDeterministicInteractive(params: {
+  isFirstReply: boolean;
+  languageObvious: boolean;
+  history: { role: string; content: string }[];
+  guestMessage: string;
+  replyText: string;
+  aiInteractive?: InteractivePrompt;
+}): InteractivePrompt | undefined {
+  const { isFirstReply, languageObvious, history, guestMessage, replyText, aiInteractive } = params;
+
+  if (isFirstReply) {
+    return languageObvious ? greetMenuPrompt() : { buttons: BUTTON_CATALOG.LANGUAGE_SELECT.buttons };
+  }
+  if (!hasStatedGuestCount(history, guestMessage)) {
+    return guestCountPrompt();
+  }
+  if (mentionsRoomPrice(replyText)) {
+    return roomResponsePrompt();
+  }
+  // Checked before the dates nudge, not after: dates detection is
+  // necessarily broad/imprecise (guests phrase dates far more ways than
+  // guest counts), so if a room's already been discussed, prioritize
+  // moving the guest toward confirming over risking a guest who's ready to
+  // book getting stuck being asked for dates on a loop because their
+  // phrasing didn't match the pattern.
+  const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
+  if (roomMentionedEver) {
+    return confirmBookingPrompt();
+  }
+  if (!hasStatedDates(history, guestMessage)) {
+    return dateQuickPickPrompt();
+  }
+  return aiInteractive;
 }
