@@ -221,6 +221,29 @@ export function looksLikeObviousLanguage(text: string): boolean {
   return NON_ENGLISH_SCRIPT_PATTERN.test(text);
 }
 
+// Real production data caught this: isFirstReply is true exactly once per
+// contact, ever (see ReplyContext) — but a guest re-testing or re-engaging
+// often just types "Hi" again, expecting a fresh start, and got zero
+// buttons at all once they were no longer a first-time contact. A bare
+// greeting with nothing else in it is a strong, unambiguous signal to
+// treat as "start the greeting flow" regardless of isFirstReply.
+const BARE_GREETING_PATTERN = /^(hi+|hello+|hey+|hii+|namaste|hola)[\s!.,]*$/i;
+
+export function looksLikeBareGreeting(text: string): boolean {
+  return BARE_GREETING_PATTERN.test(text.trim());
+}
+
+// DATE_QUICK_PICK's own "I'll type dates" button — a guest tapping it (or
+// typing the same phrase back) is explicitly declining the date buttons in
+// favor of typing a real date next, so re-showing the same three buttons
+// on the very next reply would be exactly the redundant loop this is
+// meant to prevent.
+const DECLINED_DATE_QUICK_PICK_PATTERN = /^i'?ll type dates$/i;
+
+function declinedDateQuickPick(text: string): boolean {
+  return DECLINED_DATE_QUICK_PICK_PATTERN.test(text.trim());
+}
+
 export function greetMenuPrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.GREET_MENU.buttons };
 }
@@ -287,12 +310,12 @@ function resolveStageKey(params: {
     if (roomMentionedEver) {
       return "CONFIRM_BOOKING";
     }
-    if (!hasStatedDates(history, guestMessage)) {
+    if (!hasStatedDates(history, guestMessage) && !declinedDateQuickPick(guestMessage)) {
       return "DATE_QUICK_PICK";
     }
   }
 
-  if (isFirstReply) {
+  if (isFirstReply || looksLikeBareGreeting(guestMessage)) {
     return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
   return null;

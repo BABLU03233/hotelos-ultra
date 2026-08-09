@@ -12,6 +12,7 @@ import {
   hasExpressedBookingIntent,
   hasStatedDates,
   hasStatedGuestCount,
+  looksLikeBareGreeting,
   looksLikeObviousLanguage,
   mentionsRoomPrice,
   predictedStageInstruction,
@@ -239,6 +240,26 @@ describe("looksLikeObviousLanguage", () => {
   });
 });
 
+describe("looksLikeBareGreeting", () => {
+  it("detects common bare greetings, with or without trailing punctuation", () => {
+    expect(looksLikeBareGreeting("Hi")).toBe(true);
+    expect(looksLikeBareGreeting("hello!")).toBe(true);
+    expect(looksLikeBareGreeting("Hii")).toBe(true);
+    expect(looksLikeBareGreeting("hey there".replace(" there", ""))).toBe(true);
+    expect(looksLikeBareGreeting("namaste")).toBe(true);
+    expect(looksLikeBareGreeting("  Hello.  ")).toBe(true);
+  });
+
+  it("does not treat a greeting with real content attached as bare", () => {
+    expect(looksLikeBareGreeting("Hi, do you have rooms available?")).toBe(false);
+    expect(looksLikeBareGreeting("Hi, 2 guests this weekend")).toBe(false);
+  });
+
+  it("returns false for unrelated text", () => {
+    expect(looksLikeBareGreeting("what's the checkout time")).toBe(false);
+  });
+});
+
 describe("greetMenuPrompt / dateQuickPickPrompt", () => {
   it("greetMenuPrompt's 'View rooms' button reuses SEE_OTHER_ROOMS_BUTTON_ID for the deterministic room-list handler", () => {
     const prompt = greetMenuPrompt();
@@ -382,6 +403,41 @@ describe("selectDeterministicInteractive", () => {
   it("starts the funnel the moment a booking-related keyword appears, even without a number", () => {
     const result = selectDeterministicInteractive({ ...base, guestMessage: "I'd like to book a room" });
     expect(result).toEqual(guestCountPrompt());
+  });
+
+  it("offers LANGUAGE_SELECT/GREET_MENU on a bare 'Hi' even when isFirstReply is false (a returning/re-tested contact)", () => {
+    // The real bug found in production: isFirstReply only fires once ever
+    // per contact, so a guest (or tester) re-sending "Hi" later got zero
+    // buttons at all, which read as "buttons are broken."
+    const notObvious = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: false, guestMessage: "Hi" });
+    expect(notObvious?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+
+    const obvious = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: true, guestMessage: "hello!" });
+    expect(obvious).toEqual(greetMenuPrompt());
+  });
+
+  it("does not treat a message with real content as a bare greeting, even if it starts with 'Hi'", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: false,
+      guestMessage: "Hi, 2 guests, this weekend",
+      replyText: "Our Deluxe Room starts from ₹1,299/night",
+    });
+    expect(result).toEqual(roomResponsePrompt());
+  });
+
+  it("does not re-offer DATE_QUICK_PICK right after the guest declined it via 'I'll type dates'", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "I'll type dates",
+      replyText: "Sure, go ahead and type your dates.",
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it("still offers DATE_QUICK_PICK normally when dates are unknown and the guest didn't decline it", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "2 people please", replyText: "Got it!" });
+    expect(result).toEqual(dateQuickPickPrompt());
   });
 });
 
