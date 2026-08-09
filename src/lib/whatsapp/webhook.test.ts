@@ -227,6 +227,98 @@ describe("parseWebhookPayload", () => {
     expect(messages[0]).toMatchObject({ type: "interactive", buttonText: "Confirm booking", interactiveId: "confirm_booking" });
   });
 
+  it("extracts a Flow completion's nfm_reply response_json into flowResponse", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.FLOW1",
+                    timestamp: "1700000000",
+                    type: "interactive",
+                    interactive: {
+                      type: "nfm_reply",
+                      nfm_reply: {
+                        name: "flow",
+                        body: "Sent",
+                        response_json: '{"flow_token":"abc123","room":"r1","date_range":"2026-08-15,2026-08-16","guests":"2"}',
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].flowResponse).toEqual({ flow_token: "abc123", room: "r1", date_range: "2026-08-15,2026-08-16", guests: "2" });
+  });
+
+  it("leaves flowResponse null for a malformed nfm_reply response_json, without throwing", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.FLOW2",
+                    timestamp: "1700000000",
+                    type: "interactive",
+                    interactive: { type: "nfm_reply", nfm_reply: { name: "flow", body: "Sent", response_json: "{not valid json" } },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(() => parseWebhookPayload(payload)).not.toThrow();
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].flowResponse).toBeNull();
+  });
+
+  it("leaves flowResponse null for an ordinary button_reply message", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    from: "919876543210",
+                    id: "wamid.INT2",
+                    timestamp: "1700000000",
+                    type: "interactive",
+                    interactive: { type: "button_reply", button_reply: { id: "confirm_booking", title: "Confirm booking" } },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].flowResponse).toBeNull();
+  });
+
   it("leaves interactiveId null for a plain text message", () => {
     const payload = {
       entry: [

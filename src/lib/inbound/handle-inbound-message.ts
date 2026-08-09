@@ -14,6 +14,7 @@ import { transcribeAudio } from "@/lib/ai/transcription";
 import { isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
+import { parseFlowDateRange } from "@/lib/booking/parse-flow-response";
 import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { messageQueue } from "@/lib/queue/queues";
@@ -61,7 +62,8 @@ async function downloadInboundMedia(tenantId: string, msg: InboundMessage): Prom
 type ShortCircuitMessage =
   | { type: "text"; text: string }
   | { type: "interactive"; body: string; buttons: { id: string; title: string }[] }
-  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] };
+  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] }
+  | { type: "flow"; body: string; flowId: string; flowCta: string; screen: string };
 
 /**
  * Shared by every deterministic short-circuit below (opt-out, confirm-
@@ -107,6 +109,53 @@ async function matchOfferForBooking(tenantId: string, contactId: string): Promis
   return matchOfferCode(
     offers,
     recentMessages.map((m) => m.content ?? "")
+  );
+}
+
+/**
+ * The real-time-availability-gated booking completion, shared by both entry
+ * points that can trigger it (a "Confirm booking" tap, and a completed
+ * WhatsApp Flow submission) — both already know a specific room and both
+ * exact dates, so this is the one place that decides whether to actually
+ * book. Always sends its own reply and returns; callers just `return` after
+ * calling it.
+ */
+async function attemptBookingCompletion(
+  tenant: { id: string },
+  contact: { id: string; name: string | null; phone: string; whatsappNumber: string },
+  roomId: string,
+  checkIn: Date,
+  checkOut: Date
+): Promise<void> {
+  const available = await isRoomAvailable(prisma, tenant.id, roomId, checkIn, checkOut);
+  if (available) {
+    const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
+    const booking = await completeBooking(prisma, tenant.id, contact.id, {
+      roomId,
+      checkIn,
+      checkOut,
+      offerId: matchedOffer?.id,
+      offerSnapshot: matchedOffer?.title,
+    });
+    const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
+    await sendAndPersist(
+      tenant,
+      contact,
+      { type: "interactive", body: confirmationText, buttons: postBookingPrompt().buttons },
+      "Failed to send booking confirmation"
+    );
+    return;
+  }
+
+  // Conflict — do not book. Clear the pending dates so the next answer is
+  // treated fresh, and offer a real recovery path.
+  await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: null, pendingCheckOut: null } });
+  const body = "Ah, sorry — that room's actually already booked for those exact dates. Want to try different dates, or see other rooms?";
+  await sendAndPersist(
+    tenant,
+    contact,
+    { type: "interactive", body, buttons: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] },
+    "Failed to send availability-conflict message"
   );
 }
 
@@ -242,36 +291,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // dates get captured, the very next AI turn re-offers Confirm-booking
     // buttons naturally, resolving in one extra tap, not a stuck state.
     if (contact.pendingRoomId && contact.pendingCheckIn && contact.pendingCheckOut) {
-      const available = await isRoomAvailable(prisma, tenant.id, contact.pendingRoomId, contact.pendingCheckIn, contact.pendingCheckOut);
-      if (available) {
-        const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
-        const booking = await completeBooking(prisma, tenant.id, contact.id, {
-          roomId: contact.pendingRoomId,
-          checkIn: contact.pendingCheckIn,
-          checkOut: contact.pendingCheckOut,
-          offerId: matchedOffer?.id,
-          offerSnapshot: matchedOffer?.title,
-        });
-        const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-        await sendAndPersist(
-          tenant,
-          contact,
-          { type: "interactive", body: confirmationText, buttons: postBookingPrompt().buttons },
-          "Failed to send booking confirmation"
-        );
-        return;
-      }
-
-      // Conflict — do not book. Clear the pending dates so the next answer
-      // is treated fresh, and offer a real recovery path.
-      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: null, pendingCheckOut: null } });
-      const body = "Ah, sorry — that room's actually already booked for those exact dates. Want to try different dates, or see other rooms?";
-      await sendAndPersist(
-        tenant,
-        contact,
-        { type: "interactive", body, buttons: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] },
-        "Failed to send availability-conflict message"
-      );
+      await attemptBookingCompletion(tenant, contact, contact.pendingRoomId, contact.pendingCheckIn, contact.pendingCheckOut);
       return;
     }
 
@@ -304,6 +324,39 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     return;
   }
 
+  // A completed WhatsApp Flow submission (the one-tap booking form — see
+  // src/lib/whatsapp/flows/booking-flow.ts) — a Flow's "Book now" tap is the
+  // explicit confirmation itself, the same trust level as any other fixed-id
+  // button tap, so this completes directly with no extra "are you sure" step.
+  if (msg.flowResponse) {
+    if (contact.aiPaused) {
+      await fireBookingNotification(
+        prisma,
+        tenant.id,
+        contact.id,
+        `${contact.name || contact.phone} submitted the booking form — AI is paused, needs manual completion.`
+      );
+      return;
+    }
+
+    const roomId = typeof msg.flowResponse.room === "string" ? msg.flowResponse.room : null;
+    const dateRange = parseFlowDateRange(msg.flowResponse.date_range);
+    const room = roomId ? await prisma.room.findFirst({ where: { id: roomId, tenantId: tenant.id } }) : null;
+
+    if (room && dateRange) {
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { pendingRoomId: room.id, pendingCheckIn: dateRange.checkIn, pendingCheckOut: dateRange.checkOut },
+      });
+      await attemptBookingCompletion(tenant, contact, room.id, dateRange.checkIn, dateRange.checkOut);
+      return;
+    }
+    // Couldn't make sense of the submission (an unexpected field shape, or a
+    // stale room id) -- fail soft into the normal AI queue below rather than
+    // leaving the guest with silence; Anushka picks up from whatever text
+    // content the Flow message carried.
+  }
+
   // A guest asked to try different dates after an availability conflict.
   if (msg.interactiveId === "dates_retry") {
     if (contact.aiPaused) return;
@@ -324,6 +377,42 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     }
     // No active offers configured — fall through to the AI queue so the
     // guest still gets *some* reply, matching the "no rooms configured" fallback above.
+  }
+
+  // GREET_MENU's "Book a room" tap — the highest-intent signal in the whole
+  // flow. If this tenant has a published WhatsApp Flow (a real native
+  // date-range calendar + room dropdown, see
+  // src/lib/whatsapp/flows/booking-flow.ts), send it for a one-tap booking
+  // instead of the step-by-step button waterfall. Deliberately narrow entry
+  // point for v1 (every other path is unchanged) and fully resilient: no
+  // Flow configured, or the send itself fails (e.g. not yet approved by
+  // Meta) both fall straight through to today's normal behavior below —
+  // this can never leave a guest stuck.
+  if (msg.interactiveId === "greet_book") {
+    if (contact.aiPaused) return;
+
+    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id } });
+    if (profile?.whatsappBookingFlowId) {
+      try {
+        await sendAndPersist(
+          tenant,
+          contact,
+          {
+            type: "flow",
+            body: "Let's get you booked — pick a room and your dates:",
+            flowId: profile.whatsappBookingFlowId,
+            flowCta: "Book now",
+            screen: "BOOKING",
+          },
+          "Failed to send booking flow"
+        );
+        return;
+      } catch (err) {
+        console.error(`Booking flow send failed for tenant ${tenant.id}, contact ${contact.id} — falling back to normal flow:`, err);
+      }
+    }
+    // No Flow configured for this tenant, or the send failed -- fall
+    // through to the normal AI queue below, exactly as today.
   }
 
   // GREET_MENU's "Ask a question" tap: show the tenant's real FAQ questions

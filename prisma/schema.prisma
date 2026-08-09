@@ -201,28 +201,34 @@ model PlatformAdmin {
 // ─── Hotel content / knowledge base ────────────────────────────────────
 
 model HotelProfile {
-  tenantId           String   @id
-  name               String
-  address            String?
-  googleMapsUrl      String?
-  lat                Float?
-  lng                Float?
-  checkInTime        String?
-  checkOutTime       String?
-  wifiInfo           String?
-  parkingInfo        String?
-  restaurantInfo     String?
-  cancellationPolicy String?
-  refundPolicy       String?
-  nearbyAttractions  String?
-  businessHours      String?
-  aiSystemPrompt     String?  @db.Text
-  aiAgentName        String   @default("Anushka")
+  tenantId              String   @id
+  name                  String
+  address               String?
+  googleMapsUrl         String?
+  lat                   Float?
+  lng                   Float?
+  checkInTime           String?
+  checkOutTime          String?
+  wifiInfo              String?
+  parkingInfo           String?
+  restaurantInfo        String?
+  cancellationPolicy    String?
+  refundPolicy          String?
+  nearbyAttractions     String?
+  businessHours         String?
+  aiSystemPrompt        String?  @db.Text
+  aiAgentName           String   @default("Anushka")
   // Optional owner override for the "IVR-4821"-style booking reference code
   // prefix — auto-derived from the hotel name when unset (see
   // src/lib/booking/reference-code.ts).
-  bookingCodePrefix  String?
-  updatedAt          DateTime @updatedAt
+  bookingCodePrefix     String?
+  // The published WhatsApp Flow id for the one-tap booking form (real room
+  // dropdown + native date-range calendar) — see
+  // src/lib/whatsapp/flows/booking-flow.ts. Null until the one-time setup
+  // script creates and publishes a Flow for this tenant; the "Book a room"
+  // tap falls back to today's step-by-step buttons whenever this is unset.
+  whatsappBookingFlowId String?
+  updatedAt             DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }

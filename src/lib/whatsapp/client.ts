@@ -1,3 +1,5 @@
+import { randomUUID } from "crypto";
+
 const GRAPH_VERSION = "v21.0";
 
 export interface WhatsAppCredentials {
@@ -23,7 +25,15 @@ type OutboundMessage =
   // <=72 chars, id <=200 chars, button (the text on the "open list" tab)
   // <=20 chars (WhatsApp Cloud API limits, verified against Meta's current
   // docs).
-  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] };
+  | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] }
+  // A published WhatsApp Flow (native multi-field form: dropdowns, a real
+  // date-range calendar) — see src/lib/whatsapp/flows/booking-flow.ts for
+  // the flow_json this flowId points to. flow_token isn't used for
+  // correlation anywhere in this codebase (the completion arrives as a
+  // normal inbound webhook message, already resolved to a contact via the
+  // sender's WhatsApp number like any other message) — it's generated fresh
+  // per send purely because Meta's API requires some value.
+  | { type: "flow"; body: string; flowId: string; flowCta: string; screen: string };
 
 export function buildPayload(to: string, message: OutboundMessage): Record<string, unknown> {
   const base = { messaging_product: "whatsapp", to };
@@ -84,6 +94,26 @@ export function buildPayload(to: string, message: OutboundMessage): Record<strin
               title: s.title,
               rows: s.rows.map((r) => ({ id: r.id, title: r.title, description: r.description })),
             })),
+          },
+        },
+      };
+    case "flow":
+      return {
+        ...base,
+        type: "interactive",
+        interactive: {
+          type: "flow",
+          body: { text: message.body },
+          action: {
+            name: "flow",
+            parameters: {
+              flow_message_version: "3",
+              flow_token: randomUUID(),
+              flow_id: message.flowId,
+              flow_cta: message.flowCta,
+              flow_action: "navigate",
+              flow_action_payload: { screen: message.screen, data: {} },
+            },
           },
         },
       };

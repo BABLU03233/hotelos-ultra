@@ -34,6 +34,12 @@ export interface InboundMessage {
   // which is only the human-readable label. Used to detect specific actions
   // (e.g. the booking-confirmation button) without depending on label text.
   interactiveId: string | null;
+  // Structured data from a completed WhatsApp Flow submission (see
+  // src/lib/whatsapp/flows/booking-flow.ts) -- WhatsApp calls this an
+  // "nfm_reply". Whatever field names the Flow's screen used (e.g. "room",
+  // "date_range", "guests") become keys here, straight from the guest's
+  // real submission. Null for every other message type.
+  flowResponse: Record<string, unknown> | null;
   mediaId: string | null;
   mediaMimeType: string | null;
   location: { latitude: number; longitude: number } | null;
@@ -86,16 +92,33 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
         // Interactive list/button message: { type: "interactive", interactive: { type: "button_reply"|"list_reply", button_reply|list_reply: { id, title } } }.
         let buttonText: string | null = null;
         let interactiveId: string | null = null;
+        let flowResponse: Record<string, unknown> | null = null;
         if (type === "button") {
           const btn = raw.button as { text?: string; payload?: string } | undefined;
           buttonText = btn?.text ?? null;
           interactiveId = btn?.payload ?? null;
         } else if (type === "interactive") {
           const interactive = raw.interactive as
-            | { button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string } }
+            | {
+                button_reply?: { id?: string; title?: string };
+                list_reply?: { id?: string; title?: string };
+                nfm_reply?: { response_json?: string };
+              }
             | undefined;
           buttonText = interactive?.button_reply?.title ?? interactive?.list_reply?.title ?? null;
           interactiveId = interactive?.button_reply?.id ?? interactive?.list_reply?.id ?? null;
+          // A completed Flow submission -- response_json is a JSON *string*,
+          // not an object. A malformed/unparseable payload should never
+          // crash webhook processing; it just leaves flowResponse null and
+          // the message falls through to the AI queue like anything else
+          // that couldn't be specially handled.
+          if (interactive?.nfm_reply?.response_json) {
+            try {
+              flowResponse = JSON.parse(interactive.nfm_reply.response_json) as Record<string, unknown>;
+            } catch {
+              flowResponse = null;
+            }
+          }
         }
 
         messages.push({
@@ -108,6 +131,7 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           text: textBody,
           buttonText,
           interactiveId,
+          flowResponse,
           mediaId: media?.id ?? null,
           mediaMimeType: media?.mime_type ?? null,
           location:

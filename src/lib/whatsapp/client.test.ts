@@ -80,6 +80,38 @@ describe("buildPayload", () => {
     expect(interactive).toHaveLength(2);
   });
 
+  it("builds a flow interactive payload with a generated flow_token", () => {
+    const payload = buildPayload("919876543210", {
+      type: "flow",
+      body: "Let's get you booked:",
+      flowId: "123456789",
+      flowCta: "Book now",
+      screen: "BOOKING",
+    });
+    expect(payload).toMatchObject({
+      messaging_product: "whatsapp",
+      to: "919876543210",
+      type: "interactive",
+      interactive: {
+        type: "flow",
+        body: { text: "Let's get you booked:" },
+        action: {
+          name: "flow",
+          parameters: {
+            flow_message_version: "3",
+            flow_id: "123456789",
+            flow_cta: "Book now",
+            flow_action: "navigate",
+            flow_action_payload: { screen: "BOOKING", data: {} },
+          },
+        },
+      },
+    });
+    const params = (payload.interactive as { action: { parameters: { flow_token: string } } }).action.parameters;
+    expect(typeof params.flow_token).toBe("string");
+    expect(params.flow_token.length).toBeGreaterThan(0);
+  });
+
   it("still builds a plain text payload", () => {
     const payload = buildPayload("919876543210", { type: "text", text: "Hi there" });
     expect(payload).toEqual({
