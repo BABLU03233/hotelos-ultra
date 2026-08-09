@@ -182,6 +182,16 @@ describe("hasStatedGuestCount", () => {
     const history = [{ role: "assistant", content: "How many guests, e.g. 2 guests or 3+?" }];
     expect(hasStatedGuestCount(history, "not sure yet")).toBe(false);
   });
+
+  it("detects 'for N' phrasing without the word guests (a real gap found live)", () => {
+    expect(hasStatedGuestCount([], "a room for 2 this weekend")).toBe(true);
+    expect(hasStatedGuestCount([], "book for 4")).toBe(true);
+  });
+
+  it("does not treat 'for N nights/days' (a duration) as a guest count", () => {
+    expect(hasStatedGuestCount([], "book for 2 nights")).toBe(false);
+    expect(hasStatedGuestCount([], "staying for 3 days")).toBe(false);
+  });
 });
 
 describe("hasStatedDates", () => {
@@ -259,6 +269,32 @@ describe("selectDeterministicInteractive", () => {
   it("offers GREET_MENU on the first reply when language is already obvious", () => {
     const result = selectDeterministicInteractive({ ...base, isFirstReply: true, languageObvious: true });
     expect(result).toEqual(greetMenuPrompt());
+  });
+
+  it("does NOT force LANGUAGE_SELECT/GREET_MENU on a first reply that's already information-rich (a severe mismatch found live)", () => {
+    // "Hi, 2 guests, want a room this weekend" as the guest's first-ever
+    // message: guest count is already known, so if the AI's reply names a
+    // room, ROOM_RESPONSE must win over LANGUAGE_SELECT/GREET_MENU even
+    // though isFirstReply is true.
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: true,
+      languageObvious: true,
+      guestMessage: "Hi, 2 guests, want a room this weekend",
+      replyText: "Our Deluxe Room starts from ₹1,299/night",
+    });
+    expect(result).toEqual(roomResponsePrompt());
+  });
+
+  it("offers GUEST_COUNT (not LANGUAGE_SELECT/GREET_MENU) on a rich first reply where only guest count is missing", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: true,
+      languageObvious: true,
+      guestMessage: "Hi, I want to book a room this weekend",
+      replyText: "Sure, how many guests?",
+    });
+    expect(result).toEqual(guestCountPrompt());
   });
 
   it("offers GUEST_COUNT whenever guest count is unknown, regardless of what else is in the reply", () => {
@@ -383,6 +419,22 @@ describe("predictedStageInstruction", () => {
   it("gives a GREET_MENU instruction on the first reply when language is already obvious", () => {
     const result = predictedStageInstruction({ ...base, isFirstReply: true, languageObvious: true });
     expect(result).toContain("Book a room");
+  });
+
+  it("gives the room-recommend heads-up (not GREET_MENU) on a rich first reply where guest count and dates are already known", () => {
+    // The exact mismatch this function exists to prevent: without the fix,
+    // this would predict GREET_MENU (since replyText is empty pre-call),
+    // but the real post-call decision would end up as ROOM_RESPONSE the
+    // moment the AI names a room -- telling the AI the wrong thing was
+    // about to happen.
+    const result = predictedStageInstruction({
+      ...base,
+      isFirstReply: true,
+      languageObvious: true,
+      guestMessage: "Hi, 2 guests, want a room this weekend",
+    });
+    expect(result).toContain("recommend");
+    expect(result).not.toContain("Book a room\" / \"View rooms");
   });
 
   it("gives a GUEST_COUNT instruction once booking intent is shown but count is unknown", () => {
