@@ -63,14 +63,18 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // 5. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
 //    disagree on whether the entry free tier needs a card; ships anyway
 //    since a missing key just skips it instantly, same as every other slot.
-// 6. Cloudflare Workers AI (two accounts) — 10,000 Neurons/day *per account*
-//    (Cloudflare's own compute unit, not a 1:1 request count — live-measured
-//    at ~29 neurons per real reply here, so ~340/day per account). The
-//    10,000/day cap is per Cloudflare account, not per token, so a second
-//    account's credentials (not just a second token on the same account)
-//    genuinely doubles this — far and away the best throughput of anything
-//    added tonight, and 5/5 succeeded in a rapid-fire burst test with no
-//    throttling at all.
+// 6. Cloudflare Workers AI (two accounts) — 10,000 Neurons/day *per account*,
+//    same as ever, but running the 70B model by default now (not the 8B
+//    one) after live production testing 2026-08-09 caught the 8B model
+//    hallucinating once it ended up carrying most of the day's traffic
+//    during a Groq/Gemini outage (see cloudflare-provider.ts for specifics).
+//    That's a real throughput trade — ~55 replies/day per account (~110/day
+//    combined) instead of ~340/day, since the 70B model costs ~6x more
+//    neurons/token — but a guest getting a hallucinated answer is worse than
+//    the chain moving on to the next provider a bit sooner. The 10,000/day
+//    cap is per Cloudflare account, not per token, so a second account's
+//    credentials (not just a second token on the same account) genuinely
+//    doubles this.
 // 7. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
 //    and discovered these do NOT have independent per-model quotas the way
 //    this was originally designed around. OpenRouter caps free-model usage
