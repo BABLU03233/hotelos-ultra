@@ -7,7 +7,7 @@ import { cohereProvider } from "./cohere-provider";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
-import { extractInteractivePrompt, InteractivePrompt } from "./interactive-prompts";
+import { extractInteractivePrompt, InteractivePrompt, mentionsRoomPrice, roomResponsePrompt } from "./interactive-prompts";
 import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
@@ -301,7 +301,11 @@ export async function generateReply(
 
   const { text: withoutImages, imageUrls } = extractImageUrls(trimmed);
   const { text, interactive } = extractInteractivePrompt(withoutImages);
-  return { reply: text, imageUrls, interactive, shouldEscalate: false, agentName };
+  // Deterministic safety net for ROOM_RESPONSE's marker-miss rate (see
+  // interactive-prompts.ts) — only fires when the AI's own BUTTONS decision
+  // produced nothing, so an explicit marker (any key) always wins.
+  const finalInteractive = interactive ?? (mentionsRoomPrice(text) ? roomResponsePrompt() : undefined);
+  return { reply: text, imageUrls, interactive: finalInteractive, shouldEscalate: false, agentName };
 }
 
 /** One-sentence CRM summary of a conversation so far, refreshed after each inbound message. */

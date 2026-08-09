@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { CONFIRM_BOOKING_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, extractInteractivePrompt } from "./interactive-prompts";
+import {
+  CONFIRM_BOOKING_BUTTON_ID,
+  SEE_OTHER_ROOMS_BUTTON_ID,
+  extractInteractivePrompt,
+  mentionsRoomPrice,
+  roomResponsePrompt,
+} from "./interactive-prompts";
 
 describe("extractInteractivePrompt", () => {
   it("returns the text unchanged when no BUTTONS marker is present", () => {
@@ -87,5 +93,32 @@ describe("extractInteractivePrompt", () => {
 
     const roomResponse = extractInteractivePrompt("Great room!\nBUTTONS: ROOM_RESPONSE");
     expect(roomResponse.interactive?.buttons.map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
+  });
+});
+
+describe("mentionsRoomPrice", () => {
+  it("detects the standard '₹<amount>/night' price format", () => {
+    expect(mentionsRoomPrice("Our Deluxe Room starts from ₹1,299/night")).toBe(true);
+    expect(mentionsRoomPrice("₹999/night for a Classic Room")).toBe(true);
+  });
+
+  it("is not fooled by whitespace around the slash", () => {
+    expect(mentionsRoomPrice("₹1499 / night for 2 guests")).toBe(true);
+  });
+
+  it("returns false when no price is mentioned", () => {
+    expect(mentionsRoomPrice("Check-out is by 11:00 AM 🕚")).toBe(false);
+    expect(mentionsRoomPrice("How many guests will be staying?")).toBe(false);
+  });
+
+  it("returns false for a non-per-night rupee mention", () => {
+    expect(mentionsRoomPrice("There's a ₹100 discount available")).toBe(false);
+  });
+});
+
+describe("roomResponsePrompt", () => {
+  it("returns the same three buttons as the ROOM_RESPONSE catalog entry", () => {
+    const prompt = roomResponsePrompt();
+    expect(prompt.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, "room_question"]);
   });
 });

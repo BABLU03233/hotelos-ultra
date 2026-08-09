@@ -86,3 +86,24 @@ export function extractInteractivePrompt(text: string): { text: string; interact
   }
   return { text: cleaned || prompt.fallbackBody, interactive: { buttons: prompt.buttons } };
 }
+
+// Live testing found a real UX consequence of ROOM_RESPONSE's ~50% marker
+// miss rate on weaker/faster models: when the AI names a room's price but
+// forgets the marker, the guest's only reply is a vague acknowledgement
+// ("sounds good"), which the CLOSE-stage logic then reasonably reads as
+// "ready to book" — skipping straight to BUTTONS: CONFIRM_BOOKING with no
+// intermediate tap step. That reads as pushy/presumptuous to a guest who
+// hasn't actually confirmed a room yet. ₹<amount>/night is the one
+// observable signal that's true every single time a room gets named (it's
+// the literal instruction in CONVERSATION FLOW's RECOMMEND step), so it's
+// used as a deterministic fallback in generateReply() below: only kicks in
+// when the AI's own marker decision-making produced nothing at all.
+const ROOM_PRICE_PATTERN = /₹[\d,]+\s*\/\s*night/i;
+
+export function mentionsRoomPrice(text: string): boolean {
+  return ROOM_PRICE_PATTERN.test(text);
+}
+
+export function roomResponsePrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.ROOM_RESPONSE.buttons };
+}
