@@ -9,6 +9,7 @@ import {
   extractInteractivePrompt,
   greetMenuPrompt,
   guestCountPrompt,
+  hasExpressedBookingIntent,
   hasStatedDates,
   hasStatedGuestCount,
   looksLikeObviousLanguage,
@@ -325,5 +326,47 @@ describe("selectDeterministicInteractive", () => {
   it("returns undefined when nothing applies and the AI offered no marker either", () => {
     const result = selectDeterministicInteractive({ ...base, guestMessage: "2 guests, this weekend" });
     expect(result).toBeUndefined();
+  });
+
+  it("does NOT force GUEST_COUNT on the message right after the greeting when the guest hasn't shown booking interest", () => {
+    // The bug this gate fixes: "Hi" -> greeted -> guest says something with
+    // no booking signal at all -> used to immediately show GUEST_COUNT
+    // buttons, which read as robotic/presumptuous before the guest has even
+    // said they want to stay anywhere.
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "just looking around, thanks" });
+    expect(result).toBeUndefined();
+  });
+
+  it("still falls through naturally (no forced buttons) for an unrelated question with no booking signal", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "what's the weather like there" });
+    expect(result).toBeUndefined();
+  });
+
+  it("starts the funnel the moment a booking-related keyword appears, even without a number", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "I'd like to book a room" });
+    expect(result).toEqual(guestCountPrompt());
+  });
+});
+
+describe("hasExpressedBookingIntent", () => {
+  it("detects common booking-related keywords", () => {
+    expect(hasExpressedBookingIntent([], "do you have any rooms available")).toBe(true);
+    expect(hasExpressedBookingIntent([], "what's the rate per night")).toBe(true);
+    expect(hasExpressedBookingIntent([], "I want to book a stay")).toBe(true);
+  });
+
+  it("treats an already-stated guest count or date as booking intent", () => {
+    expect(hasExpressedBookingIntent([], "2 guests")).toBe(true);
+    expect(hasExpressedBookingIntent([], "this weekend")).toBe(true);
+  });
+
+  it("returns false for plain small talk with no booking signal", () => {
+    expect(hasExpressedBookingIntent([], "just looking around, thanks")).toBe(false);
+    expect(hasExpressedBookingIntent([], "haha nice")).toBe(false);
+  });
+
+  it("finds intent stated earlier in history, not just the latest message", () => {
+    const history = [{ role: "user", content: "hi, I want to book a room" }];
+    expect(hasExpressedBookingIntent(history, "sure")).toBe(true);
   });
 });

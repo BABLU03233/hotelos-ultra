@@ -183,6 +183,28 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
   );
 }
 
+// Live testing surfaced a real problem: the guest-count gate fired on the
+// very next message after "Hi" regardless of what the guest actually said —
+// even idle small talk or an unrelated question got railroaded straight
+// into "how many guests?" That reads as robotic, not helpful. This gate
+// requires the guest to have shown SOME sign of booking interest (a
+// booking-related keyword, or already having stated guest count/dates
+// directly) before the funnel-style prompts (GUEST_COUNT, DATE_QUICK_PICK)
+// kick in at all — before that, replies fall through to whatever the AI
+// itself decides (usually nothing, i.e. a normal conversational reply),
+// giving room for a genuine "how can I help" exchange first.
+const BOOKING_INTENT_PATTERN =
+  /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|check-?in|check-?out|accommodation)\b/i;
+
+export function hasExpressedBookingIntent(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
+  const userTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage];
+  return (
+    userTexts.some((t) => BOOKING_INTENT_PATTERN.test(t)) ||
+    hasStatedGuestCount(history, latestGuestMessage) ||
+    hasStatedDates(history, latestGuestMessage)
+  );
+}
+
 // Devanagari (Hindi) and Telugu Unicode blocks — a guest typing in either
 // script has unambiguously told us their language already, so LANGUAGE_SELECT
 // would be redundant. A guest typing Hindi/Telugu in Latin/Roman script
@@ -226,6 +248,17 @@ export function selectDeterministicInteractive(params: {
   if (isFirstReply) {
     return languageObvious ? greetMenuPrompt() : { buttons: BUTTON_CATALOG.LANGUAGE_SELECT.buttons };
   }
+
+  const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
+
+  // Don't force the booking funnel (GUEST_COUNT, DATE_QUICK_PICK) onto a
+  // guest who hasn't shown any booking-related interest yet — e.g. small
+  // talk, or a one-off question right after the greeting. A room already
+  // having come up counts as interest even if this exact turn's keywords
+  // don't match hasExpressedBookingIntent's pattern.
+  if (!hasExpressedBookingIntent(history, guestMessage) && !roomMentionedEver) {
+    return aiInteractive;
+  }
   if (!hasStatedGuestCount(history, guestMessage)) {
     return guestCountPrompt();
   }
@@ -238,7 +271,6 @@ export function selectDeterministicInteractive(params: {
   // moving the guest toward confirming over risking a guest who's ready to
   // book getting stuck being asked for dates on a loop because their
   // phrasing didn't match the pattern.
-  const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
   if (roomMentionedEver) {
     return confirmBookingPrompt();
   }
