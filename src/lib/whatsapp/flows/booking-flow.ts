@@ -38,11 +38,15 @@ export function buildBookingFlowJson(rooms: { id: string; name: string; price: n
             {
               type: "CalendarPicker",
               name: "date_range",
-              label: "Your dates",
+              // Real-API-verified requirement, not documented in Meta's own
+              // written docs at the time this was built: in "range" mode,
+              // `label`/`required` must be per-endpoint objects, not a
+              // single string/boolean the way single-date mode accepts.
+              label: { "start-date": "Check-in", "end-date": "Check-out" },
               mode: "range",
               "min-date": minDate,
               "min-days": 1,
-              required: true,
+              required: { "start-date": true, "end-date": true },
             },
             {
               type: "Dropdown",
