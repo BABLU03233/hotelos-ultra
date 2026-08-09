@@ -14,6 +14,12 @@ export const CONFIRM_BOOKING_BUTTON_ID = "confirm_booking";
 // rooms, rather than trusting a free-tier model to relay room names/prices
 // accurately in prose a second time.
 export const SEE_OTHER_ROOMS_BUTTON_ID = "room_other";
+// Deliberately routed through the AI, not a deterministic short-circuit like
+// SEE_OTHER_ROOMS — a guest tapping this always taps it right after Anushka
+// named one specific room, so the conversation history alone already tells
+// the model exactly which room's photos to send via the existing "IMAGE:
+// <url>" mechanism (see PHOTOS in pipeline.ts). No new plumbing needed.
+export const VIEW_PHOTOS_BUTTON_ID = "view_photos";
 
 export interface InteractivePrompt {
   buttons: { id: string; title: string }[];
@@ -38,7 +44,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     buttons: [
       { id: "room_book", title: "Book this room" },
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other options" },
-      { id: "room_question", title: "I have a question" },
+      { id: VIEW_PHOTOS_BUTTON_ID, title: "View photos" },
     ],
   },
   CONFIRM_BOOKING: {
@@ -106,4 +112,29 @@ export function mentionsRoomPrice(text: string): boolean {
 
 export function roomResponsePrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.ROOM_RESPONSE.buttons };
+}
+
+export function guestCountPrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.GUEST_COUNT.buttons };
+}
+
+// A prompt-only "never recommend a room before you know guest count" rule
+// had zero measurable effect in live testing (6/6 violations, unchanged
+// from before the instruction was added) — the model's prior toward naming
+// a room the moment it has dates+budget is too strong to prompt away. This
+// is the code-level guarantee instead: guest-count phrases are varied
+// enough (numbers, "just me", "family of 4", ...) that this can't be as
+// precise as mentionsRoomPrice's fixed "₹.../night" format, so it's kept
+// deliberately broad — false negatives (thinks count is unknown when it
+// was given) just mean an extra GUEST_COUNT prompt the guest re-answers,
+// which is mildly repetitive but harmless; false positives (thinks count
+// is known when it wasn't) would defeat the whole point, so broad is the
+// right way to err.
+const GUEST_COUNT_STATED_PATTERN =
+  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?)|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us)/i;
+
+export function hasStatedGuestCount(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
+  return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
+    GUEST_COUNT_STATED_PATTERN.test(t)
+  );
 }

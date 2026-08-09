@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
+  VIEW_PHOTOS_BUTTON_ID,
   extractInteractivePrompt,
+  guestCountPrompt,
+  hasStatedGuestCount,
   mentionsRoomPrice,
   roomResponsePrompt,
 } from "./interactive-prompts";
@@ -31,7 +34,7 @@ describe("extractInteractivePrompt", () => {
   it("resolves the ROOM_RESPONSE key at the RECOMMEND stage", () => {
     const result = extractInteractivePrompt("The Deluxe Room is ₹1,299/night with a great view.\nBUTTONS: ROOM_RESPONSE");
     expect(result.text).toBe("The Deluxe Room is ₹1,299/night with a great view.");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", "room_other", "room_question"]);
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("falls back to plain text and warns on an unknown/hallucinated key", () => {
@@ -62,7 +65,7 @@ describe("extractInteractivePrompt", () => {
   it("resolves a key even with trailing punctuation right after it", () => {
     const result = extractInteractivePrompt("Great choice!\nBUTTONS: ROOM_RESPONSE.");
     expect(result.text).toBe("Great choice!");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", "room_other", "room_question"]);
+    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("resolves the CONFIRM_BOOKING key at the CLOSE stage, using the exported button id", () => {
@@ -119,6 +122,42 @@ describe("mentionsRoomPrice", () => {
 describe("roomResponsePrompt", () => {
   it("returns the same three buttons as the ROOM_RESPONSE catalog entry", () => {
     const prompt = roomResponsePrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, "room_question"]);
+    expect(prompt.buttons.map((b) => b.id)).toEqual(["room_book", SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+  });
+});
+
+describe("guestCountPrompt", () => {
+  it("returns the same three buttons as the GUEST_COUNT catalog entry", () => {
+    const prompt = guestCountPrompt();
+    expect(prompt.buttons.map((b) => b.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+});
+
+describe("hasStatedGuestCount", () => {
+  it("detects a plain number of guests", () => {
+    expect(hasStatedGuestCount([], "2 guests please")).toBe(true);
+    expect(hasStatedGuestCount([], "we'll be 4 people")).toBe(true);
+  });
+
+  it("detects common solo-traveller phrasing", () => {
+    expect(hasStatedGuestCount([], "just me")).toBe(true);
+    expect(hasStatedGuestCount([], "it's only me")).toBe(true);
+  });
+
+  it("returns false when no message (history or latest) mentions a count", () => {
+    expect(hasStatedGuestCount([], "this weekend, budget 1500")).toBe(false);
+  });
+
+  it("finds a guest count stated earlier in history, not just the latest message", () => {
+    const history = [
+      { role: "user", content: "hi, 2 guests for this weekend" },
+      { role: "assistant", content: "Our Deluxe Room is a great fit!" },
+    ];
+    expect(hasStatedGuestCount(history, "sounds good")).toBe(true);
+  });
+
+  it("ignores assistant messages when scanning for a stated count", () => {
+    const history = [{ role: "assistant", content: "How many guests, e.g. 2 guests or 3+?" }];
+    expect(hasStatedGuestCount(history, "not sure yet")).toBe(false);
   });
 });
