@@ -1,11 +1,26 @@
 import { MessageStatus, MessageType } from "@/generated/prisma/enums";
-import { CONFIRM_BOOKING_BUTTON_ID, ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, confirmBookingPrompt } from "@/lib/ai/interactive-prompts";
+import {
+  CONFIRM_BOOKING_BUTTON_ID,
+  GREET_QUESTION_BUTTON_ID,
+  ROOM_BOOK_BUTTON_ID,
+  SEE_OTHER_ROOMS_BUTTON_ID,
+  SHOW_OFFERS_BUTTON_ID,
+  confirmBookingPrompt,
+  dateQuickPickPrompt,
+  postBookingPrompt,
+  roomResponsePrompt,
+} from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
+import { isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
+import { matchOfferCode } from "@/lib/booking/offer-match";
+import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { downloadMedia, getMediaUrl, sendWhatsAppMessage } from "@/lib/whatsapp/client";
+import { buildFaqListMessage } from "@/lib/whatsapp/faq-list-message";
+import { buildOfferListMessage } from "@/lib/whatsapp/offer-list-message";
 import { isOptOutSignal } from "@/lib/whatsapp/opt-out";
 import { buildRoomListMessage } from "@/lib/whatsapp/room-list-message";
 import { getWhatsAppCredentials, resolveTenantByPhoneNumberId } from "@/lib/whatsapp/tenant-credentials";
@@ -79,6 +94,20 @@ async function sendAndPersist(
   } catch (err) {
     console.error(`${errorLabel} for tenant ${tenant.id}, contact ${contact.id}:`, err);
   }
+}
+
+const OFFER_MATCH_HISTORY_LIMIT = 20;
+
+/** Scans this contact's recent conversation for a real offer code (e.g. "FLAT100") to snapshot onto the booking — see offer-match.ts. */
+async function matchOfferForBooking(tenantId: string, contactId: string): Promise<{ id: string; title: string } | null> {
+  const [offers, recentMessages] = await Promise.all([
+    prisma.offer.findMany({ where: { tenantId, active: true }, select: { id: true, title: true, code: true } }),
+    prisma.message.findMany({ where: { tenantId, contactId }, orderBy: { createdAt: "desc" }, take: OFFER_MATCH_HISTORY_LIMIT, select: { content: true } }),
+  ]);
+  return matchOfferCode(
+    offers,
+    recentMessages.map((m) => m.content ?? "")
+  );
 }
 
 /**
@@ -206,10 +235,124 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       return;
     }
 
-    const booking = await completeBooking(prisma, tenant.id, contact.id);
-    const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(tenant, contact, { type: "text", text: confirmationText }, "Failed to send booking confirmation");
+    // Real-time availability gating: today a tap always completed even with
+    // zero structured dates ever captured — this is a deliberate tightening.
+    // resolveStageKey doesn't gate CONFIRM_BOOKING on dates being known (by
+    // design, see interactive-prompts.ts), so this isn't a dead end: once
+    // dates get captured, the very next AI turn re-offers Confirm-booking
+    // buttons naturally, resolving in one extra tap, not a stuck state.
+    if (contact.pendingRoomId && contact.pendingCheckIn && contact.pendingCheckOut) {
+      const available = await isRoomAvailable(prisma, tenant.id, contact.pendingRoomId, contact.pendingCheckIn, contact.pendingCheckOut);
+      if (available) {
+        const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
+        const booking = await completeBooking(prisma, tenant.id, contact.id, {
+          roomId: contact.pendingRoomId,
+          checkIn: contact.pendingCheckIn,
+          checkOut: contact.pendingCheckOut,
+          offerId: matchedOffer?.id,
+          offerSnapshot: matchedOffer?.title,
+        });
+        const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
+        await sendAndPersist(
+          tenant,
+          contact,
+          { type: "interactive", body: confirmationText, buttons: postBookingPrompt().buttons },
+          "Failed to send booking confirmation"
+        );
+        return;
+      }
+
+      // Conflict — do not book. Clear the pending dates so the next answer
+      // is treated fresh, and offer a real recovery path.
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: null, pendingCheckOut: null } });
+      const body = "Ah, sorry — that room's actually already booked for those exact dates. Want to try different dates, or see other rooms?";
+      await sendAndPersist(
+        tenant,
+        contact,
+        { type: "interactive", body, buttons: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] },
+        "Failed to send availability-conflict message"
+      );
+      return;
+    }
+
+    if (!contact.pendingCheckIn || !contact.pendingCheckOut) {
+      const body = contact.pendingRoomId
+        ? "Just need your dates to lock this in — when are you thinking? 📅"
+        : "Let's get your dates sorted first — when are you thinking? 📅";
+      await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: dateQuickPickPrompt().buttons }, "Failed to send date-quick-pick prompt");
+      return;
+    }
+
+    // Dates known, room missing — ask them to pick one from the real list.
+    const roomsForConfirm = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
+    if (roomsForConfirm.length) {
+      await sendAndPersist(tenant, contact, buildRoomListMessage(roomsForConfirm), "Failed to send room list");
+      return;
+    }
+
+    // No rooms configured at all (shouldn't happen operationally, since
+    // reaching CONFIRM_BOOKING requires a prior room recommendation) —
+    // complete without room/date fields so the guest still gets a booking.
+    const fallbackBooking = await completeBooking(prisma, tenant.id, contact.id);
+    const fallbackText = `You're all set! Your booking reference is ${fallbackBooking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
+    await sendAndPersist(
+      tenant,
+      contact,
+      { type: "interactive", body: fallbackText, buttons: postBookingPrompt().buttons },
+      "Failed to send booking confirmation"
+    );
     return;
+  }
+
+  // A guest asked to try different dates after an availability conflict.
+  if (msg.interactiveId === "dates_retry") {
+    if (contact.aiPaused) return;
+    await sendAndPersist(tenant, contact, { type: "interactive", body: "No problem — when else works for you? 📅", buttons: dateQuickPickPrompt().buttons }, "Failed to send date-retry prompt");
+    return;
+  }
+
+  // "Show me offers" — deterministic for the same reason SEE_OTHER_ROOMS_BUTTON_ID
+  // is: real active offers from the DB, not a free-tier model relaying them
+  // a second time from memory.
+  if (msg.interactiveId === SHOW_OFFERS_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    const offers = await prisma.offer.findMany({ where: { tenantId: tenant.id, active: true } });
+    if (offers.length) {
+      await sendAndPersist(tenant, contact, buildOfferListMessage(offers), "Failed to send offers list");
+      return;
+    }
+    // No active offers configured — fall through to the AI queue so the
+    // guest still gets *some* reply, matching the "no rooms configured" fallback above.
+  }
+
+  // GREET_MENU's "Ask a question" tap: show the tenant's real FAQ questions
+  // as a list instead of free-texting through the AI — a guest taps a real
+  // question and gets a guaranteed-accurate stored answer next (see the
+  // faq_pick_ handler below).
+  if (msg.interactiveId === GREET_QUESTION_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    const faqs = await prisma.faq.findMany({ where: { tenantId: tenant.id }, orderBy: { createdAt: "asc" } });
+    if (faqs.length) {
+      await sendAndPersist(tenant, contact, buildFaqListMessage(faqs), "Failed to send FAQ list");
+      return;
+    }
+    // No FAQs configured — fall through to the AI queue.
+  }
+
+  // A tap on a specific FAQ row — send the real stored answer directly, zero
+  // AI/hallucination risk, same reasoning as SEE_OTHER_ROOMS_BUTTON_ID.
+  if (msg.interactiveId?.startsWith("faq_pick_")) {
+    if (contact.aiPaused) return;
+
+    const faqId = msg.interactiveId.slice("faq_pick_".length);
+    const faq = await prisma.faq.findFirst({ where: { id: faqId, tenantId: tenant.id } });
+    if (faq) {
+      await sendAndPersist(tenant, contact, { type: "text", text: faq.answer }, "Failed to send FAQ answer");
+      return;
+    }
+    // Not found (stale/cross-tenant id) — fall through to the AI queue.
   }
 
   // "See other options" is handled deterministically too — not because it's
@@ -231,6 +374,27 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // normal AI queue below so the guest still gets *some* reply.
   }
 
+  // A tap on one specific room from the "See other options"/"View rooms"
+  // list. Previously this silently fell through to the AI as plain
+  // room-name text (a real pre-existing gap) — trusting a free-tier model
+  // to relay that same room's name/price a second time is exactly the
+  // failure mode SEE_OTHER_ROOMS_BUTTON_ID is already deterministic to
+  // avoid. Also the most reliable capture point for real-time availability
+  // checking's pendingRoomId (see room-match.ts for the free-text fallback).
+  if (msg.interactiveId?.startsWith("room_pick_")) {
+    if (contact.aiPaused) return;
+
+    const roomId = msg.interactiveId.slice("room_pick_".length);
+    const room = await prisma.room.findFirst({ where: { id: roomId, tenantId: tenant.id } });
+    if (room) {
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: room.id } });
+      const body = `${room.name} — from ₹${room.price}/night. Want to go ahead with this one?`;
+      await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: roomResponsePrompt().buttons }, "Failed to send room-pick response");
+      return;
+    }
+    // Not found (stale/cross-tenant id) — fall through to the AI queue.
+  }
+
   // "Book this room" is deterministic too — zero ambiguity in what it means
   // (move to CLOSE), so there's nothing for the AI to interpret. Live
   // testing found a real failure mode when this was left to the AI: it
@@ -242,6 +406,20 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     const body = "Great choice! Ready to confirm your booking? 🎉";
     await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: confirmBookingPrompt().buttons }, "Failed to send confirm-booking prompt");
     return;
+  }
+
+  // DATE_QUICK_PICK taps ("This weekend"/"Next week") — unlike the
+  // short-circuits above, this doesn't return: Anushka still needs to
+  // compose a natural next line (move to guest count, or on to confirming),
+  // so real dates are resolved deterministically in code (100% reliable,
+  // unlike trusting the AI to interpret "This weekend" itself), persisted,
+  // and the guest's own message content is rewritten to the human-readable
+  // resolved label before falling through to the normal AI queue below —
+  // so Anushka's reply is grounded in the real date, not the vague phrase.
+  if (msg.interactiveId === "dates_weekend" || msg.interactiveId === "dates_nextweek") {
+    const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
+    await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
+    await prisma.message.update({ where: { id: messageRow.id }, data: { content: label } });
   }
 
   // jobId keyed to the inbound message: if this same message is ever

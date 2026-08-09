@@ -10,17 +10,27 @@ function isUniqueConstraintError(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code?: unknown }).code === "P2002";
 }
 
+export interface BookingExtras {
+  roomId?: string;
+  roomNameSnapshot?: string;
+  checkIn?: Date;
+  checkOut?: Date;
+  offerId?: string;
+  offerSnapshot?: string;
+}
+
 async function createBookingWithUniqueCode(
   prisma: PrismaClient,
   tenantId: string,
   contactId: string,
   prefix: string,
-  summary: string | null
+  summary: string | null,
+  extras: BookingExtras
 ) {
   for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
     try {
       return await prisma.booking.create({
-        data: { tenantId, contactId, referenceCode: randomReferenceCode(prefix), summary },
+        data: { tenantId, contactId, referenceCode: randomReferenceCode(prefix), summary, ...extras },
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) continue; // code collision, retry with a fresh random suffix
@@ -35,26 +45,49 @@ async function createBookingWithUniqueCode(
  * unique reference code, updates Contact.bookingStatus/leadStatus, and fires
  * the same StaffNotification the manual CRM path already uses.
  *
+ * `extra` carries whatever real-time-availability state the caller already
+ * verified (room, dates, matched offer) — this function stays a pure
+ * "create the booking" boundary and never decides *whether* to book;
+ * handle-inbound-message.ts is the orchestration layer that runs the
+ * availability check and decides that before ever calling this.
+ *
  * Idempotent within a 5-minute window — WhatsApp buttons aren't single-use,
  * so a guest tapping "Confirm booking" twice produces two distinct message
  * ids that sail past the normal whatsappMessageId dedup check; without this,
  * a double-tap would create two Booking rows and fire two notifications.
  */
-export async function completeBooking(prisma: PrismaClient, tenantId: string, contactId: string): Promise<Prisma.BookingGetPayload<object>> {
+export async function completeBooking(
+  prisma: PrismaClient,
+  tenantId: string,
+  contactId: string,
+  extra?: { roomId?: string; checkIn?: Date; checkOut?: Date; offerId?: string; offerSnapshot?: string }
+): Promise<Prisma.BookingGetPayload<object>> {
   const recent = await prisma.booking.findFirst({
     where: { tenantId, contactId, createdAt: { gte: new Date(Date.now() - IDEMPOTENCY_WINDOW_MS) } },
     orderBy: { createdAt: "desc" },
   });
   if (recent) return recent;
 
-  const [contact, profile] = await Promise.all([
+  const [contact, profile, room] = await Promise.all([
     prisma.contact.findUniqueOrThrow({ where: { id: contactId } }),
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
+    extra?.roomId ? prisma.room.findUnique({ where: { id: extra.roomId } }) : Promise.resolve(null),
   ]);
 
-  const booking = await createBookingWithUniqueCode(prisma, tenantId, contactId, derivePrefix(profile), contact.aiSummary);
+  const extras: BookingExtras = {
+    roomId: extra?.roomId,
+    roomNameSnapshot: room?.name,
+    checkIn: extra?.checkIn,
+    checkOut: extra?.checkOut,
+    offerId: extra?.offerId,
+    offerSnapshot: extra?.offerSnapshot,
+  };
+  const booking = await createBookingWithUniqueCode(prisma, tenantId, contactId, derivePrefix(profile), contact.aiSummary, extras);
 
-  await prisma.contact.update({ where: { id: contactId }, data: { bookingStatus: "PENDING", leadStatus: "BOOKED" } });
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: { bookingStatus: "PENDING", leadStatus: "BOOKED", pendingRoomId: null, pendingCheckIn: null, pendingCheckOut: null },
+  });
 
   await fireBookingNotification(
     prisma,

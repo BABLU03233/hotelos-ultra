@@ -178,6 +178,7 @@ export interface Offer {
   title: string;
   description: string | null;
   discount: string | null;
+  code: string | null;
   validFrom: string | null;
   validTo: string | null;
   active: boolean;

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
+  GREET_QUESTION_BUTTON_ID,
   ROOM_BOOK_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
+  SHOW_OFFERS_BUTTON_ID,
   VIEW_PHOTOS_BUTTON_ID,
   confirmBookingPrompt,
   dateQuickPickPrompt,
@@ -14,7 +16,9 @@ import {
   hasStatedGuestCount,
   looksLikeBareGreeting,
   looksLikeObviousLanguage,
+  looksLikePriceOrOfferSignal,
   mentionsRoomPrice,
+  postBookingPrompt,
   predictedStageInstruction,
   roomResponsePrompt,
   selectDeterministicInteractive,
@@ -134,6 +138,25 @@ describe("mentionsRoomPrice", () => {
   });
 });
 
+describe("looksLikePriceOrOfferSignal", () => {
+  it("detects price pushback", () => {
+    expect(looksLikePriceOrOfferSignal("that's too expensive for us")).toBe(true);
+    expect(looksLikePriceOrOfferSignal("do you have anything cheaper")).toBe(true);
+    expect(looksLikePriceOrOfferSignal("that's a bit pricey")).toBe(true);
+  });
+
+  it("detects offer/discount interest", () => {
+    expect(looksLikePriceOrOfferSignal("any discount available?")).toBe(true);
+    expect(looksLikePriceOrOfferSignal("do you have any offers running")).toBe(true);
+    expect(looksLikePriceOrOfferSignal("got a promo code?")).toBe(true);
+  });
+
+  it("returns false for ordinary messages with no price/offer signal", () => {
+    expect(looksLikePriceOrOfferSignal("sounds good, let's book it")).toBe(false);
+    expect(looksLikePriceOrOfferSignal("2 guests this weekend")).toBe(false);
+  });
+});
+
 describe("roomResponsePrompt", () => {
   it("returns the same three buttons as the ROOM_RESPONSE catalog entry", () => {
     const prompt = roomResponsePrompt();
@@ -152,6 +175,20 @@ describe("confirmBookingPrompt", () => {
   it("returns the same two buttons as the CONFIRM_BOOKING catalog entry, with the stable button id", () => {
     const prompt = confirmBookingPrompt();
     expect(prompt.buttons.map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+  });
+});
+
+describe("postBookingPrompt", () => {
+  it("returns the same two buttons as the POST_BOOKING catalog entry", () => {
+    const prompt = postBookingPrompt();
+    expect(prompt.buttons.map((b) => b.id)).toEqual(["post_booking_question", "post_booking_done"]);
+  });
+});
+
+describe("GREET_QUESTION_BUTTON_ID / SHOW_OFFERS_BUTTON_ID", () => {
+  it("are stable ids used both in the catalog and for the deterministic short-circuits", () => {
+    expect(GREET_QUESTION_BUTTON_ID).toBe("greet_question");
+    expect(SHOW_OFFERS_BUTTON_ID).toBe("show_offers");
   });
 });
 
@@ -444,6 +481,45 @@ describe("selectDeterministicInteractive", () => {
     const result = selectDeterministicInteractive({ ...base, guestMessage: "2 people please", replyText: "Got it!" });
     expect(result).toEqual(dateQuickPickPrompt());
   });
+
+  it("offers PRICE_OBJECTION when the guest pushes back on price after a room's already been discussed", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "that's a bit too expensive for us",
+      replyText: "No worries, I understand!",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result?.buttons.map((b) => b.id)).toEqual([SEE_OTHER_ROOMS_BUTTON_ID, SHOW_OFFERS_BUTTON_ID, "continue_anyway"]);
+  });
+
+  it("does NOT offer PRICE_OBJECTION before any room has ever been recommended", () => {
+    // A price/offer question pre-recommendation just starts the normal
+    // funnel (an "offer" mention now counts as booking intent) -- the AI
+    // answers from its already-grounded offer data, no PRICE_OBJECTION
+    // special-casing needed until a room's actually been named.
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "any discounts running right now?" });
+    expect(result).toEqual(guestCountPrompt());
+  });
+
+  it("lets ROOM_RESPONSE win over PRICE_OBJECTION when this same reply names a (cheaper) room's price", () => {
+    // The guest objected to price, and this specific reply responds by
+    // naming a cheaper alternative room's price -- that's a fresh room
+    // recommendation, so the guest should get the room-selection buttons,
+    // not the price-objection recovery buttons, on this turn.
+    const result = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "that's too expensive, anything cheaper?",
+      replyText: "The Classic Room is more budget-friendly at ₹999/night",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result).toEqual(roomResponsePrompt());
+  });
 });
 
 describe("hasExpressedBookingIntent", () => {
@@ -542,6 +618,18 @@ describe("predictedStageInstruction", () => {
       ],
     });
     expect(result).toContain("Confirm booking");
+  });
+
+  it("gives a PRICE_OBJECTION instruction when the guest pushes back on price after a room's already come up", () => {
+    const result = predictedStageInstruction({
+      ...base,
+      guestMessage: "that's too expensive for us",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result).toContain("cheaper room");
   });
 
   it("gives a heads-up about recommending a room once guest count and dates are both known", () => {

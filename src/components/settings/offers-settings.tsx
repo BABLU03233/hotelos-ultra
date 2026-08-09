@@ -30,7 +30,7 @@ function OfferCard({ offer, onChanged }: { offer: Offer; onChanged: () => void }
     setForm(next);
     await apiFetch(`/api/settings/offers/${offer.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ title: next.title, description: next.description, discount: next.discount, active: next.active }),
+      body: JSON.stringify({ title: next.title, description: next.description, discount: next.discount, code: next.code, active: next.active }),
     });
     onChanged();
   }
@@ -57,6 +57,15 @@ function OfferCard({ offer, onChanged }: { offer: Offer; onChanged: () => void }
               placeholder="20% off"
             />
           </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Code</Label>
+          <Input
+            value={form.code ?? ""}
+            onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+            onBlur={() => save()}
+            placeholder="e.g. FLAT100 — lets Anushka match it when a guest types it"
+          />
         </div>
         <Input
           value={form.description ?? ""}

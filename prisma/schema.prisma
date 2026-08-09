@@ -282,10 +282,11 @@ model KnowledgeChunk {
 }
 
 model Faq {
-  id       String @id @default(cuid())
-  tenantId String
-  question String
-  answer   String @db.Text
+  id        String   @id @default(cuid())
+  tenantId  String
+  question  String
+  answer    String   @db.Text
+  createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -298,6 +299,11 @@ model Offer {
   title       String
   description String?
   discount    String?
+  // Short code a guest can type in chat (e.g. "FLAT100") to have it matched
+  // and snapshotted onto their Booking at confirmation time — see
+  // src/lib/booking/offer-match.ts. Optional: nothing breaks if unset, the
+  // guest's booking just won't have a matched offer recorded.
+  code        String?
   validFrom   DateTime?
   validTo     DateTime?
   active      Boolean   @default(true)
@@ -312,48 +318,57 @@ model Offer {
 // ─── CRM ────────────────────────────────────────────────────────────────
 
 model Contact {
-  id             String        @id @default(cuid())
-  tenantId       String
-  name           String?
-  phone          String
-  whatsappNumber String
-  createdAt      DateTime      @default(now())
-  lastMessage    String?
-  lastInboundAt  DateTime?
-  leadStatus     LeadStatus    @default(NEW)
-  bookingStatus  BookingStatus @default(NONE)
-  aiSummary      String?       @db.Text
+  id              String        @id @default(cuid())
+  tenantId        String
+  name            String?
+  phone           String
+  whatsappNumber  String
+  createdAt       DateTime      @default(now())
+  lastMessage     String?
+  lastInboundAt   DateTime?
+  leadStatus      LeadStatus    @default(NEW)
+  bookingStatus   BookingStatus @default(NONE)
+  aiSummary       String?       @db.Text
   // Set true the moment staff sends a manual reply — pauses the AI for this
   // contact until a staff member flips it back off (see M3 in the spec).
-  aiPaused       Boolean       @default(false)
+  aiPaused        Boolean       @default(false)
   // A manually scheduled reminder (calendar date/time picker in the CRM) —
   // separate from the automated FollowUpRule ladder. When followUpDate
   // comes due, the worker's reminder sweep creates a REMINDER-type
   // StaffNotification prompting staff to personally reach out, then clears
   // both fields — it's a nudge to a human, not an automatic WhatsApp send,
   // since a one-off manual follow-up usually needs personal context.
-  followUpDate   DateTime?
-  followUpNote   String?
-  notes          String?       @db.Text
+  followUpDate    DateTime?
+  followUpNote    String?
+  notes           String?       @db.Text
   // CRM tags (free-form labels, e.g. "VIP", "Corporate") and read-state /
   // ownership for the team inbox view.
-  tags           String[]      @default([])
-  lastReadAt     DateTime?
-  assignedToId   String?
+  tags            String[]      @default([])
+  lastReadAt      DateTime?
+  assignedToId    String?
   // Where this contact came from — set once at creation, never overwritten
   // by later messages. sourceDetail is the ad headline (META_AD) or an
   // import note (COLD_IMPORT); ctwaClid is Meta's click id, kept for future
   // ad-platform reporting but not acted on yet.
-  leadSource     LeadSource    @default(DIRECT)
-  sourceDetail   String?
-  ctwaClid       String?
+  leadSource      LeadSource    @default(DIRECT)
+  sourceDetail    String?
+  ctwaClid        String?
   // Set when the guest clicks a "Stop promos" quick-reply button or texts
   // STOP/UNSUBSCRIBE — a required opt-out mechanism under WhatsApp's
   // Business Messaging Policy. Suppresses campaign broadcasts and follow-up
   // nudges, but not the core AI concierge — a guest who opts out of
   // promotions should still get help if they message in on their own.
-  optedOutAt     DateTime?
-  updatedAt      DateTime      @updatedAt
+  optedOutAt      DateTime?
+  // The room/dates Anushka and the guest have converged on but not yet
+  // confirmed — a denormalized "current negotiation state," same pattern as
+  // aiSummary/bookingStatus above. Read at the "Confirm booking" tap to run
+  // a real-time availability check and populate the Booking row; cleared on
+  // a date conflict so the next answer is treated fresh. Not a booking
+  // itself — see the Booking model for that.
+  pendingRoomId   String?
+  pendingCheckIn  DateTime?
+  pendingCheckOut DateTime?
+  updatedAt       DateTime      @updatedAt
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignedTo         User?               @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -393,6 +408,13 @@ model Booking {
   offerSnapshot    String?
   roomId           String?
   roomNameSnapshot String?
+  // The actual stay dates, captured at confirmation time — used for
+  // real-time availability checking (see src/lib/booking/availability.ts).
+  // Nullable: a legacy booking made before this field existed, or one
+  // confirmed without structured dates ever being captured, simply doesn't
+  // block a room for any date range.
+  checkIn          DateTime?
+  checkOut         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -403,6 +425,7 @@ model Booking {
 
   @@unique([tenantId, referenceCode])
   @@index([tenantId, contactId])
+  @@index([roomId, checkIn, checkOut])
 }
 
 model Message {

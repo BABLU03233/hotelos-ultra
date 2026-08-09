@@ -45,6 +45,7 @@ export const offerSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).nullable().optional(),
   discount: z.string().max(100).nullable().optional(),
+  code: z.string().max(50).nullable().optional(),
   validFrom: z.string().datetime().nullable().optional(),
   validTo: z.string().datetime().nullable().optional(),
   active: z.boolean().optional(),

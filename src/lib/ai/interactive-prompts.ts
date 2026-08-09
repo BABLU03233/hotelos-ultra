@@ -27,6 +27,14 @@ export const ROOM_BOOK_BUTTON_ID = "room_book";
 // the model exactly which room's photos to send via the existing "IMAGE:
 // <url>" mechanism (see PHOTOS in pipeline.ts). No new plumbing needed.
 export const VIEW_PHOTOS_BUTTON_ID = "view_photos";
+// Handled deterministically — sends a real DB list of active offers, same
+// "don't trust a free-tier model to relay real data a second time" reasoning
+// as SEE_OTHER_ROOMS_BUTTON_ID.
+export const SHOW_OFFERS_BUTTON_ID = "show_offers";
+// GREET_MENU's third option — promoted from an inline literal to a named
+// export because handle-inbound-message.ts now routes this deterministically
+// too (shows the tenant's real FAQ list instead of free-texting through the AI).
+export const GREET_QUESTION_BUTTON_ID = "greet_question";
 
 export interface InteractivePrompt {
   buttons: { id: string; title: string }[];
@@ -78,7 +86,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
       // gets the exact same real-data List Message as tapping "See other
       // options" mid-RECOMMEND, no separate handling needed.
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "View rooms" },
-      { id: "greet_question", title: "Ask a question" },
+      { id: GREET_QUESTION_BUTTON_ID, title: "Ask a question" },
     ],
   },
   DATE_QUICK_PICK: {
@@ -87,6 +95,29 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
       { id: "dates_weekend", title: "This weekend" },
       { id: "dates_nextweek", title: "Next week" },
       { id: "dates_custom", title: "I'll type dates" },
+    ],
+  },
+  // HANDLE OBJECTIONS was 100% free-text before this — a guest pushing back
+  // on price got only prose, no tappable recovery path. Fires only after a
+  // room's already been named (see resolveStageKey), reusing the two
+  // already-deterministic handlers below rather than inventing new ones.
+  PRICE_OBJECTION: {
+    fallbackBody: "No worries — want a more budget-friendly option, or to see our current offers? 😊",
+    buttons: [
+      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See cheaper room" },
+      { id: SHOW_OFFERS_BUTTON_ID, title: "Show me offers" },
+      { id: "continue_anyway", title: "Continue anyway" },
+    ],
+  },
+  // Sent directly by the CONFIRM_BOOKING_BUTTON_ID handler in
+  // handle-inbound-message.ts, never through the AI/waterfall — that reply
+  // (the reference code) is never AI-generated. Closes the one moment in the
+  // whole flow that used to send as plain text with zero buttons.
+  POST_BOOKING: {
+    fallbackBody: "Anything else I can help with?",
+    buttons: [
+      { id: "post_booking_question", title: "I have a question" },
+      { id: "post_booking_done", title: "All set, thanks!" },
     ],
   },
 };
@@ -143,6 +174,17 @@ export function mentionsRoomPrice(text: string): boolean {
   return ROOM_PRICE_PATTERN.test(text);
 }
 
+// Covers price pushback AND offer/discount interest in one pattern — the two
+// overlap in practice ("that's expensive, any discount?") and the same
+// recovery buttons (cheaper room / see offers / continue anyway) serve both,
+// so there's no value in two separate detectors here.
+const PRICE_OR_OFFER_PATTERN =
+  /\b(expensive|costly|too much|pricey|discount|cheaper|lower price|any offers?|promo(tion)?s?|any deals?|coupon)\b/i;
+
+export function looksLikePriceOrOfferSignal(text: string): boolean {
+  return PRICE_OR_OFFER_PATTERN.test(text);
+}
+
 export function roomResponsePrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.ROOM_RESPONSE.buttons };
 }
@@ -153,6 +195,10 @@ export function guestCountPrompt(): InteractivePrompt {
 
 export function confirmBookingPrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.CONFIRM_BOOKING.buttons };
+}
+
+export function postBookingPrompt(): InteractivePrompt {
+  return { buttons: BUTTON_CATALOG.POST_BOOKING.buttons };
 }
 
 // A prompt-only "never recommend a room before you know guest count" rule
@@ -203,7 +249,7 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
 // itself decides (usually nothing, i.e. a normal conversational reply),
 // giving room for a genuine "how can I help" exchange first.
 const BOOKING_INTENT_PATTERN =
-  /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|check-?in|check-?out|accommodation)\b/i;
+  /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|check-?in|check-?out|accommodation|offers?|discounts?|deals?|promos?|coupons?)\b/i;
 
 // Real production conversation caught this: it only scanned the GUEST's own
 // words, but a real guest keeps replying in short, contentless
@@ -291,7 +337,15 @@ export function selectDeterministicInteractive(params: {
   return key ? promptForStageKey(key) : params.aiInteractive;
 }
 
-type StageKey = "LANGUAGE_SELECT" | "GREET_MENU" | "GUEST_COUNT" | "ROOM_RESPONSE" | "CONFIRM_BOOKING" | "DATE_QUICK_PICK" | null;
+type StageKey =
+  | "LANGUAGE_SELECT"
+  | "GREET_MENU"
+  | "GUEST_COUNT"
+  | "ROOM_RESPONSE"
+  | "PRICE_OBJECTION"
+  | "CONFIRM_BOOKING"
+  | "DATE_QUICK_PICK"
+  | null;
 
 function resolveStageKey(params: {
   isFirstReply: boolean;
@@ -318,6 +372,12 @@ function resolveStageKey(params: {
     }
     if (mentionsRoomPrice(replyText)) {
       return "ROOM_RESPONSE";
+    }
+    // Only fires post-recommendation — pre-recommendation, a price/offer
+    // question just falls through to the AI's normal (already grounded)
+    // prose reply below, no special-casing needed there.
+    if (roomMentionedEver && looksLikePriceOrOfferSignal(guestMessage)) {
+      return "PRICE_OBJECTION";
     }
     // Checked before the dates nudge, not after: dates detection is
     // necessarily broad/imprecise (guests phrase dates far more ways than
@@ -349,6 +409,8 @@ function promptForStageKey(key: StageKey): InteractivePrompt | undefined {
       return guestCountPrompt();
     case "ROOM_RESPONSE":
       return roomResponsePrompt();
+    case "PRICE_OBJECTION":
+      return { buttons: BUTTON_CATALOG.PRICE_OBJECTION.buttons };
     case "CONFIRM_BOOKING":
       return confirmBookingPrompt();
     case "DATE_QUICK_PICK":
@@ -410,8 +472,10 @@ export function predictedStageInstruction(params: {
       return "This reply's job: move toward learning how many people will be staying. \"Just me\" / \"2 people\" / \"3+ people\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
       return "This reply's job: move toward learning their dates. \"This weekend\" / \"Next week\" / \"I'll type dates\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask anything else in this same reply.";
+    case "PRICE_OBJECTION":
+      return "See cheaper room / Show me offers / Continue anyway buttons will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
     case "CONFIRM_BOOKING":
-      return "Confirm booking / Not yet buttons will automatically appear under your reply. Write a short, warm closing line, not a new question — and never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
+      return "Confirm booking / Not yet buttons will automatically appear under your reply. Write a short, warm closing line, not a new question — mention that tapping instantly gives them a real reference code to quote at check-in, with nothing to pay right now (pay at the counter when they arrive), so they know what tapping actually does. Never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
     default:
       // Nothing predictable — either no booking interest shown yet (plain
       // open chat) or genuinely nothing else applies; write normally.

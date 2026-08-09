@@ -25,4 +25,10 @@ describe("hasHallucinationRisk", () => {
     expect(hasHallucinationRisk("Our Classic Room starts from ₹999/night")).toBe(false);
     expect(hasHallucinationRisk("Get ₹100 off with our direct booking offer")).toBe(false);
   });
+
+  it("does not flag the new CLOSE-stage reference-code/pay-at-counter mention as a false confirmation", () => {
+    expect(hasHallucinationRisk("Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive! 🎉")).toBe(
+      false
+    );
+  });
 });

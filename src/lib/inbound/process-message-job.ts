@@ -1,5 +1,6 @@
 import { ChatMessage } from "@/lib/ai/provider";
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
+import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
@@ -83,7 +84,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     });
     return;
   }
-  const { reply, imageUrls, interactive, shouldEscalate, escalationReason, agentName } = generated;
+  const { reply, imageUrls, interactive, shouldEscalate, escalationReason, agentName, pendingDates } = generated;
 
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
@@ -161,12 +162,22 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
       agentName
     ).catch(() => contact.aiSummary ?? "");
 
+    // Real-time-availability capture (see availability.ts): a room match is
+    // only looked up when this reply actually names one, and only merged in
+    // when found -- a miss (0 or >1 rooms matched) leaves whatever was
+    // already pending untouched rather than clearing it out. Same for
+    // pendingDates: only present when the AI's DATES: marker fired this turn.
+    const rooms = await prisma.room.findMany({ where: { tenantId }, select: { id: true, name: true } });
+    const matchedRoomId = matchRecommendedRoom(reply, rooms);
+
     await prisma.contact.update({
       where: { id: contactId },
       data: {
         lastMessage: reply,
         aiSummary: summary,
         leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
+        ...(matchedRoomId ? { pendingRoomId: matchedRoomId } : {}),
+        ...(pendingDates ? { pendingCheckIn: pendingDates.checkIn, pendingCheckOut: pendingDates.checkOut } : {}),
       },
     });
 
