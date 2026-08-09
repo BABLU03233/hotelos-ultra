@@ -458,6 +458,22 @@ describe("selectDeterministicInteractive", () => {
     expect(obvious).toEqual(greetMenuPrompt());
   });
 
+  it("offers GREET_MENU right after a language-select tap, even though it's neither a first reply nor a bare greeting", () => {
+    // Real gap found tracing the full button journey end-to-end: tapping a
+    // LANGUAGE_SELECT button becomes the guest's next message ("English"),
+    // which isn't first-reply anymore, isn't a bare greeting, and has no
+    // booking-intent keyword -- without this case it fell through to no
+    // buttons at all, a dead end right after the funnel's first tap.
+    const english = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: false, guestMessage: "English" });
+    expect(english).toEqual(greetMenuPrompt());
+
+    const hindi = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: false, guestMessage: "हिंदी" });
+    expect(hindi).toEqual(greetMenuPrompt());
+
+    const telugu = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: false, guestMessage: "తెలుగు" });
+    expect(telugu).toEqual(greetMenuPrompt());
+  });
+
   it("does not treat a message with real content as a bare greeting, even if it starts with 'Hi'", () => {
     const result = selectDeterministicInteractive({
       ...base,

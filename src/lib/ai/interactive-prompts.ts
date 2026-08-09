@@ -308,6 +308,23 @@ function declinedDateQuickPick(text: string): boolean {
   return DECLINED_DATE_QUICK_PICK_PATTERN.test(text.trim());
 }
 
+// A real gap found tracing the full button journey end-to-end: tapping a
+// LANGUAGE_SELECT button (its content becomes the guest's message, e.g.
+// "English") isn't a bare greeting and isn't first-reply anymore (that already
+// fired to show LANGUAGE_SELECT itself), and has no booking-intent keyword —
+// so with no special case, the very next reply fell through to "null" (no
+// buttons at all), a dead end right after the first tap in the whole funnel.
+// A guest just told us their language explicitly, which is a *more*
+// certain signal than the general "obvious from script" heuristic
+// (languageObvious only catches Devanagari/Telugu script, so it'd stay
+// false even right after tapping "English"), so this always moves straight
+// to GREET_MENU rather than re-asking or falling silent.
+const LANGUAGE_SELECTED_PATTERN = /^(english|हिंदी|తెలుగు)$/i;
+
+function looksLikeLanguageSelection(text: string): boolean {
+  return LANGUAGE_SELECTED_PATTERN.test(text.trim());
+}
+
 export function greetMenuPrompt(): InteractivePrompt {
   return { buttons: BUTTON_CATALOG.GREET_MENU.buttons };
 }
@@ -393,6 +410,9 @@ function resolveStageKey(params: {
     }
   }
 
+  if (looksLikeLanguageSelection(guestMessage)) {
+    return "GREET_MENU";
+  }
   if (isFirstReply || looksLikeBareGreeting(guestMessage)) {
     return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
