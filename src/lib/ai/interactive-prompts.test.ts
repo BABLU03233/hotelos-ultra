@@ -30,8 +30,8 @@ describe("extractInteractivePrompt", () => {
     expect(result.text).toBe("How many guests will be staying?");
     expect(result.interactive?.buttons).toEqual([
       { id: "guests_1", title: "Just me" },
-      { id: "guests_2", title: "2 guests" },
-      { id: "guests_3plus", title: "3+ guests" },
+      { id: "guests_2", title: "2 people" },
+      { id: "guests_3plus", title: "3+ people" },
     ]);
   });
 
@@ -439,7 +439,7 @@ describe("predictedStageInstruction", () => {
 
   it("gives a GUEST_COUNT instruction once booking intent is shown but count is unknown", () => {
     const result = predictedStageInstruction({ ...base, guestMessage: "I'd like to book a room" });
-    expect(result).toContain("how many guests");
+    expect(result).toContain("how many people");
   });
 
   it("gives a DATE_QUICK_PICK instruction once guest count is known but dates and room are not", () => {

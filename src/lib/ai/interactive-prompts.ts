@@ -39,11 +39,11 @@ export interface InteractivePrompt {
 // and fail to send. Used only when the AI's own text is empty/whitespace.
 const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string }> = {
   GUEST_COUNT: {
-    fallbackBody: "How many guests will be staying? 😊",
+    fallbackBody: "How many people will be staying? 😊",
     buttons: [
       { id: "guests_1", title: "Just me" },
-      { id: "guests_2", title: "2 guests" },
-      { id: "guests_3plus", title: "3+ guests" },
+      { id: "guests_2", title: "2 people" },
+      { id: "guests_3plus", title: "3+ people" },
     ],
   },
   ROOM_RESPONSE: {
@@ -366,7 +366,7 @@ export function predictedStageInstruction(params: {
     case "GREET_MENU":
       return "This is the guest's very first message and their language is already clear from how they wrote. \"Book a room\" / \"View rooms\" / \"Ask a question\" buttons will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the buttons already are the question.";
     case "GUEST_COUNT":
-      return "This reply's job: move toward learning how many guests will be staying. \"Just me\" / \"2 guests\" / \"3+ guests\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask about dates or anything else in this same reply.";
+      return "This reply's job: move toward learning how many people will be staying. \"Just me\" / \"2 people\" / \"3+ people\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
       return "This reply's job: move toward learning their dates. \"This weekend\" / \"Next week\" / \"I'll type dates\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask anything else in this same reply.";
     case "CONFIRM_BOOKING":
