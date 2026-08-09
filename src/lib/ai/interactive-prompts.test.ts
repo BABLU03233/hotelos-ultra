@@ -119,6 +119,11 @@ describe("mentionsRoomPrice", () => {
     expect(mentionsRoomPrice("₹1499 / night for 2 guests")).toBe(true);
   });
 
+  it("detects the 'per night' phrasing, not just the slash form", () => {
+    expect(mentionsRoomPrice("The Deluxe Room is ₹1,299 per night")).toBe(true);
+    expect(mentionsRoomPrice("Rooms start from ₹1299 per night")).toBe(true);
+  });
+
   it("returns false when no price is mentioned", () => {
     expect(mentionsRoomPrice("Check-out is by 11:00 AM 🕚")).toBe(false);
     expect(mentionsRoomPrice("How many guests will be staying?")).toBe(false);
@@ -461,6 +466,30 @@ describe("hasExpressedBookingIntent", () => {
   it("finds intent stated earlier in history, not just the latest message", () => {
     const history = [{ role: "user", content: "hi, I want to book a room" }];
     expect(hasExpressedBookingIntent(history, "sure")).toBe(true);
+  });
+
+  it("finds intent from the assistant's own messages, not just the guest's", () => {
+    // Real production conversation: the guest only ever replied with terse
+    // acknowledgements ("Hi", "Photo s send", "S", "Yeah") that never match
+    // any keyword, while the assistant clearly established a booking
+    // conversation ("Which room would you like to see photos of?", "Let me
+    // send those photos over"). This must still count as intent.
+    const history = [
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Which room would you like to see photos of?" },
+      { role: "user", content: "Delax" },
+      { role: "assistant", content: "The Deluxe Room looks great! Let me send those photos over" },
+      { role: "user", content: "S" },
+    ];
+    expect(hasExpressedBookingIntent(history, "Yeah")).toBe(true);
+  });
+
+  it("still returns false for generic small talk even with assistant messages scanned", () => {
+    const history = [
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hi! I'm Anushka 😊 What brings you here today?" },
+    ];
+    expect(hasExpressedBookingIntent(history, "just browsing")).toBe(false);
   });
 });
 

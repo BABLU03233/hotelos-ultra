@@ -131,7 +131,13 @@ export function extractInteractivePrompt(text: string): { text: string; interact
 // the literal instruction in CONVERSATION FLOW's RECOMMEND step), so it's
 // used as a deterministic fallback in generateReply() below: only kicks in
 // when the AI's own marker decision-making produced nothing at all.
-const ROOM_PRICE_PATTERN = /₹[\d,]+\s*\/\s*night/i;
+// Real production data caught this too: the AI phrases this as often as
+// "₹1,299 per night" as it does "₹1,299/night", and the old pattern only
+// matched the slash form — silently missing roughly half of real room
+// recommendations and cascading into every check that depends on it
+// (roomMentionedEver, hasExpressedBookingIntent, the CONFIRM_BOOKING
+// trigger). Both phrasings now match.
+const ROOM_PRICE_PATTERN = /₹[\d,]+\s*(\/|\bper\b)\s*night/i;
 
 export function mentionsRoomPrice(text: string): boolean {
   return ROOM_PRICE_PATTERN.test(text);
@@ -199,10 +205,22 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
 const BOOKING_INTENT_PATTERN =
   /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|check-?in|check-?out|accommodation)\b/i;
 
+// Real production conversation caught this: it only scanned the GUEST's own
+// words, but a real guest keeps replying in short, contentless
+// acknowledgements ("Yeah", "S", "ok") once a conversation is already
+// underway — none of which ever match a keyword — while the whole
+// conversation is unmistakably about booking from the ASSISTANT's side
+// (naming rooms, sending photos, asking about dates). That mismatch
+// silently killed the intent gate deep into a real booking flow, well past
+// the "is this even the right stage" question this gate exists to answer.
+// Scanning assistant messages too fixes it without reopening the earlier
+// bug this gate was built to fix — a bare "Hi! I'm Anushka, what brings you
+// here?" greeting doesn't contain any of these keywords either, so it still
+// doesn't trigger the funnel prematurely.
 export function hasExpressedBookingIntent(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
-  const userTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage];
+  const allTexts = [...history.map((m) => m.content), latestGuestMessage];
   return (
-    userTexts.some((t) => BOOKING_INTENT_PATTERN.test(t)) ||
+    allTexts.some((t) => BOOKING_INTENT_PATTERN.test(t)) ||
     hasStatedGuestCount(history, latestGuestMessage) ||
     hasStatedDates(history, latestGuestMessage)
   );
