@@ -265,6 +265,12 @@ describe("hasStatedGuestCount", () => {
     expect(hasStatedGuestCount([], "3 logon ke liye Premium Room theek hai")).toBe(true);
   });
 
+  it("detects native Telugu-script guest counts -- a real gap found live: a guest typing entirely in Telugu script ('2 మంది కోసం ఈ వారాంతం') wasn't recognized by anything, since every existing pattern is \\b-anchored and JavaScript's \\b cannot anchor Telugu script at all", () => {
+    expect(hasStatedGuestCount([], "2 మంది కోసం రూమ్ కావాలి")).toBe(true);
+    expect(hasStatedGuestCount([], "ఇద్దరు వస్తారు")).toBe(true);
+    expect(hasStatedGuestCount([], "ముగ్గురు ఉంటారు")).toBe(true);
+  });
+
   it("detects numbers spelled as words when paired with a noun -- a real gap found live: 'two people please' wasn't recognized at all since the pattern required a digit", () => {
     expect(hasStatedGuestCount([], "two people please")).toBe(true);
     expect(hasStatedGuestCount([], "three guests")).toBe(true);
@@ -348,6 +354,12 @@ describe("hasStatedDates", () => {
   it("detects 'in N days' -- a real gap found live: this wholly relative phrasing had no anchor at all, risking the same stuck-loop class of bug as the guest-count gap above", () => {
     expect(hasStatedDates([], "in 3 days")).toBe(true);
     expect(hasStatedDates([], "we can come in 10 days")).toBe(true);
+  });
+
+  it("detects native Telugu-script dates -- same real gap as the Telugu guest-count case: \\b cannot anchor Telugu script, so a guest typing 'ఈ వారాంతం' (this weekend) or 'రేపు' (tomorrow) wasn't recognized at all", () => {
+    expect(hasStatedDates([], "ఈ వారాంతం రూమ్ కావాలి")).toBe(true);
+    expect(hasStatedDates([], "రేపు వస్తాము")).toBe(true);
+    expect(hasStatedDates([], "వచ్చే వారం రావాలని అనుకుంటున్నాము")).toBe(true);
   });
 
   it("detects day and month names", () => {
@@ -706,6 +718,12 @@ describe("hasExpressedBookingIntent", () => {
   it("treats an already-stated guest count or date as booking intent", () => {
     expect(hasExpressedBookingIntent([], "2 guests")).toBe(true);
     expect(hasExpressedBookingIntent([], "this weekend")).toBe(true);
+  });
+
+  it("detects booking intent expressed entirely in Telugu script, even with no count/date given yet -- a real gap found live: 'రూమ్ కావాలి' (need a room) wasn't recognized at all, since BOOKING_INTENT_PATTERN only ever matched Latin-script words", () => {
+    expect(hasExpressedBookingIntent([], "రూమ్ కావాలి")).toBe(true);
+    expect(hasExpressedBookingIntent([], "ధర ఎంత")).toBe(true);
+    expect(hasExpressedBookingIntent([], "రూమ్ అందుబాటులో ఉందా")).toBe(true);
   });
 
   it("returns false for plain small talk with no booking signal", () => {

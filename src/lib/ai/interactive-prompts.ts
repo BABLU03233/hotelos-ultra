@@ -321,6 +321,26 @@ export function postBookingPrompt(): InteractivePrompt {
 const GUEST_COUNT_STATED_PATTERN =
   /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|(one|two|three|four|five|six|seven|eight|nine|ten)\s*(guests?|people|persons?|pax|adults?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|group of \d+|we are \d+|there(?:'s| is) \d+ of us|we'?re a couple\b|just the two of us\b|couple of us\b|me and my (wife|husband|partner|girlfriend|boyfriend)\b|(ek|do|teen|char|chaar|paanch|che|chhe|saat|aath|nau|das|dus)\s*log\b(?!\s*in)|(myself|me)\s*\+\s*\d+\b|\d+\s*including me\b)/i;
 
+// A guest typing a full sentence in native Telugu script ("2 మంది కోసం ఈ
+// వారాంతం" -- "for 2 people this weekend") wasn't recognized by ANYTHING
+// above at all -- a real, live-caught gap, and a different KIND of gap than
+// the Hindi/Hinglish work: this file's patterns are all ASCII \b-anchored,
+// and JavaScript's \b is fundamentally Latin-script-only -- it does not
+// treat Telugu characters as "word characters," so \b silently fails to
+// match even immediately before/after a Telugu word (confirmed directly:
+// /\b(వారాంతం)\b/.test("వారాంతం") is false on its own, standalone, with
+// nothing else in the string). Simply adding Telugu alternatives inside the
+// existing \b-wrapped patterns above would have looked like a fix while
+// actually matching nothing. Kept as an entirely separate, unanchored
+// pattern instead and OR'd into the result -- correct in every position
+// Telugu script can appear, exactly because it never depends on \b at all.
+// "మంది" is the counting classifier that always follows a person-count in
+// Telugu (2 మంది = "2 people"); ఇద్దరు/ముగ్గురు/నలుగురు/ఐదుగురు are the
+// specific person-counting number words for 2/3/4/5 (distinct from the
+// ordinary cardinal numbers), commonly used standalone without needing
+// మంది attached.
+const TELUGU_GUEST_COUNT_PATTERN = /\d+\+?\s*మంది|ఒక్కరు|ఒకరు|ఇద్దరు|ముగ్గురు|నలుగురు|ఐదుగురు/;
+
 // The single most severe gap live-caught this pass: a guest replying with
 // JUST a bare number ("2") right after being asked "how many people will be
 // staying?" -- an extremely common, natural WhatsApp reply style -- wasn't
@@ -344,8 +364,8 @@ function lastAssistantMessageAskedGuestCount(history: { role: string; content: s
 }
 
 export function hasStatedGuestCount(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
-  const explicit = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
-    GUEST_COUNT_STATED_PATTERN.test(t)
+  const explicit = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some(
+    (t) => GUEST_COUNT_STATED_PATTERN.test(t) || TELUGU_GUEST_COUNT_PATTERN.test(t)
   );
   if (explicit) return true;
 
@@ -401,9 +421,20 @@ export function hasStatedGuestCount(history: { role: string; content: string }[]
 const DATE_STATED_PATTERN =
   /\b(weekend|tonight|tomorrow|today|next week|this week|in \d+\s*days?|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th))\b/i;
 
+// Native Telugu-script date words -- same reasoning and same \b pitfall as
+// TELUGU_GUEST_COUNT_PATTERN above: JavaScript's \b cannot anchor Telugu
+// script at all, so this has to be its own unanchored pattern, never merged
+// into the \b-wrapped one above. "మే" (May) is deliberately not included
+// standalone -- at 2 characters it's too short a substring to safely match
+// without word-boundary protection, a real false-positive risk this file's
+// own philosophy elsewhere warns against; every other month name is long
+// enough to be safe.
+const TELUGU_DATE_PATTERN =
+  /వారాంతం|రేపు|ఈ ?రోజు|నేడు|వచ్చే వారం|ఈ వారం|సోమవారం|మంగళవారం|బుధవారం|గురువారం|శుక్రవారం|శనివారం|ఆదివారం|జనవరి|ఫిబ్రవరి|మార్చి|ఏప్రిల్|జూన్|జూలై|ఆగస్టు|సెప్టెంబర్|అక్టోబర్|నవంబర్|డిసెంబర్/;
+
 export function hasStatedDates(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
-  return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
-    DATE_STATED_PATTERN.test(t)
+  return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some(
+    (t) => DATE_STATED_PATTERN.test(t) || TELUGU_DATE_PATTERN.test(t)
   );
 }
 
@@ -430,6 +461,15 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
 // meaningfully weakening real intent detection.
 const BOOKING_INTENT_PATTERN =
   /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|accommodation|offers?|discounts?|deals?|promos?|coupons?)\b/i;
+
+// Same \b-cannot-anchor-Telugu reasoning as the guest-count/date patterns
+// above -- a guest expressing booking interest entirely in Telugu script
+// ("రూమ్ కావాలి" -- "need a room") wasn't recognized at all, since
+// BOOKING_INTENT_PATTERN only ever matched Latin-script words. "రూమ్"/"బుక్"
+// are the common loanword spellings (room/book, written in Telugu script);
+// కావాలి = want/need, అందుబాటులో = available, దొరుకుతుందా = "is it
+// available?", ధర/రేటు = price/rate, ఆఫర్ = offer (loanword).
+const TELUGU_BOOKING_INTENT_PATTERN = /రూమ్|బుక్|కావాలి|అందుబాటులో|దొరుకుతుందా|ధర|రేటు|ఆఫర్/;
 
 // Live-caught: "I need to cancel my booking, reference HOT-9999" matched
 // BOOKING_INTENT_PATTERN via the word "booking" itself, then got funneled
@@ -461,7 +501,7 @@ function looksLikeExistingBookingRequest(text: string): boolean {
 export function hasExpressedBookingIntent(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
   const allTexts = [...history.map((m) => m.content), latestGuestMessage];
   return (
-    allTexts.some((t) => BOOKING_INTENT_PATTERN.test(t)) ||
+    allTexts.some((t) => BOOKING_INTENT_PATTERN.test(t) || TELUGU_BOOKING_INTENT_PATTERN.test(t)) ||
     hasStatedGuestCount(history, latestGuestMessage) ||
     hasStatedDates(history, latestGuestMessage)
   );
