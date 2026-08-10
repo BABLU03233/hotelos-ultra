@@ -153,6 +153,12 @@ describe("mentionsRoomPrice", () => {
     expect(mentionsRoomPrice("Starts from Rs 1,299 per night")).toBe(true);
     expect(mentionsRoomPrice("INR 999/night for 2 guests")).toBe(true);
   });
+
+  it("catches the ₹ symbol paired with a translated 'night' word -- live-caught: a Telugu reply kept ₹ but wrote '/రాత్రి' instead of '/night'", () => {
+    expect(mentionsRoomPrice("మా ప్రీమియం రూమ్ ₹1,599/రాత్రి నుండి మొదలవుతుంది")).toBe(true);
+    expect(mentionsRoomPrice("Room available hai, ₹2500/रात्रि se start hota hai")).toBe(true);
+    expect(mentionsRoomPrice("₹999 per रात के लिए")).toBe(true);
+  });
 });
 
 describe("looksLikePriceOrOfferSignal", () => {

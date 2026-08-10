@@ -226,13 +226,17 @@ export function extractInteractivePrompt(text: string): { text: string; interact
 // very next turn hallucinated a guest's genuinely future date as "already
 // passed" with zero recovery buttons attached -- the exact class of bug the
 // DATES rule in pipeline.ts calls out as serious, just reached through a
-// missed price detection instead of a misread guest date. Regex can't
-// reliably cover every language's currency marker and "per night" phrasing,
-// so the primary fix is a system-prompt rule mandating the literal
-// "₹<amount>/night" format verbatim in every language (see pipeline.ts's
-// RULES section); "Rs."/"INR" are added here only as a realistic
-// English/Hinglish-side backstop for when that instruction isn't followed.
-const ROOM_PRICE_PATTERN = /(₹|rs\.?|inr)\s*[\d,]+\s*(\/|\bper\b)\s*night/i;
+// missed price detection instead of a misread guest date. The primary fix
+// is a system-prompt rule mandating the literal "₹<amount>/night" format
+// verbatim in every language (see pipeline.ts's RULES section), but a live
+// re-test (3 identical Telugu attempts, same conversation) found that rule
+// alone only holds ~2/3 of the time -- one reply kept the ₹ symbol but still
+// translated "/night" into "/రాత్రి" (Telugu for "night"). Same stochastic
+// ~50% class of prompt-only miss already documented above for the English
+// marker, just one language over, so "night" itself is now translated here
+// too rather than trusting compliance alone. "Rs."/"INR" cover the
+// realistic English/Hinglish-side currency variant.
+const ROOM_PRICE_PATTERN = /(₹|rs\.?|inr)\s*[\d,]+\s*(\/|\bper\b)\s*(night|రాత్రి|रात्रि|रात)/i;
 
 export function mentionsRoomPrice(text: string): boolean {
   return ROOM_PRICE_PATTERN.test(text);
