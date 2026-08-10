@@ -264,6 +264,37 @@ describe("hasStatedGuestCount", () => {
     expect(hasStatedGuestCount([], "2 log ke liye room chahiye is weekend")).toBe(true);
     expect(hasStatedGuestCount([], "3 logon ke liye Premium Room theek hai")).toBe(true);
   });
+
+  it("detects numbers spelled as words when paired with a noun -- a real gap found live: 'two people please' wasn't recognized at all since the pattern required a digit", () => {
+    expect(hasStatedGuestCount([], "two people please")).toBe(true);
+    expect(hasStatedGuestCount([], "three guests")).toBe(true);
+  });
+
+  it("detects 'couple'/'two of us' phrasings for a headcount of 2", () => {
+    expect(hasStatedGuestCount([], "we're a couple")).toBe(true);
+    expect(hasStatedGuestCount([], "just the two of us")).toBe(true);
+    expect(hasStatedGuestCount([], "me and my wife")).toBe(true);
+  });
+
+  it("does NOT treat a bare 'couple' idiom (e.g. 'a couple of minutes') as a guest count", () => {
+    expect(hasStatedGuestCount([], "give me a couple minutes to decide")).toBe(false);
+  });
+
+  it("recognizes a bare number as a guest count ONLY when it directly follows a 'how many guests' question -- the single most severe gap found live: a guest replying just '2' (an extremely common WhatsApp reply style) was never recognized, creating a genuine stuck loop where the same question re-fired forever", () => {
+    const history = [{ role: "assistant", content: "How many people will be staying? 😊" }];
+    expect(hasStatedGuestCount(history, "2")).toBe(true);
+    expect(hasStatedGuestCount(history, "two")).toBe(true);
+    expect(hasStatedGuestCount(history, "3+")).toBe(true);
+  });
+
+  it("does NOT treat a bare number as a guest count when it wasn't asked -- too ambiguous out of context (could be a room number, a price, anything)", () => {
+    const history = [{ role: "assistant", content: "Which room would you like to see photos of?" }];
+    expect(hasStatedGuestCount(history, "2")).toBe(false);
+  });
+
+  it("does NOT treat a bare number as a guest count with no prior assistant message at all", () => {
+    expect(hasStatedGuestCount([], "2")).toBe(false);
+  });
 });
 
 describe("hasStatedDates", () => {
@@ -271,6 +302,11 @@ describe("hasStatedDates", () => {
     expect(hasStatedDates([], "this weekend")).toBe(true);
     expect(hasStatedDates([], "next week works")).toBe(true);
     expect(hasStatedDates([], "tomorrow night")).toBe(true);
+  });
+
+  it("detects 'in N days' -- a real gap found live: this wholly relative phrasing had no anchor at all, risking the same stuck-loop class of bug as the guest-count gap above", () => {
+    expect(hasStatedDates([], "in 3 days")).toBe(true);
+    expect(hasStatedDates([], "we can come in 10 days")).toBe(true);
   });
 
   it("detects day and month names", () => {
@@ -759,6 +795,15 @@ describe("resolveDeterministicReply", () => {
     const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room" });
     expect(result?.text).toBe("How many people will be staying? 😊");
     expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+
+  it("returns null (lets the AI actually answer) for a genuine question, even once booking intent is already shown -- a real gap found live: 'am I talking to a real person or a bot?' was silently swallowed and funneled straight into 'how many people will be staying?' just because the assistant's own earlier message had mentioned 'book a room'", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "am I talking to a real person or a bot?",
+      history: [{ role: "assistant", content: "Are you looking to book a room with us today? 😊" }],
+    });
+    expect(result).toBeNull();
   });
 
   it("gives a fixed DATE_QUICK_PICK reply once guest count is known", () => {

@@ -291,13 +291,45 @@ export function postBookingPrompt(): InteractivePrompt {
 // — exactly the pattern this file's own system prompt tells the AI to
 // expect from real Hyderabad WhatsApp chats (see pipeline.ts's LANGUAGE
 // section), so the deterministic side needs to expect it too.
+// "two people"/"couple" phrasings are a further live-caught gap: numbers
+// spelled as words ("two people please") weren't recognized at all since
+// the pattern required a digit, and "we're a couple"/"just the two of us"
+// are extremely common, unambiguous ways a guest states a headcount of 2.
+// Deliberately specific phrasings for "couple" rather than the bare word --
+// "a couple of minutes/days" is a common, unrelated idiom for "a few," so
+// matching bare "couple" anywhere would risk exactly the false-positive
+// this file's own philosophy above warns against.
 const GUEST_COUNT_STATED_PATTERN =
-  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us)/i;
+  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|(one|two|three|four|five|six|seven|eight|nine|ten)\s*(guests?|people|persons?|pax|adults?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us|we'?re a couple\b|just the two of us\b|couple of us\b|me and my (wife|husband|partner|girlfriend|boyfriend)\b)/i;
+
+// The single most severe gap live-caught this pass: a guest replying with
+// JUST a bare number ("2") right after being asked "how many people will be
+// staying?" -- an extremely common, natural WhatsApp reply style -- wasn't
+// recognized at all, and since resolveStageKey's GUEST_COUNT check fires
+// unconditionally whenever count still looks unknown, this created a genuine
+// stuck loop: the exact same "how many people?" question re-fired forever,
+// no matter what the guest said next, since nothing downstream (dates, a
+// room) can ever be reached while guest count still looks unstated.
+// Deliberately NOT matched unconditionally like the phrases above -- a bare
+// number alone is too ambiguous out of context (could be a room number, a
+// price, anything) to safely assume everywhere the way "2 people" can.
+// Only trusted when the immediately preceding assistant message actually
+// asked about guest count, checked via content rather than plumbing the
+// stage key through every layer of these text-only scanners.
+const BARE_COUNT_REPLY_PATTERN = /^(\d{1,2}\+?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(guests?|people|persons?|pax)?[.!?]?$/i;
+const ASKED_GUEST_COUNT_PATTERN = /how many (people|guests|persons)|kitne (guests|log)/i;
+
+function lastAssistantMessageAskedGuestCount(history: { role: string; content: string }[]): boolean {
+  const lastAssistant = [...history].reverse().find((m) => m.role === "assistant");
+  return lastAssistant ? ASKED_GUEST_COUNT_PATTERN.test(lastAssistant.content) : false;
+}
 
 export function hasStatedGuestCount(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
-  return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
+  const explicit = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
     GUEST_COUNT_STATED_PATTERN.test(t)
   );
+  if (explicit) return true;
+  return lastAssistantMessageAskedGuestCount(history) && BARE_COUNT_REPLY_PATTERN.test(latestGuestMessage.trim());
 }
 
 // Same "broad on purpose" reasoning as guest count — dates are phrased in
@@ -319,8 +351,13 @@ export function hasStatedGuestCount(history: { role: string; content: string }[]
 // fri(day)?, ...) -- needed so "Aug" and "August" both still match, since a
 // blanket trailing boundary alone would otherwise break the intentional
 // prefix-of-a-full-month-name case too.
+// "in N days" is a further live-caught gap: a wholly relative phrasing with
+// no weekday/month/numeric-date anchor at all -- without it, a guest saying
+// "in 3 days" fell through every alternative and re-triggered the exact
+// same stuck-loop risk as the guest-count gap above (the dates prompt
+// re-firing forever since nothing ever satisfies hasStatedDates).
 const DATE_STATED_PATTERN =
-  /\b(weekend|tonight|tomorrow|today|next week|this week|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th))\b/i;
+  /\b(weekend|tonight|tomorrow|today|next week|this week|in \d+\s*days?|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th))\b/i;
 
 export function hasStatedDates(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
@@ -681,6 +718,23 @@ export function resolveDeterministicReply(params: {
 
   const key = resolveStageKey({ ...params, replyText: "" });
   if (!key || !DETERMINISTIC_STAGE_KEYS.has(key)) return null;
+
+  // Live-caught, a more general case of the same bug the check-in/check-out
+  // fix above addresses: once booking intent is EVER shown (even just from
+  // the assistant's own opening line mentioning "book a room"), it stays
+  // true for the rest of the conversation, so GUEST_COUNT/DATE_QUICK_PICK
+  // fire unconditionally on every later turn regardless of what THIS
+  // specific message actually says -- a guest asking "am I talking to a
+  // real person or a bot?" got silently swallowed and re-funneled into
+  // "how many people will be staying?" instead of getting answered. A
+  // guest message that's phrased as a genuine question (ends in "?") and
+  // doesn't itself contain a guest-count/date answer is far more likely to
+  // be a real question than an attempt to fill in the missing slot -- skip
+  // the deterministic bypass so the AI actually engages with it; the
+  // waterfall still re-attaches the right buttons afterward based on what
+  // the AI's real reply ends up saying, same mechanism ROOM_RESPONSE and
+  // CONFIRM_BOOKING already rely on.
+  if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && params.guestMessage.trim().endsWith("?")) return null;
 
   const entry = BUTTON_CATALOG[key];
   let text: string;
