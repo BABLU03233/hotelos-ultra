@@ -22,32 +22,40 @@ import { retrieveRelevantChunks } from "./rag";
 import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK, stripUnapprovedUrls } from "./reply-safety";
 import { sambanovaProvider } from "./sambanova-provider";
 
-// Curated OpenRouter free-tier models for the fallback tier below, ordered
-// by actual observed speed/reliability across two live test runs against
-// production's real key (scripts/test-openrouter-models.ts), not just
-// catalog listing. "nvidia/nemotron-nano-30b-a3b:free" turned out to be an
-// invalid model ID (400 from OpenRouter, despite being listed) and
-// "openai/gpt-oss-20b:free" came back slow *and* empty (a reasoning model
-// that burned its whole token budget on hidden reasoning) — both dropped.
-// Of the remaining four, "nemotron-nano-9b-v2" and "gemma-4-26b-a4b-it"
-// answered successfully in both runs (nano-9b in 400-600ms); "laguna-xs-2.1"
-// and "nemotron-nano-12b-v2-vl" answered once but timed out the other time —
-// real free-tier flakiness, not a fluke, so they're kept (still free
-// redundancy) but moved behind the two that were consistently reliable.
-// (openrouter-provider.ts throws on a 200-with-blank-content response
-// instead of treating it as success, so a flaky model fails over fast
-// rather than risking a blank WhatsApp message reaching a guest.) Excludes
-// narrow specialists (a content-safety classifier, a code-only model)
-// unsuited to a general conversational reply. The whole list is
-// env-overridable (comma-separated `OPENROUTER_FREE_MODELS`) so a
-// deprecated/rate-limited entry can be swapped without a code change.
+// Curated OpenRouter free-tier models for the fallback tier below. Ordering
+// is re-verified periodically against real production traffic, not assumed
+// stable — free-tier model availability on OpenRouter is genuinely volatile
+// day to day, not just noisy: a 2026-08-10 re-test (isolating each model
+// directly, real system prompt, 4 realistic scenarios including the exact
+// hallucination-risk and script-matching cases this session caught real
+// providers failing) found the OPPOSITE ranking from the 2026-08-09 test
+// this comment previously documented. "poolside/laguna-xs-2.1" went 4/4
+// with zero hallucinations (correctly said "I don't have that information"
+// on an unlisted amenity rather than inventing one, correctly stayed in
+// Roman-script Hinglish) -- moved to first. "nvidia/nemotron-nano-9b-v2"
+// and "nvidia/nemotron-nano-12b-v2-vl" each timed out 3 of 4 times (the one
+// success from each was good quality, so kept, just not relied on first).
+// "google/gemma-4-26b-a4b-it" failed all 4 (timeout once, rate-limited the
+// rest) -- moved last rather than dropped, since a currently-bad model can
+// recover next time this is re-checked. "nvidia/nemotron-nano-30b-a3b:free"
+// turned out to be an invalid model ID (400 from OpenRouter, despite being
+// listed) and "openai/gpt-oss-20b:free" came back slow *and* empty (a
+// reasoning model that burned its whole token budget on hidden reasoning) —
+// both dropped entirely, not just reordered. (openrouter-provider.ts throws
+// on a 200-with-blank-content response instead of treating it as success,
+// so a flaky model fails over fast rather than risking a blank WhatsApp
+// message reaching a guest.) Excludes narrow specialists (a content-safety
+// classifier, a code-only model) unsuited to a general conversational
+// reply. The whole list is env-overridable (comma-separated
+// `OPENROUTER_FREE_MODELS`) so a deprecated/rate-limited entry can be
+// swapped without a code change.
 const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
   .map((m) => m.trim())
   .filter(Boolean) ?? [
-  "nvidia/nemotron-nano-9b-v2:free",
-  "google/gemma-4-26b-a4b-it:free",
   "poolside/laguna-xs-2.1:free",
+  "nvidia/nemotron-nano-9b-v2:free",
   "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-26b-a4b-it:free",
 ];
 
 // Tries each configured provider in order and falls through on failure
