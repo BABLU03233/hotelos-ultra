@@ -625,7 +625,19 @@ function resolveStageKey(params: {
   if (looksLikeLanguageSelection(guestMessage)) {
     return "GREET_MENU";
   }
-  if (isFirstReply || looksLikeBareGreeting(guestMessage)) {
+  // Live-caught: gated on !intentShown for the same reason the comment
+  // above this whole block explains, just a case that comment's own fix
+  // didn't fully close. A guest's rich first message ("Hi, 2 guests, need a
+  // room this weekend") can lead the AI to ask a narrower clarifying
+  // question (e.g. "which exact weekend date?") rather than naming a room
+  // outright -- count and dates are both already known so GUEST_COUNT/
+  // DATE_QUICK_PICK correctly don't fire, and no price has been named yet
+  // so ROOM_RESPONSE/CONFIRM_BOOKING don't either, so NOTHING in the block
+  // above claims this turn -- it fell all the way through to here, where
+  // isFirstReply alone was enough to wrongly attach LANGUAGE_SELECT under a
+  // reply that has nothing to do with language. Real booking intent already
+  // being shown means this was never actually a blank first message.
+  if (!intentShown && (isFirstReply || looksLikeBareGreeting(guestMessage))) {
     return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
   return null;

@@ -16,7 +16,7 @@ import {
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK, stripUnapprovedUrls } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
 
 // Curated OpenRouter free-tier models for the fallback tier below. Ordering
 // is re-verified periodically against real production traffic, not assumed
@@ -268,6 +268,8 @@ RULES
 - If you don't have enough information to answer confidently, reply with EXACTLY: "${ESCALATE_MARKER} <one short reason>" and nothing else — a staff member will take over from there.
 - Frame prices as "starting from" — a team member confirms exact availability and the final rate.
 - Whenever you name a room's price, write it in EXACTLY this format: ₹<amount>/night (e.g. ₹1,299/night) — the literal ₹ symbol and "/night", never translated or reformatted (not "Rs.", not "రూ.", not "प्रति रात्रि"), even when the rest of your reply is in Hindi or Telugu. The app's own logic detects this exact format to know a price was just quoted — writing it any other way silently breaks what happens next in the conversation.
+- Room prices are FIXED — the same rate every day, exactly as listed in ROOMS above. Never invent a different rate for a specific day, "tomorrow's price," a "weekday rate," or any other day-specific/dynamic pricing — that concept doesn't exist for this hotel. The only way a price is ever lower is one of the real offers listed in CURRENT OFFERS above, applied correctly to the room's real listed price.
+- Never say you'll "send a link" for anything (booking, payment, photos, or otherwise) — this app has no such feature. A booking is completed only by the guest tapping Confirm booking; photos are sent directly in the chat, not via a link.
 - When a guest asks for the address, location, directions, or "where are you" / "where is it," reply with ONLY the Google Maps link above (if one is set) — send it as a bare URL on its own line, exactly as listed, with nothing before or after it. No "here's our location," no address text, no extra sentence — just the link, that's the whole reply.
 - Never send any other link or URL — no website, booking site, review site, social media, or search link — for any reason, even if a guest asks for one. The Google Maps link above (only when asked for the address) is the only URL you ever send.
 - Short and sweet, ALWAYS — this is the rule you break the least, and the one guests notice fastest when it's broken. A lead reading WhatsApp on their phone will not read a paragraph — assume they'll skim past anything longer than two lines. One short sentence is the default and is genuinely enough most of the time. Two sentences is already a long reply. Three is the hard ceiling, and only when the question truly can't be answered in less. Lead with the single most useful or exciting thing first (the answer, the offer, the room), then stop — don't follow it with a second sentence just to round the reply out. Never restate what the guest just told you back to them ("Got it, you're looking for a room for 2 guests this weekend" — they already know what they said; just answer). Never repeat information you already gave them earlier in this same conversation. If you catch yourself explaining, justifying, or narrating why you're asking something — delete that clause. Never say things like "so I can help you better," "that way I can recommend the best room for you," or "to give you accurate info" — just ask the question or give the answer directly, the way a real person texting never explains their own thinking. No markdown formatting.
@@ -370,7 +372,11 @@ export async function generateReply(
     messages: [...history, { role: "user", content: guestMessage }],
   });
 
-  const trimmed = reply.trim();
+  // Stripped first, before anything else touches the raw reply -- a leaked
+  // <think> block (or an orphaned "</think>") could otherwise interfere
+  // with the ESCALATE_MARKER check right below it, not just the guest-
+  // facing text further down.
+  const trimmed = stripThinkingArtifacts(reply).trim();
   if (trimmed.startsWith(ESCALATE_MARKER)) {
     return {
       reply: "Thanks for your message — let me get one of our team to help with that, they'll be with you shortly!",

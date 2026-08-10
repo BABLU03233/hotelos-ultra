@@ -81,3 +81,28 @@ export function stripUnapprovedUrls(text: string, approvedUrls: Set<string> = ne
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+const THINK_BLOCK_PATTERN = /<think>[\s\S]*?<\/think>/gi;
+const ORPHANED_THINK_CLOSE_PATTERN = /^[\s\S]*?<\/think>/i;
+
+/**
+ * Some free-tier "reasoning" models occasionally leak their internal
+ * <think>...</think> scratch-work straight into the guest-facing reply
+ * instead of keeping it out of the visible completion -- live-caught in a
+ * Hindi conversation: the reply contained an orphaned "</think>" mid-
+ * sentence (no matching opening tag ever appeared in the visible text, so
+ * the model's provider likely truncated/misrouted the reasoning channel),
+ * immediately followed by what looked like the model re-answering from
+ * scratch. Handles both the well-formed case (a full <think>...</think>
+ * block, stripped whole) and the orphaned-closing-tag case (strips
+ * everything up to and including the first "</think>", keeping only what
+ * comes after it -- in the live-caught case this alone was already a
+ * complete, correct answer on its own).
+ */
+export function stripThinkingArtifacts(text: string): string {
+  let cleaned = text.replace(THINK_BLOCK_PATTERN, "").trim();
+  if (cleaned.includes("</think>")) {
+    cleaned = cleaned.replace(ORPHANED_THINK_CLOSE_PATTERN, "").trim();
+  }
+  return cleaned;
+}

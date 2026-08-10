@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk, stripUnapprovedUrls } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
 
 describe("hasHallucinationRisk", () => {
   it("detects a fabricated Indian phone number in +91 format", () => {
@@ -76,5 +76,26 @@ describe("stripUnapprovedUrls", () => {
     expect(stripUnapprovedUrls("Directions: https://maps.app.goo.gl/xxxxx, or check reviews at fakereviews.com", approved)).toBe(
       "Directions: https://maps.app.goo.gl/xxxxx, or check reviews at"
     );
+  });
+});
+
+describe("stripThinkingArtifacts", () => {
+  it("strips a well-formed <think>...</think> block entirely", () => {
+    expect(stripThinkingArtifacts("<think>let me consider the room options</think>Our Deluxe Room starts from ₹1,299/night")).toBe(
+      "Our Deluxe Room starts from ₹1,299/night"
+    );
+  });
+
+  it("strips an orphaned closing </think> tag (no matching opening tag) and everything before it -- the exact live-caught case: a Hindi reply had a stray '</think>' mid-sentence with no opening tag in the visible text", () => {
+    const raw = "Dekhne aaya hai kya?</think>Perfect! 15-16 August weekend hai. ✓";
+    expect(stripThinkingArtifacts(raw)).toBe("Perfect! 15-16 August weekend hai. ✓");
+  });
+
+  it("leaves normal text with no thinking artifacts untouched", () => {
+    expect(stripThinkingArtifacts("Our Classic Room starts from ₹999/night 🛏️")).toBe("Our Classic Room starts from ₹999/night 🛏️");
+  });
+
+  it("handles multiple think blocks in one reply", () => {
+    expect(stripThinkingArtifacts("<think>a</think>Hello <think>b</think>there!")).toBe("Hello there!");
   });
 });

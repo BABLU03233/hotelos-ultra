@@ -468,6 +468,17 @@ describe("selectDeterministicInteractive", () => {
     expect(result).toEqual(roomResponsePrompt());
   });
 
+  it("does NOT attach LANGUAGE_SELECT when a rich first message already has count+dates but the AI's reply is a narrower clarifying question (no price yet) -- a real gap the fix above didn't fully close: nothing else in the waterfall claims this turn (count/dates already known so those don't fire, no price yet so ROOM_RESPONSE/CONFIRM_BOOKING don't either), so it fell through to isFirstReply alone wrongly attaching a language picker under a reply about which exact date", () => {
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: true,
+      languageObvious: false,
+      guestMessage: "Hi, 2 guests, need a room this weekend",
+      replyText: "Which specific dates are you looking at -- Friday 11th to Sunday 12th, or Saturday 12th to Sunday 13th?",
+    });
+    expect(result).toBeUndefined();
+  });
+
   it("offers GUEST_COUNT (not LANGUAGE_SELECT/GREET_MENU) on a rich first reply where only guest count is missing", () => {
     const result = selectDeterministicInteractive({
       ...base,
