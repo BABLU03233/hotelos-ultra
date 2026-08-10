@@ -212,12 +212,26 @@ async function buildSystemPrompt(
     interactiveState && guestDateLooksPast(interactiveState.guestMessage, now)
       ? `\nURGENT: the guest's last message contains a date that, read day-first, is already before today (${todayFormatted}). Do NOT treat it as valid or check availability for it — tell them plainly that date has already passed and ask them to confirm what they meant.\n`
       : "";
+  // Symmetric case, live-caught: a DATE_QUICK_PICK tap ("This weekend",
+  // "Tomorrow", ...) arrives as the guest's message already rewritten to a
+  // concrete, human-readable label by resolveQuickPickDates -- which by
+  // construction can NEVER resolve to a past date. A weaker fallback model
+  // still occasionally second-guessed one of these and told the guest their
+  // genuinely future date had "already passed" (same failure class as the
+  // URGENT warning above guards against, just the opposite direction and
+  // with no code-level trigger to catch it, since guestDateLooksPast only
+  // matches raw numeric dates the guest typed themselves). An explicit
+  // reassurance closes that gap the same way the warning above does.
+  const quickPickDateConfirmed =
+    interactiveState && /^(Today|Tomorrow|This weekend|Next week)\s*\(/.test(interactiveState.guestMessage)
+      ? `\nThe guest's last message ("${interactiveState.guestMessage}") is a date the app itself already resolved and confirmed to be valid and in the future -- never claim it has already passed or ask them to reconfirm it.\n`
+      : "";
 
   const prompt = `
 You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text a friend — quick, warm, to the point. Every reply should feel like it took five seconds to write, not five minutes. Never sound like a corporate script, a formal letter, or a customer-support bot reading from a manual.
 
 Today is ${todayFormatted}. Use this as your anchor for every date the guest mentions.
-${dateWarning}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
+${dateWarning}${quickPickDateConfirmed}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
 HOTEL INFORMATION
 Address: ${profile?.address ?? "—"}
 Google Maps link: ${profile?.googleMapsUrl ?? "—"}
