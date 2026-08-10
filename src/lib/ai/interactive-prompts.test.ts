@@ -21,6 +21,7 @@ import {
   mentionsRoomPrice,
   postBookingPrompt,
   predictedStageInstruction,
+  resolveDeterministicReply,
   roomResponsePrompt,
   selectDeterministicInteractive,
 } from "./interactive-prompts";
@@ -607,7 +608,7 @@ describe("predictedStageInstruction", () => {
 
   it("gives a GREET_MENU instruction on the first reply when language is already obvious", () => {
     const result = predictedStageInstruction({ ...base, isFirstReply: true, languageObvious: true });
-    expect(result).toContain("Book a room");
+    expect(result).toContain("I want to book a room");
   });
 
   it("gives the room-recommend heads-up (not GREET_MENU) on a rich first reply where guest count and dates are already known", () => {
@@ -623,7 +624,7 @@ describe("predictedStageInstruction", () => {
       guestMessage: "Hi, 2 guests, want a room this weekend",
     });
     expect(result).toContain("recommend");
-    expect(result).not.toContain("Book a room\" / \"View rooms");
+    expect(result).not.toContain("I want to book a room\" / \"Availability");
   });
 
   it("gives a GUEST_COUNT instruction once booking intent is shown but count is unknown", () => {
@@ -668,5 +669,90 @@ describe("predictedStageInstruction", () => {
   it("returns an empty string for plain small talk with no booking interest yet", () => {
     const result = predictedStageInstruction({ ...base, guestMessage: "just looking around, thanks" });
     expect(result).toBe("");
+  });
+});
+
+describe("resolveDeterministicReply", () => {
+  const base = {
+    isFirstReply: false,
+    languageObvious: false,
+    history: [] as { role: string; content: string }[],
+    guestMessage: "",
+  };
+  const MORNING = new Date(2026, 7, 10, 9, 0);
+  const AFTERNOON = new Date(2026, 7, 10, 14, 0);
+  const EVENING = new Date(2026, 7, 10, 19, 0);
+
+  it("gives a fixed LANGUAGE_SELECT reply on the first message, with a morning greeting", () => {
+    const result = resolveDeterministicReply({ ...base, isFirstReply: true, guestMessage: "Hi", now: MORNING, hotelName: "Hotel Ivory Towers" });
+    expect(result?.text).toBe("Good morning! 😊 This is Anushka from Hotel Ivory Towers — thank you for reaching out! Which language are you comfortable in?");
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+  });
+
+  it("varies the greeting by time of day", () => {
+    expect(resolveDeterministicReply({ ...base, isFirstReply: true, guestMessage: "Hi", now: AFTERNOON })?.text).toContain("Good afternoon!");
+    expect(resolveDeterministicReply({ ...base, isFirstReply: true, guestMessage: "Hi", now: EVENING })?.text).toContain("Good evening!");
+  });
+
+  it("omits the hotel name gracefully when not provided", () => {
+    const result = resolveDeterministicReply({ ...base, isFirstReply: true, guestMessage: "Hi", now: MORNING });
+    expect(result?.text).toBe("Good morning! 😊 This is Anushka — thank you for reaching out! Which language are you comfortable in?");
+  });
+
+  it("returns null (lets the AI handle it) when the conversation is in an obviously non-English script", () => {
+    const result = resolveDeterministicReply({ ...base, isFirstReply: true, languageObvious: true, guestMessage: "नमस्ते" });
+    expect(result).toBeNull();
+  });
+
+  it("gives a fixed GUEST_COUNT reply once booking intent is shown", () => {
+    const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room" });
+    expect(result?.text).toBe("How many people will be staying? 😊");
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+
+  it("gives a fixed DATE_QUICK_PICK reply once guest count is known", () => {
+    const result = resolveDeterministicReply({ ...base, guestMessage: "2 guests please" });
+    expect(result?.text).toBe("When are you looking to stay?");
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
+  });
+
+  it("gives a fixed CONFIRM_BOOKING reply mentioning the reference code, once a room has been discussed", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "sounds good",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result?.text).toContain("reference code");
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+  });
+
+  it("gives a fixed PRICE_OBJECTION reply when the guest pushes back on price", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "that's too expensive",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual([SEE_OTHER_ROOMS_BUTTON_ID, SHOW_OFFERS_BUTTON_ID, "continue_anyway"]);
+  });
+
+  it("returns null when the AI must actually recommend a specific room (guest count and dates both known)", () => {
+    const result = resolveDeterministicReply({ ...base, guestMessage: "2 guests, this weekend" });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for plain small talk with no booking interest yet", () => {
+    const result = resolveDeterministicReply({ ...base, guestMessage: "just looking around, thanks" });
+    expect(result).toBeNull();
+  });
+
+  it("never reaches GREET_MENU here -- resolveStageKey only returns it when languageObvious is true, and the top-level guard already excludes all of those", () => {
+    const result = resolveDeterministicReply({ ...base, isFirstReply: true, languageObvious: true, guestMessage: "Hi, do you have rooms?" });
+    expect(result).toBeNull();
   });
 });

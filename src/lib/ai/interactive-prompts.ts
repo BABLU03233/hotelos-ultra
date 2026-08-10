@@ -110,16 +110,16 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
   },
   GREET_MENU: {
     type: "list",
-    fallbackBody: "How can I help you today? 😊",
+    fallbackBody: "How may I help you today? 😊",
     buttonText: "Choose",
     rows: [
-      { id: "greet_book", title: "Book a room" },
+      { id: "greet_book", title: "I want to book a room", description: "Tell us your dates and party size" },
       // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
-      // in handle-inbound-message.ts) — same id, so tapping "View rooms" here
+      // in handle-inbound-message.ts) — same id, so tapping this row here
       // gets the exact same real-data List Message as tapping "See other
       // options" mid-RECOMMEND, no separate handling needed.
-      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "View rooms" },
-      { id: GREET_QUESTION_BUTTON_ID, title: "Ask a question" },
+      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "Availability & price", description: "See our real rooms and rates" },
+      { id: GREET_QUESTION_BUTTON_ID, title: "I need more details", description: "Check-in, parking, policies & more" },
     ],
   },
   DATE_QUICK_PICK: {
@@ -533,7 +533,7 @@ export function predictedStageInstruction(params: {
     case "LANGUAGE_SELECT":
       return "This is the guest's very first message. An English / हिंदी / తెలుగు language-selection picker will automatically appear under your reply — don't ask which language they prefer yourself, just write your normal short opener.";
     case "GREET_MENU":
-      return "This is the guest's very first message and their language is already clear from how they wrote. A \"Book a room\" / \"View rooms\" / \"Ask a question\" picker will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the picker already is the question.";
+      return "This is the guest's very first message and their language is already clear from how they wrote. An \"I want to book a room\" / \"Availability & price\" / \"I need more details\" picker will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the picker already is the question.";
     case "GUEST_COUNT":
       return "This reply's job: move toward learning how many people will be staying. A \"Just me\" / \"2 people\" / \"3+ people\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
@@ -547,4 +547,79 @@ export function predictedStageInstruction(params: {
       // open chat) or genuinely nothing else applies; write normally.
       return "";
   }
+}
+
+// Stages where the next message is 100% predictable AND needs zero real
+// judgment (not "which room should I recommend" -- that's genuine synthesis
+// over real DB data; not "what did the guest actually ask" -- that's a real
+// question needing a real answer). Deliberately excludes GREET_MENU here:
+// that's already fully deterministic via a dedicated per-language
+// short-circuit in handle-inbound-message.ts (lang_en/hi/te taps produce a
+// real, language-correct greeting each), and the rarer "guest's very first
+// message already in Hindi/Telugu script" path is left to the AI --
+// hand-writing guaranteed-correct non-English text for every stage below
+// carries real risk this session hasn't validated the way the handful of
+// existing hardcoded multilingual strings were.
+const DETERMINISTIC_STAGE_KEYS: ReadonlySet<Exclude<StageKey, null>> = new Set([
+  "LANGUAGE_SELECT",
+  "GUEST_COUNT",
+  "DATE_QUICK_PICK",
+  "CONFIRM_BOOKING",
+  "PRICE_OBJECTION",
+]);
+
+function timeOfDayGreeting(now: Date): string {
+  const hour = now.getHours();
+  if (hour < 12) return "Good morning!";
+  if (hour < 17) return "Good afternoon!";
+  return "Good evening!";
+}
+
+/**
+ * Closes the exact class of bug found live twice in production: a weak
+ * fallback model writes free text that ignores its own predicted-stage
+ * instruction (e.g. asking about dates right under a language-selection
+ * list, or asking about rooms right under a "how many guests" list) while
+ * the waterfall still -- correctly -- attaches the predicted list
+ * underneath, a guaranteed text/button mismatch the guest sees as
+ * "irrelevant options." For the stages in DETERMINISTIC_STAGE_KEYS, skip
+ * AI text-generation entirely and send a fixed, code-owned reply instead --
+ * deterministic wins, the same principle the rest of this waterfall
+ * already runs on. Returns null wherever the AI genuinely still has to
+ * write something real (recommending a specific room, answering an actual
+ * question, or a non-English-appearing conversation -- see
+ * DETERMINISTIC_STAGE_KEYS's comment).
+ */
+export function resolveDeterministicReply(params: {
+  isFirstReply: boolean;
+  languageObvious: boolean;
+  history: { role: string; content: string }[];
+  guestMessage: string;
+  hotelName?: string;
+  now?: Date;
+}): { text: string; interactive: InteractivePrompt } | null {
+  if (params.languageObvious) return null;
+
+  const readyToRecommend =
+    hasStatedGuestCount(params.history, params.guestMessage) &&
+    hasStatedDates(params.history, params.guestMessage) &&
+    !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
+  if (readyToRecommend) return null;
+
+  const key = resolveStageKey({ ...params, replyText: "" });
+  if (!key || !DETERMINISTIC_STAGE_KEYS.has(key)) return null;
+
+  const entry = BUTTON_CATALOG[key];
+  let text: string;
+  if (key === "LANGUAGE_SELECT") {
+    const greeting = timeOfDayGreeting(params.now ?? new Date());
+    const from = params.hotelName ? ` from ${params.hotelName}` : "";
+    text = `${greeting} 😊 This is Anushka${from} — thank you for reaching out! Which language are you comfortable in?`;
+  } else if (key === "CONFIRM_BOOKING") {
+    text = "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
+  } else {
+    text = entry.fallbackBody;
+  }
+
+  return { text, interactive: catalogToPrompt(entry) };
 }

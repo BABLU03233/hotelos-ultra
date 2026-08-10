@@ -1,5 +1,6 @@
-import { ChatMessage } from "@/lib/ai/provider";
+import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/interactive-prompts";
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
+import { ChatMessage } from "@/lib/ai/provider";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
@@ -68,21 +69,49 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     sourceDetail: contact.sourceDetail,
   };
 
+  const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
+  const agentNameFallback = profile?.aiAgentName?.trim() || "Anushka";
+
+  // Closes a real class of bug found live twice: a weak fallback model
+  // writing free text that ignores its own predicted-stage instruction
+  // (e.g. asking about dates right under a language-selection list) while
+  // the waterfall still -- correctly -- attaches the predicted list
+  // underneath. For stages where the next message is 100% predictable and
+  // needs zero real judgment, skip AI text-generation entirely -- see
+  // resolveDeterministicReply's own docs for exactly which stages and why.
+  const languageObvious =
+    looksLikeObviousLanguage(latestInbound.content) || history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content));
+  const deterministic = resolveDeterministicReply({
+    isFirstReply: replyContext.isFirstReply,
+    languageObvious,
+    history,
+    guestMessage: latestInbound.content,
+    hotelName: profile?.name ?? undefined,
+  });
+
   let generated: Awaited<ReturnType<typeof generateReply>>;
-  try {
-    generated = await generateReply(tenantId, latestInbound.content, history, replyContext);
-  } catch (err) {
-    // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
-    // outage, rate limit, ...) must never leave the guest silently
-    // unanswered — surface it the same way an AI-side escalation would, so
-    // a human still finds out even though Anushka itself never got to reply.
-    console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
-    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true } });
-    const agentName = profile?.aiAgentName?.trim() || "Anushka";
-    await prisma.staffNotification.create({
-      data: { tenantId, contactId, reason: `${agentName} couldn't generate a reply — needs a manual response.` },
-    });
-    return;
+  if (deterministic) {
+    generated = {
+      reply: deterministic.text,
+      imageUrls: [],
+      interactive: deterministic.interactive,
+      shouldEscalate: false,
+      agentName: agentNameFallback,
+    };
+  } else {
+    try {
+      generated = await generateReply(tenantId, latestInbound.content, history, replyContext);
+    } catch (err) {
+      // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
+      // outage, rate limit, ...) must never leave the guest silently
+      // unanswered — surface it the same way an AI-side escalation would, so
+      // a human still finds out even though Anushka itself never got to reply.
+      console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
+      await prisma.staffNotification.create({
+        data: { tenantId, contactId, reason: `${agentNameFallback} couldn't generate a reply — needs a manual response.` },
+      });
+      return;
+    }
   }
   const { reply, imageUrls, interactive, shouldEscalate, escalationReason, agentName, pendingDates } = generated;
 
