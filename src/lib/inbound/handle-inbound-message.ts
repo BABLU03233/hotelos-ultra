@@ -297,8 +297,8 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     if (!contact.pendingCheckIn || !contact.pendingCheckOut) {
       const body = contact.pendingRoomId
-        ? "Just need your dates to lock this in — when are you thinking? 📅"
-        : "Let's get your dates sorted first — when are you thinking? 📅";
+        ? "Just need your dates to lock this in — when are you thinking?"
+        : "Let's get your dates sorted first — when are you thinking?";
       await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: dateQuickPickPrompt().buttons }, "Failed to send date-quick-pick prompt");
       return;
     }
@@ -360,7 +360,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // A guest asked to try different dates after an availability conflict.
   if (msg.interactiveId === "dates_retry") {
     if (contact.aiPaused) return;
-    await sendAndPersist(tenant, contact, { type: "interactive", body: "No problem — when else works for you? 📅", buttons: dateQuickPickPrompt().buttons }, "Failed to send date-retry prompt");
+    await sendAndPersist(tenant, contact, { type: "interactive", body: "No problem — when else works for you?", buttons: dateQuickPickPrompt().buttons }, "Failed to send date-retry prompt");
     return;
   }
 

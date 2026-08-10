@@ -90,7 +90,14 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     ],
   },
   DATE_QUICK_PICK: {
-    fallbackBody: "When are you looking to stay? 📅",
+    // Deliberately no 📅/🗓️ emoji here or anywhere else guest-facing dates
+    // are discussed — live-reported issue: on some phones' emoji font, the
+    // calendar emoji's own artwork prints an arbitrary unrelated date (e.g.
+    // "FEB 24") right onto the glyph, which reads as a real, wrong date in
+    // exactly the one context where that's most confusing and least
+    // forgivable (see pipeline.ts's TONE section for the same rule applied
+    // to the AI's own emoji choices).
+    fallbackBody: "When are you looking to stay?",
     buttons: [
       { id: "dates_weekend", title: "This weekend" },
       { id: "dates_nextweek", title: "Next week" },
