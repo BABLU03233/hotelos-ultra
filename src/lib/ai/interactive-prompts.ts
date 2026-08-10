@@ -236,7 +236,13 @@ export function extractInteractivePrompt(text: string): { text: string; interact
 // marker, just one language over, so "night" itself is now translated here
 // too rather than trusting compliance alone. "Rs."/"INR" cover the
 // realistic English/Hinglish-side currency variant.
-const ROOM_PRICE_PATTERN = /(₹|rs\.?|inr)\s*[\d,]+\s*(\/|\bper\b)\s*(night|రాత్రి|रात्रि|रात)/i;
+//
+// A live re-test still caught "రూ.1,299/రాత్రి" (kept the correct "రాత్రి"
+// fix above, but swapped the CURRENCY marker itself for "రూ." -- the exact
+// symbol substitution this comment already described once, just never
+// actually added to the pattern the first time around). "రూ" added as a
+// recognized currency marker alongside ₹/Rs/INR.
+const ROOM_PRICE_PATTERN = /(₹|rs\.?|inr|రూ\.?)\s*[\d,]+\s*(\/|\bper\b)\s*(night|రాత్రి|रात्रि|रात)/i;
 
 export function mentionsRoomPrice(text: string): boolean {
   return ROOM_PRICE_PATTERN.test(text);

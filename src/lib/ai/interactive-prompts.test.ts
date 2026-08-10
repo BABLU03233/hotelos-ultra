@@ -159,6 +159,11 @@ describe("mentionsRoomPrice", () => {
     expect(mentionsRoomPrice("Room available hai, ₹2500/रात्रि se start hota hai")).toBe(true);
     expect(mentionsRoomPrice("₹999 per रात के लिए")).toBe(true);
   });
+
+  it("catches 'రూ.' as a currency marker, not just ₹ -- live re-caught: a Telugu reply correctly used 'రాత్రి' for night but still swapped ₹ for 'రూ.' itself, the exact currency-symbol substitution this file already anticipated once but never actually added to the pattern", () => {
+    expect(mentionsRoomPrice("2 మందికి సరైతే Deluxe Room, రూ.1,299/రాత్రి నుండి")).toBe(true);
+    expect(mentionsRoomPrice("రూ 999 per night")).toBe(true);
+  });
 });
 
 describe("looksLikePriceOrOfferSignal", () => {
