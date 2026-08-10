@@ -2,7 +2,6 @@ import { LeadSource } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { cerebrasProvider } from "./cerebras-provider";
-import { cloudflareProvider, createCloudflareProvider } from "./cloudflare-provider";
 import { cohereProvider } from "./cohere-provider";
 import { extractDatesMarker } from "./date-marker";
 import { guestDateLooksPast } from "./date-safety";
@@ -72,19 +71,7 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // 5. Cerebras — fast inference, OpenAI-compatible. Cerebras' own docs
 //    disagree on whether the entry free tier needs a card; ships anyway
 //    since a missing key just skips it instantly, same as every other slot.
-// 6. Cloudflare Workers AI (two accounts) — 10,000 Neurons/day *per account*,
-//    same as ever, but running the 70B model by default now (not the 8B
-//    one) after live production testing 2026-08-09 caught the 8B model
-//    hallucinating once it ended up carrying most of the day's traffic
-//    during a Groq/Gemini outage (see cloudflare-provider.ts for specifics).
-//    That's a real throughput trade — ~55 replies/day per account (~110/day
-//    combined) instead of ~340/day, since the 70B model costs ~6x more
-//    neurons/token — but a guest getting a hallucinated answer is worse than
-//    the chain moving on to the next provider a bit sooner. The 10,000/day
-//    cap is per Cloudflare account, not per token, so a second account's
-//    credentials (not just a second token on the same account) genuinely
-//    doubles this.
-// 7. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
+// 6. OpenRouter's curated free models — IMPORTANT: live-tested 2026-08-09
 //    and discovered these do NOT have independent per-model quotas the way
 //    this was originally designed around. OpenRouter caps free-model usage
 //    at 50 requests/day for the *whole account*, shared across every free
@@ -92,26 +79,34 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 //    second (reproduced live: identical 429 "free-models-per-day" from all
 //    four in one test run). Kept for genuine model-level diversity when
 //    quota remains, just no longer treated as "4 independent fallbacks."
-// 8. SambaNova — real redundancy but a thin free tier (20 requests/day per
+// 7. SambaNova — real redundancy but a thin free tier (20 requests/day per
 //    SambaNova's published limits), so it's a last-resort free attempt
 //    rather than a workhorse.
-// 9. Cohere — thinnest of all: 1,000 calls/*month* total (~33/day average),
+// 8. Cohere — thinnest of all: 1,000 calls/*month* total (~33/day average),
 //    but a genuinely independent quota, so still worth the free extra shot.
-// 10. Mistral — free tier, no card, exact quota undocumented.
-// 11. Anthropic — final paid safety net. This is the only non-free step in
+// 9. Mistral — free tier, no card, exact quota undocumented.
+// 10. Anthropic — final paid safety net. This is the only non-free step in
 //    the whole chain, and exists so a guest is *never* left unanswered even
 //    if every free tier above is simultaneously exhausted (confirmed this
 //    can genuinely happen: Groq + OpenRouter were both exhausted
 //    simultaneously during testing tonight, with nothing configured below
 //    them at the time — the gap this whole reordering closes).
+//
+// Cloudflare Workers AI (two accounts) was removed entirely 2026-08-10 —
+// live end-to-end testing this session repeatedly caught it producing
+// low-quality/irrelevant replies once it ended up carrying real traffic
+// during a Groq/Gemini quota gap (a false "date already passed"
+// hallucination, ignoring the guest's actual question, and others). Even
+// the 70B model swapped in earlier after the 8B model's worse hallucination
+// problems wasn't reliable enough — better to fail over to a weaker-quota
+// but higher-quality provider (or ultimately the paid Anthropic safety net)
+// than to answer a guest with Cloudflare at all.
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
   createGroqProvider("GROQ_API_KEY_2", "groq-2"),
   geminiProvider,
   createGeminiProvider("GEMINI_API_KEY_2", "gemini-2"),
   cerebrasProvider,
-  cloudflareProvider,
-  createCloudflareProvider("CLOUDFLARE_ACCOUNT_ID_2", "CLOUDFLARE_API_TOKEN_2", "cloudflare-2"),
   ...OPENROUTER_FREE_MODELS.map(createOpenRouterProvider),
   sambanovaProvider,
   cohereProvider,
