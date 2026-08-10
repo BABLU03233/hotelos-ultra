@@ -526,15 +526,21 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     return;
   }
 
-  // DATE_QUICK_PICK taps ("This weekend"/"Next week") — unlike the
-  // short-circuits above, this doesn't return: Anushka still needs to
-  // compose a natural next line (move to guest count, or on to confirming),
-  // so real dates are resolved deterministically in code (100% reliable,
-  // unlike trusting the AI to interpret "This weekend" itself), persisted,
-  // and the guest's own message content is rewritten to the human-readable
-  // resolved label before falling through to the normal AI queue below —
-  // so Anushka's reply is grounded in the real date, not the vague phrase.
-  if (msg.interactiveId === "dates_weekend" || msg.interactiveId === "dates_nextweek") {
+  // DATE_QUICK_PICK taps ("Today"/"Tomorrow"/"This weekend"/"Next week") —
+  // unlike the short-circuits above, this doesn't return: Anushka still
+  // needs to compose a natural next line (move to guest count, or on to
+  // confirming), so real dates are resolved deterministically in code (100%
+  // reliable, unlike trusting the AI to interpret "This weekend" itself),
+  // persisted, and the guest's own message content is rewritten to the
+  // human-readable resolved label before falling through to the normal AI
+  // queue below — so Anushka's reply is grounded in the real date, not the
+  // vague phrase.
+  if (
+    msg.interactiveId === "dates_today" ||
+    msg.interactiveId === "dates_tomorrow" ||
+    msg.interactiveId === "dates_weekend" ||
+    msg.interactiveId === "dates_nextweek"
+  ) {
     const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
     await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
     await prisma.message.update({ where: { id: messageRow.id }, data: { content: label } });

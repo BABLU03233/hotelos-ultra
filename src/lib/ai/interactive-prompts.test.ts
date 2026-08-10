@@ -320,10 +320,10 @@ describe("greetMenuPrompt / dateQuickPickPrompt", () => {
     expect(asRows(prompt).map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
   });
 
-  it("dateQuickPickPrompt returns a list (not buttons) with three date-shortcut rows -- no reply-arrow icon, per user request", () => {
+  it("dateQuickPickPrompt returns a list (not buttons) with five date-shortcut rows -- no reply-arrow icon, per user request", () => {
     const prompt = dateQuickPickPrompt();
     expect(prompt.type).toBe("list");
-    expect(asRows(prompt).map((r) => r.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
+    expect(asRows(prompt).map((r) => r.id)).toEqual(["dates_today", "dates_tomorrow", "dates_weekend", "dates_nextweek", "dates_custom"]);
   });
 });
 
@@ -716,7 +716,7 @@ describe("resolveDeterministicReply", () => {
   it("gives a fixed DATE_QUICK_PICK reply once guest count is known", () => {
     const result = resolveDeterministicReply({ ...base, guestMessage: "2 guests please" });
     expect(result?.text).toBe("When are you looking to stay?");
-    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["dates_today", "dates_tomorrow", "dates_weekend", "dates_nextweek", "dates_custom"]);
   });
 
   it("gives a fixed CONFIRM_BOOKING reply mentioning the reference code, once a room has been discussed", () => {

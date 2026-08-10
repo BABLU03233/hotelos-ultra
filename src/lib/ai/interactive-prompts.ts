@@ -136,6 +136,8 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
     fallbackBody: "When are you looking to stay?",
     buttonText: "Choose dates",
     rows: [
+      { id: "dates_today", title: "Today" },
+      { id: "dates_tomorrow", title: "Tomorrow" },
       { id: "dates_weekend", title: "This weekend" },
       { id: "dates_nextweek", title: "Next week" },
       { id: "dates_custom", title: "I'll type dates" },

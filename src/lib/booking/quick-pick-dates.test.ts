@@ -11,6 +11,20 @@ const MONDAY = new Date(Date.UTC(2026, 7, 10, 6, 0)); // Mon, 10 Aug 2026 (IST)
 const SATURDAY = new Date(Date.UTC(2026, 7, 15, 6, 0)); // Sat, 15 Aug 2026 (IST)
 
 describe("resolveQuickPickDates", () => {
+  it("resolves 'today' to today's IST calendar date, a 1-night stay", () => {
+    const { checkIn, checkOut, label } = resolveQuickPickDates("dates_today", SUNDAY);
+    expect(checkIn).toEqual(new Date(2026, 7, 9));
+    expect(checkOut).toEqual(new Date(2026, 7, 10));
+    expect(label).toContain("Today");
+  });
+
+  it("resolves 'tomorrow' to today + 1 day IST, a 1-night stay", () => {
+    const { checkIn, checkOut, label } = resolveQuickPickDates("dates_tomorrow", SUNDAY);
+    expect(checkIn).toEqual(new Date(2026, 7, 10));
+    expect(checkOut).toEqual(new Date(2026, 7, 11));
+    expect(label).toContain("Tomorrow");
+  });
+
   it("resolves 'this weekend' to the upcoming Saturday-to-Sunday, from a Sunday", () => {
     const { checkIn, checkOut, label } = resolveQuickPickDates("dates_weekend", SUNDAY);
     expect(checkIn).toEqual(new Date(2026, 7, 15));
