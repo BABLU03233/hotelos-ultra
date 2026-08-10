@@ -218,7 +218,21 @@ export function extractInteractivePrompt(text: string): { text: string; interact
 // recommendations and cascading into every check that depends on it
 // (roomMentionedEver, hasExpressedBookingIntent, the CONFIRM_BOOKING
 // trigger). Both phrasings now match.
-const ROOM_PRICE_PATTERN = /₹[\d,]+\s*(\/|\bper\b)\s*night/i;
+//
+// Live-caught a second, more serious variant of the same gap: a Telugu
+// reply named a room's price as "రూ. 1599 నుండి ప్రారంభమవుతుంది" -- neither
+// the ₹ symbol nor any "/night"/"per night" anchor survived translation.
+// This confused the whole downstream state machine badly enough that the
+// very next turn hallucinated a guest's genuinely future date as "already
+// passed" with zero recovery buttons attached -- the exact class of bug the
+// DATES rule in pipeline.ts calls out as serious, just reached through a
+// missed price detection instead of a misread guest date. Regex can't
+// reliably cover every language's currency marker and "per night" phrasing,
+// so the primary fix is a system-prompt rule mandating the literal
+// "₹<amount>/night" format verbatim in every language (see pipeline.ts's
+// RULES section); "Rs."/"INR" are added here only as a realistic
+// English/Hinglish-side backstop for when that instruction isn't followed.
+const ROOM_PRICE_PATTERN = /(₹|rs\.?|inr)\s*[\d,]+\s*(\/|\bper\b)\s*night/i;
 
 export function mentionsRoomPrice(text: string): boolean {
   return ROOM_PRICE_PATTERN.test(text);

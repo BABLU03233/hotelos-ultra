@@ -147,6 +147,12 @@ describe("mentionsRoomPrice", () => {
   it("returns false for a non-per-night rupee mention", () => {
     expect(mentionsRoomPrice("There's a ₹100 discount available")).toBe(false);
   });
+
+  it("also catches 'Rs.'/'INR' as realistic alternate currency markers -- live-caught gap: a weaker model naming a price without the literal ₹ symbol silently broke ROOM_RESPONSE detection", () => {
+    expect(mentionsRoomPrice("The Classic Room is Rs.999/night")).toBe(true);
+    expect(mentionsRoomPrice("Starts from Rs 1,299 per night")).toBe(true);
+    expect(mentionsRoomPrice("INR 999/night for 2 guests")).toBe(true);
+  });
 });
 
 describe("looksLikePriceOrOfferSignal", () => {
