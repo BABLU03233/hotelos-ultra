@@ -7,7 +7,10 @@ const ROOMS = [
 ];
 
 // Fixed "now" for deterministic tests, same convention as date-safety.test.ts.
-const NOW = new Date(2026, 7, 9); // Sun, 9 Aug 2026
+// UTC-anchored (not ambient-local-timezone) so this resolves to the same
+// IST calendar date regardless of what machine runs the tests -- see
+// india-time.ts. 06:00 UTC = 11:30 IST, safely mid-day.
+const NOW = new Date(Date.UTC(2026, 7, 9, 6, 0)); // Sun, 9 Aug 2026 (IST)
 
 interface FlowScreen {
   id: string;

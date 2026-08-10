@@ -1,3 +1,5 @@
+import { currentHourIST } from "@/lib/india-time";
+
 /**
  * Anushka never authors WhatsApp button/list payloads directly — the
  * interactive API has hard, silently-rejecting limits (max 3 buttons,
@@ -569,7 +571,10 @@ const DETERMINISTIC_STAGE_KEYS: ReadonlySet<Exclude<StageKey, null>> = new Set([
 ]);
 
 function timeOfDayGreeting(now: Date): string {
-  const hour = now.getHours();
+  // Real live bug: the server runs in UTC, but every guest is in India --
+  // now.getHours() returned the SERVER's hour, not India's (confirmed live:
+  // 8:32am UTC = 2:02pm IST said "Good morning!"). See india-time.ts.
+  const hour = currentHourIST(now);
   if (hour < 12) return "Good morning!";
   if (hour < 17) return "Good afternoon!";
   return "Good evening!";

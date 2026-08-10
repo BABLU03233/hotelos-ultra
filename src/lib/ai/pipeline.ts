@@ -196,7 +196,15 @@ async function buildSystemPrompt(
     : "";
 
   const now = new Date();
-  const todayFormatted = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  // Real live bug this same session, same root cause: the server runs in
+  // UTC, but the hotel and every guest are in India. Without an explicit
+  // timeZone, toLocaleDateString silently uses the SERVER's own calendar
+  // date -- wrong for the ~5.5 hours nightly where UTC is still on
+  // "yesterday" while India has already rolled over to "today" (see
+  // src/lib/india-time.ts) -- the exact same failure class as the original
+  // past-date booking bug, just reached through the server clock this time
+  // instead of the guest's own phrasing.
+  const todayFormatted = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   // Deterministic catch for the exact real incident this session (see
   // date-safety.ts) — checked directly against the guest's own latest
   // message, not left to the DATES prompt rule alone.

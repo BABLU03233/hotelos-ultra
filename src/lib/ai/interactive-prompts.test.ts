@@ -679,9 +679,12 @@ describe("resolveDeterministicReply", () => {
     history: [] as { role: string; content: string }[],
     guestMessage: "",
   };
-  const MORNING = new Date(2026, 7, 10, 9, 0);
-  const AFTERNOON = new Date(2026, 7, 10, 14, 0);
-  const EVENING = new Date(2026, 7, 10, 19, 0);
+  // UTC-anchored (not ambient-local-timezone) so these pass identically
+  // regardless of what machine runs the tests -- IST is UTC+5:30, so these
+  // resolve to 9am/2pm/7pm IST exactly. See india-time.test.ts.
+  const MORNING = new Date(Date.UTC(2026, 7, 10, 3, 30)); // 9:00am IST
+  const AFTERNOON = new Date(Date.UTC(2026, 7, 10, 8, 30)); // 2:00pm IST
+  const EVENING = new Date(Date.UTC(2026, 7, 10, 13, 30)); // 7:00pm IST
 
   it("gives a fixed LANGUAGE_SELECT reply on the first message, with a morning greeting", () => {
     const result = resolveDeterministicReply({ ...base, isFirstReply: true, guestMessage: "Hi", now: MORNING, hotelName: "Hotel Ivory Towers" });

@@ -1,3 +1,5 @@
+import { todayMidnightIST } from "@/lib/india-time";
+
 export type QuickPickKey = "dates_weekend" | "dates_nextweek";
 
 function startOfDay(d: Date): Date {
@@ -31,9 +33,16 @@ function formatShort(d: Date): string {
  * Saturday) since a guest can still book for tonight. "Next week"
  * deliberately does NOT allow a same-day match on Monday -- if today is
  * already Monday, "next week" should mean the following Monday, not today.
+ *
+ * "Today" is resolved in India Standard Time, not the server's own clock --
+ * the server runs in UTC, and for ~5.5 hours every night it's still on
+ * "yesterday" while India has already rolled over, which would otherwise
+ * shift these quick-pick dates off by a day during exactly that window
+ * (see india-time.ts).
  */
 export function resolveQuickPickDates(key: QuickPickKey, now: Date = new Date()): { checkIn: Date; checkOut: Date; label: string } {
-  const checkIn = key === "dates_weekend" ? nextWeekday(now, 6, false) : nextWeekday(now, 1, true);
+  const todayIST = todayMidnightIST(now);
+  const checkIn = key === "dates_weekend" ? nextWeekday(todayIST, 6, false) : nextWeekday(todayIST, 1, true);
   const checkOut = addDays(checkIn, 1);
   const prefix = key === "dates_weekend" ? "This weekend" : "Next week";
   return { checkIn, checkOut, label: `${prefix} (${formatShort(checkIn)} – ${formatShort(checkOut)})` };

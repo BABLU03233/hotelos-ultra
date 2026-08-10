@@ -1,3 +1,5 @@
+import { dateFieldsIST } from "@/lib/india-time";
+
 /**
  * WhatsApp Flow JSON for a one-tap booking form: room dropdown, a real
  * native date-range calendar, guest-count dropdown, single terminal screen
@@ -16,7 +18,12 @@
  * observed (see parseFlowBookingResponse in handle-inbound-message.ts).
  */
 export function buildBookingFlowJson(rooms: { id: string; name: string; price: number }[], now: Date = new Date()): object {
-  const minDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  // "Today" here means India's calendar date, not the server's -- see
+  // india-time.ts. Without this, the server's own UTC clock could show a
+  // min-date that's a day behind India's during the ~5.5 hours nightly
+  // where the two disagree.
+  const { year, month, day } = dateFieldsIST(now);
+  const minDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   return {
     version: "7.1",

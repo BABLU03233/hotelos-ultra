@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { guestDateLooksPast } from "./date-safety";
 
-// Fixed "today" for deterministic tests: Sunday, 9 August 2026.
-const TODAY = new Date(2026, 7, 9);
+// Fixed "today" for deterministic tests: Sunday, 9 August 2026, mid-morning
+// IST. UTC-anchored (not ambient-local-timezone) so this resolves to the
+// same IST calendar date regardless of what machine runs the tests --
+// guestDateLooksPast now derives "today" from India's timezone specifically
+// (see india-time.ts), not the test runner's own default. 06:00 UTC = 11:30
+// IST, safely mid-day with no boundary ambiguity.
+const TODAY = new Date(Date.UTC(2026, 7, 9, 6, 0));
 
 describe("guestDateLooksPast", () => {
   it("catches the exact real incident: '4/8/2026' read day-first is already 5 days in the past", () => {

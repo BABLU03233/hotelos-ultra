@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { resolveQuickPickDates } from "./quick-pick-dates";
 
-// Fixed "now" values for deterministic tests, same convention as date-safety.test.ts.
-const SUNDAY = new Date(2026, 7, 9); // Sun, 9 Aug 2026
-const MONDAY = new Date(2026, 7, 10); // Mon, 10 Aug 2026
-const SATURDAY = new Date(2026, 7, 15); // Sat, 15 Aug 2026
+// Fixed "now" values for deterministic tests, UTC-anchored (not
+// ambient-local-timezone) so these resolve to the same IST calendar date
+// regardless of what machine runs the tests -- resolveQuickPickDates now
+// derives "today" from India's timezone specifically (see india-time.ts).
+// 06:00 UTC = 11:30 IST, safely mid-day with no boundary ambiguity.
+const SUNDAY = new Date(Date.UTC(2026, 7, 9, 6, 0)); // Sun, 9 Aug 2026 (IST)
+const MONDAY = new Date(Date.UTC(2026, 7, 10, 6, 0)); // Mon, 10 Aug 2026 (IST)
+const SATURDAY = new Date(Date.UTC(2026, 7, 15, 6, 0)); // Sat, 15 Aug 2026 (IST)
 
 describe("resolveQuickPickDates", () => {
   it("resolves 'this weekend' to the upcoming Saturday-to-Sunday, from a Sunday", () => {
