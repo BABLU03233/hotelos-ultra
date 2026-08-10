@@ -253,6 +253,15 @@ export function looksLikePriceOrOfferSignal(text: string): boolean {
   return PRICE_OR_OFFER_PATTERN.test(text);
 }
 
+// Matches both the literal "View photos" button tap and a guest typing the
+// same request as free text -- see PHOTOS in pipeline.ts, which already
+// expects both forms to arrive as the guest's plain message.
+const PHOTO_REQUEST_PATTERN = /\b(photos?|pictures?|pics?)\b|what (does|do) (it|the room) look like/i;
+
+function looksLikePhotoRequest(text: string): boolean {
+  return PHOTO_REQUEST_PATTERN.test(text);
+}
+
 export function roomResponsePrompt(): InteractivePrompt {
   return catalogToPrompt(BUTTON_CATALOG.ROOM_RESPONSE);
 }
@@ -548,6 +557,23 @@ function resolveStageKey(params: {
     // prose reply below, no special-casing needed there.
     if (roomMentionedEver && looksLikePriceOrOfferSignal(guestMessage)) {
       return "PRICE_OBJECTION";
+    }
+    // Live-caught, the most severe instance of this class of bug found this
+    // session: CONFIRM_BOOKING fired completely unconditionally once a room
+    // had ever been mentioned, with NO check on what the guest's current
+    // message actually says -- unlike every other branch in this block. A
+    // guest tapping "View photos" (which arrives as the literal guest
+    // message, exactly like typed text -- see PHOTOS in pipeline.ts) got
+    // silently swallowed and replaced with "tap Confirm booking below"
+    // instead of ever seeing a single photo -- deterministic, so the AI
+    // never even got a chance to send them. Any genuine question after a
+    // recommendation ("is there a bathtub?") was equally at risk. Return
+    // null instead of falling through to a different wrong branch here --
+    // this lets the AI actually respond (send real photos, answer the
+    // question); the post-hoc call re-derives real buttons from what it
+    // actually wrote, same mechanism ROOM_RESPONSE already relies on.
+    if (roomMentionedEver && (looksLikePhotoRequest(guestMessage) || guestMessage.trim().endsWith("?"))) {
+      return null;
     }
     // Checked before the dates nudge, not after: dates detection is
     // necessarily broad/imprecise (guests phrase dates far more ways than

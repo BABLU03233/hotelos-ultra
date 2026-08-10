@@ -226,12 +226,29 @@ async function buildSystemPrompt(
     interactiveState && /^(Today|Tomorrow|This weekend|Next week)\s*\(/.test(interactiveState.guestMessage)
       ? `\nThe guest's last message ("${interactiveState.guestMessage}") is a date the app itself already resolved and confirmed to be valid and in the future -- never claim it has already passed or ask them to reconfirm it.\n`
       : "";
+  // Live-caught: a guest who tapped "हिंदी" (Devanagari) to pick their
+  // language, then typed every actual message afterward in plain Roman
+  // letters ("wifi hai kya aapke yaha"), still got a reply written in full
+  // Devanagari script -- a direct violation of this same prompt's own
+  // LANGUAGE rule ("match whichever script they used... don't switch to
+  // Devanagari on them"), just not reliably followed on its own. The
+  // language TAP only proves which language, not which script -- script
+  // choice has to track the guest's most recent message, not an earlier
+  // selection. Reinforced here as an explicit, per-turn reminder the same
+  // way the date-safety warnings above are, rather than trusting the
+  // general rule alone.
+  const scriptReminder =
+    interactiveState &&
+    !looksLikeObviousLanguage(interactiveState.guestMessage) &&
+    interactiveState.history.some((m) => looksLikeObviousLanguage(m.content))
+      ? `\nThe guest's last message was typed in plain Roman/Latin letters, not Devanagari or Telugu script -- reply in that same Roman-letter Hinglish/Tenglish style, even if they earlier selected Hindi or Telugu as their language. Match how they're typing RIGHT NOW, not an earlier language pick.\n`
+      : "";
 
   const prompt = `
 You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text a friend — quick, warm, to the point. Every reply should feel like it took five seconds to write, not five minutes. Never sound like a corporate script, a formal letter, or a customer-support bot reading from a manual.
 
 Today is ${todayFormatted}. Use this as your anchor for every date the guest mentions.
-${dateWarning}${quickPickDateConfirmed}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
+${dateWarning}${quickPickDateConfirmed}${scriptReminder}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
 HOTEL INFORMATION
 Address: ${profile?.address ?? "—"}
 Google Maps link: ${profile?.googleMapsUrl ?? "—"}

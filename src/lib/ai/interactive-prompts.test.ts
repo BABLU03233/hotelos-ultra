@@ -475,6 +475,24 @@ describe("selectDeterministicInteractive", () => {
     expect(result).toEqual(confirmBookingPrompt());
   });
 
+  it("does NOT force CONFIRM_BOOKING when the guest taps 'View photos' -- the most severe gap found live: this fired completely unconditionally once a room had been mentioned, with no check on the guest's actual message, silently swallowing the photo request and replacing it with 'tap Confirm booking' instead of ever sending a single photo", () => {
+    const history = [
+      { role: "user", content: "2 guests" },
+      { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+    ];
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "View photos", replyText: "Here are some photos!", history });
+    expect(result).not.toEqual(confirmBookingPrompt());
+  });
+
+  it("does NOT force CONFIRM_BOOKING for a genuine question after a room's been discussed, e.g. 'is there a bathtub?'", () => {
+    const history = [
+      { role: "user", content: "2 guests" },
+      { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+    ];
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "is there a bathtub?", replyText: "Yes, it has a bathtub!", history });
+    expect(result).not.toEqual(confirmBookingPrompt());
+  });
+
   it("offers DATE_QUICK_PICK only when no room has ever been discussed and dates are unknown", () => {
     const result = selectDeterministicInteractive({
       ...base,
