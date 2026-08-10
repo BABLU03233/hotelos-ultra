@@ -276,6 +276,30 @@ describe("hasStatedGuestCount", () => {
     expect(hasStatedGuestCount([], "me and my wife")).toBe(true);
   });
 
+  it("detects spelled-out Hindi number words paired with 'log'", () => {
+    expect(hasStatedGuestCount([], "do log ke liye room chahiye")).toBe(true);
+    expect(hasStatedGuestCount([], "teen log honge is weekend")).toBe(true);
+    expect(hasStatedGuestCount([], "chaar log ke liye 2 rooms chahiye")).toBe(true);
+  });
+
+  it("does NOT treat 'do log in' (a WiFi/tech question, not a headcount) as a guest count", () => {
+    expect(hasStatedGuestCount([], "do log in every time I need to enter wifi password?")).toBe(false);
+  });
+
+  it("detects 'myself + N' / 'me + N' and 'N including me' phrasings for adding the speaker to a party size", () => {
+    expect(hasStatedGuestCount([], "myself + 2")).toBe(true);
+    expect(hasStatedGuestCount([], "me + 3")).toBe(true);
+    expect(hasStatedGuestCount([], "3 including me")).toBe(true);
+  });
+
+  it("does NOT treat a '+91' phone number prefix as a guest count", () => {
+    expect(hasStatedGuestCount([], "you can reach me on +91 98765 43210")).toBe(false);
+  });
+
+  it("detects 'group of N'", () => {
+    expect(hasStatedGuestCount([], "group of 6 coming down")).toBe(true);
+  });
+
   it("does NOT treat a bare 'couple' idiom (e.g. 'a couple of minutes') as a guest count", () => {
     expect(hasStatedGuestCount([], "give me a couple minutes to decide")).toBe(false);
   });

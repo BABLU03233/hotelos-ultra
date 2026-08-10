@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, stripUnapprovedUrls } from "./reply-safety";
 
 describe("hasHallucinationRisk", () => {
   it("detects a fabricated Indian phone number in +91 format", () => {
@@ -46,5 +46,35 @@ describe("hasHallucinationRisk", () => {
     const legitimate = extractLegitimatePhoneNumbers("Front Desk (call only, not WhatsApp): +91 90147 76868. Reservations (call only): +91 63053 89600.");
     expect(legitimate.has("+919014776868")).toBe(true);
     expect(legitimate.has("+916305389600")).toBe(true);
+  });
+});
+
+describe("stripUnapprovedUrls", () => {
+  it("removes a fabricated website/booking-site URL while keeping the rest of the reply intact", () => {
+    expect(stripUnapprovedUrls("You can book directly at hotelivorytowers.com for the best rate!")).toBe("You can book directly at for the best rate!");
+  });
+
+  it("removes a bare www. URL", () => {
+    expect(stripUnapprovedUrls("Check out www.example-hotel.com for more photos")).toBe("Check out for more photos");
+  });
+
+  it("removes a full https:// URL", () => {
+    expect(stripUnapprovedUrls("Reviews here: https://reviews.example.com/hotel-ivory-towers")).toBe("Reviews here:");
+  });
+
+  it("leaves a reply with no URL untouched", () => {
+    expect(stripUnapprovedUrls("Our Deluxe Room starts from ₹1,299/night 🛏️")).toBe("Our Deluxe Room starts from ₹1,299/night 🛏️");
+  });
+
+  it("keeps the hotel's own approved Google Maps link when explicitly allowlisted -- the one legitimate URL this app ever sends", () => {
+    const approved = new Set(["https://maps.app.goo.gl/xxxxx"]);
+    expect(stripUnapprovedUrls("Here you go: https://maps.app.goo.gl/xxxxx", approved)).toBe("Here you go: https://maps.app.goo.gl/xxxxx");
+  });
+
+  it("still strips a DIFFERENT url even when a Maps link is allowlisted", () => {
+    const approved = new Set(["https://maps.app.goo.gl/xxxxx"]);
+    expect(stripUnapprovedUrls("Directions: https://maps.app.goo.gl/xxxxx, or check reviews at fakereviews.com", approved)).toBe(
+      "Directions: https://maps.app.goo.gl/xxxxx, or check reviews at"
+    );
   });
 });

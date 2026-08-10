@@ -20,7 +20,7 @@ import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK, stripUnapprovedUrls } from "./reply-safety";
 import { sambanovaProvider } from "./sambanova-provider";
 
 // Curated OpenRouter free-tier models for the fallback tier below, ordered
@@ -161,7 +161,7 @@ async function buildSystemPrompt(
   retrievedContext: string[],
   context?: ReplyContext,
   interactiveState?: { history: ChatMessage[]; guestMessage: string }
-): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string> }> {
+): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string>; legitimateUrls: Set<string> }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
     prisma.room.findMany({ where: { tenantId } }),
@@ -279,6 +279,7 @@ RULES
 - Frame prices as "starting from" — a team member confirms exact availability and the final rate.
 - Whenever you name a room's price, write it in EXACTLY this format: ₹<amount>/night (e.g. ₹1,299/night) — the literal ₹ symbol and "/night", never translated or reformatted (not "Rs.", not "రూ.", not "प्रति रात्रि"), even when the rest of your reply is in Hindi or Telugu. The app's own logic detects this exact format to know a price was just quoted — writing it any other way silently breaks what happens next in the conversation.
 - When a guest asks for the address, location, directions, or "where are you" / "where is it," reply with ONLY the Google Maps link above (if one is set) — send it as a bare URL on its own line, exactly as listed, with nothing before or after it. No "here's our location," no address text, no extra sentence — just the link, that's the whole reply.
+- Never send any other link or URL — no website, booking site, review site, social media, or search link — for any reason, even if a guest asks for one. The Google Maps link above (only when asked for the address) is the only URL you ever send.
 - Short and sweet, ALWAYS — this is the rule you break the least, and the one guests notice fastest when it's broken. A lead reading WhatsApp on their phone will not read a paragraph — assume they'll skim past anything longer than two lines. One short sentence is the default and is genuinely enough most of the time. Two sentences is already a long reply. Three is the hard ceiling, and only when the question truly can't be answered in less. Lead with the single most useful or exciting thing first (the answer, the offer, the room), then stop — don't follow it with a second sentence just to round the reply out. Never restate what the guest just told you back to them ("Got it, you're looking for a room for 2 guests this weekend" — they already know what they said; just answer). Never repeat information you already gave them earlier in this same conversation. If you catch yourself explaining, justifying, or narrating why you're asking something — delete that clause. Never say things like "so I can help you better," "that way I can recommend the best room for you," or "to give you accurate info" — just ask the question or give the answer directly, the way a real person texting never explains their own thinking. No markdown formatting.
 - When the guest has given enough detail (dates, guests, budget), recommend one specific room.
 - Use the guest's name if you know it. Match their energy — enthusiastic if they're excited, brief if they're brief.
@@ -334,7 +335,12 @@ PHOTOS
 - If a guest asks to see a room, photos, or what it looks like — or taps the "View photos" button, which arrives as the guest's message just like any typed text — send the real photo URLs listed for that room above. Since the tap always comes right after you named a specific room, that's the room whose photos to send — don't ask which room they mean. Add a line for each photo in the exact format "IMAGE: <url>" (one per line, at most 3), placed after your normal reply text. Only use URLs that are literally listed above — never invent or guess a URL, and never send a photo for a room that has none listed. If that room genuinely has no photos listed, say so plainly instead of sending nothing silently.
 `.trim();
 
-  return { prompt, agentName, legitimatePhoneNumbers: extractLegitimatePhoneNumbers(profile?.aiSystemPrompt ?? "") };
+  return {
+    prompt,
+    agentName,
+    legitimatePhoneNumbers: extractLegitimatePhoneNumbers(profile?.aiSystemPrompt ?? ""),
+    legitimateUrls: new Set(profile?.googleMapsUrl ? [profile.googleMapsUrl] : []),
+  };
 }
 
 export interface GenerateReplyResult {
@@ -364,7 +370,10 @@ export async function generateReply(
   context?: ReplyContext
 ): Promise<GenerateReplyResult> {
   const retrieved = await retrieveRelevantChunks(tenantId, guestMessage).catch(() => []);
-  const { prompt: systemPrompt, agentName, legitimatePhoneNumbers } = await buildSystemPrompt(tenantId, retrieved, context, { history, guestMessage });
+  const { prompt: systemPrompt, agentName, legitimatePhoneNumbers, legitimateUrls } = await buildSystemPrompt(tenantId, retrieved, context, {
+    history,
+    guestMessage,
+  });
 
   const reply = await aiProvider.chat({
     systemPrompt,
@@ -385,11 +394,18 @@ export async function generateReply(
   const { text: withoutImages, imageUrls } = extractImageUrls(trimmed);
   const { text: withoutDates, dates: pendingDates } = extractDatesMarker(withoutImages);
   const { text: rawText, interactive } = extractInteractivePrompt(withoutDates);
+  // Code-level guard, not prompt-only: strips any URL that isn't the
+  // tenant's own configured Google Maps link (the only URL this app is ever
+  // supposed to send, and only when a guest asks for the address -- see
+  // RULES below). A prompt instruction alone can't *guarantee* this the way
+  // stripping it after the fact can. See stripUnapprovedUrls's own comment
+  // for why this is a surgical strip rather than swapping the whole reply.
+  const urlSafeText = stripUnapprovedUrls(rawText, legitimateUrls);
   // Deterministic interception for a live-observed hallucination: a
   // fabricated phone number or a false "booking confirmed" claim in prose,
   // most often when a guest types confirmation instead of tapping the
   // button. Swapped for a safe generic line rather than a partial rewrite.
-  const text = hasHallucinationRisk(rawText, legitimatePhoneNumbers) ? SAFE_REPLY_FALLBACK : rawText;
+  const text = hasHallucinationRisk(urlSafeText, legitimatePhoneNumbers) ? SAFE_REPLY_FALLBACK : urlSafeText;
   // The deterministic waterfall (see selectDeterministicInteractive) is now
   // the primary decision-maker for which buttons accompany a reply, not the
   // AI's own "BUTTONS: X" marker — prompt-only button decisions proved

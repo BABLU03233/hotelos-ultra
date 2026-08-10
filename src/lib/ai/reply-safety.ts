@@ -41,3 +41,43 @@ export function hasHallucinationRisk(text: string, legitimatePhoneNumbers: Set<s
 }
 
 export const SAFE_REPLY_FALLBACK = "Great, glad that works for you! 🎉 Just tap Confirm booking below when you're ready and I'll take care of the rest.";
+
+const URL_PATTERN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]+\.(com|in|co\.in|net|org|me|app|link|gl|online|shop)\b\S*/gi;
+
+/**
+ * A stray URL (a fabricated booking.com/review link, an invented website)
+ * is a real, separate hallucination risk from the phone-number/false-
+ * confirmation cases above, but handled differently on purpose: those two
+ * usually ARE the whole point of the sentence, so swapping the entire reply
+ * for a safe generic line loses nothing real. A URL is more often incidental
+ * to an otherwise fine, helpful reply ("check our website at X, want to
+ * book?"), and SAFE_REPLY_FALLBACK's own confirm-booking-flavored wording
+ * would read as a jarring non-sequitur if it replaced a reply that wasn't
+ * actually about confirming a booking -- the exact same class of mismatch
+ * already found and fixed once this session for "View photos". Surgically
+ * removing just the URL substring keeps the rest of a genuinely useful
+ * answer intact instead. The one legitimate URL this app ever sends -- the
+ * hotel's own configured Google Maps link, only when a guest asks for the
+ * address (see RULES in pipeline.ts) -- is passed in and never stripped.
+ */
+// A URL sitting mid-sentence is almost always immediately followed by real
+// sentence punctuation ("...at hotel.com, hope that helps!"), which \S+
+// greedily sweeps into the match. Comparing that raw match against
+// approvedUrls verbatim would fail even for the one legitimate URL this app
+// sends, since the approved entry itself never has trailing punctuation --
+// so the punctuation is split off before the approval check, and re-attached
+// either way (a URL that gets removed still leaves its trailing comma/period
+// as real sentence punctuation; an approved URL keeps its own).
+const TRAILING_PUNCTUATION_PATTERN = /[,.;:!?()]+$/;
+
+export function stripUnapprovedUrls(text: string, approvedUrls: Set<string> = new Set()): string {
+  return text
+    .replace(URL_PATTERN, (rawMatch) => {
+      const trailingPunctuation = rawMatch.match(TRAILING_PUNCTUATION_PATTERN)?.[0] ?? "";
+      const url = trailingPunctuation ? rawMatch.slice(0, -trailingPunctuation.length) : rawMatch;
+      return approvedUrls.has(url) ? rawMatch : trailingPunctuation;
+    })
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

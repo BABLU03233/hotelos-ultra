@@ -308,8 +308,18 @@ export function postBookingPrompt(): InteractivePrompt {
 // "a couple of minutes/days" is a common, unrelated idiom for "a few," so
 // matching bare "couple" anywhere would risk exactly the false-positive
 // this file's own philosophy above warns against.
+// Spelled-out Hindi number words ("do log", "teen log") are a further real
+// gap -- as natural in Hinglish as English word-numbers are, just not
+// covered by them. Requires the "log" noun immediately after (not a bare
+// number word alone, which would be far too ambiguous in English) and
+// excludes a trailing "in" specifically so "do log in" (a plausible WiFi/
+// tech question, nothing to do with headcount) doesn't false-positive.
+// "myself + 2" / "me + 2" and "N including me" are two more real phrasings
+// for a guest adding themselves to a party size -- deliberately anchored to
+// "myself"/"me" rather than a bare "+ N" pattern, since a bare one would
+// collide with a "+91 98765..." phone number's own leading "+".
 const GUEST_COUNT_STATED_PATTERN =
-  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|(one|two|three|four|five|six|seven|eight|nine|ten)\s*(guests?|people|persons?|pax|adults?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us|we'?re a couple\b|just the two of us\b|couple of us\b|me and my (wife|husband|partner|girlfriend|boyfriend)\b)/i;
+  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|(one|two|three|four|five|six|seven|eight|nine|ten)\s*(guests?|people|persons?|pax|adults?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|group of \d+|we are \d+|there(?:'s| is) \d+ of us|we'?re a couple\b|just the two of us\b|couple of us\b|me and my (wife|husband|partner|girlfriend|boyfriend)\b|(ek|do|teen|char|chaar|paanch|che|chhe|saat|aath|nau|das|dus)\s*log\b(?!\s*in)|(myself|me)\s*\+\s*\d+\b|\d+\s*including me\b)/i;
 
 // The single most severe gap live-caught this pass: a guest replying with
 // JUST a bare number ("2") right after being asked "how many people will be
