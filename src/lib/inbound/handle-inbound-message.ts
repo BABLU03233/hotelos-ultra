@@ -8,6 +8,7 @@ import {
   SHOW_OFFERS_BUTTON_ID,
   confirmBookingPrompt,
   dateQuickPickPrompt,
+  greetMenuPrompt,
   postBookingPrompt,
   roomResponsePrompt,
 } from "@/lib/ai/interactive-prompts";
@@ -385,6 +386,26 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     }
     // No active offers configured — fall through to the AI queue so the
     // guest still gets *some* reply, matching the "no rooms configured" fallback above.
+  }
+
+  // A language-select tap (English/हिंदी/తెలుగు) — made fully deterministic
+  // after a real live-observed failure: the waterfall correctly forces
+  // GREET_MENU buttons right after this tap (see looksLikeLanguageSelection
+  // in interactive-prompts.ts), but a weak fallback model can still ignore
+  // its predicted-stage instruction and write incongruent free text (e.g.
+  // asking about dates) while those GREET_MENU buttons render underneath —
+  // a real text/button mismatch this sidesteps entirely, same reasoning as
+  // every other zero-ambiguity tap (ROOM_BOOK_BUTTON_ID, etc.) in this file.
+  if (msg.interactiveId === "lang_en" || msg.interactiveId === "lang_hi" || msg.interactiveId === "lang_te") {
+    if (contact.aiPaused) return;
+
+    const greetings: Record<string, string> = {
+      lang_en: "Great! How can I help you today? 😊",
+      lang_hi: "Bilkul! Aaj main aapki kaise madad karoon? 😊",
+      lang_te: "Sare! Ivvala meeku ela help cheyagalanu? 😊",
+    };
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(greetings[msg.interactiveId], greetMenuPrompt()), "Failed to send greet-menu after language select");
+    return;
   }
 
   // GREET_MENU's "Book a room" tap — the highest-intent signal in the whole
