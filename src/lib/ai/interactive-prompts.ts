@@ -76,35 +76,43 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
     ],
   },
   ROOM_RESPONSE: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "Would you like to go ahead with this room?",
-    buttons: [
+    buttonText: "Choose",
+    rows: [
       { id: ROOM_BOOK_BUTTON_ID, title: "Book this room" },
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other options" },
       { id: VIEW_PHOTOS_BUTTON_ID, title: "View photos" },
     ],
   },
+  // The actual booking-commitment tap -- converted to a list too per
+  // explicit user request (no arrow anywhere, even here), accepting the
+  // one extra tap (open the list, then pick) at the highest-stakes moment
+  // in the whole flow.
   CONFIRM_BOOKING: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "Ready to confirm your booking? 🎉",
-    buttons: [
+    buttonText: "Confirm",
+    rows: [
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
       { id: "not_yet", title: "Not yet" },
     ],
   },
   LANGUAGE_SELECT: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "Which language would you like to chat in? 😊",
-    buttons: [
+    buttonText: "Select language",
+    rows: [
       { id: "lang_en", title: "English" },
       { id: "lang_hi", title: "हिंदी" },
       { id: "lang_te", title: "తెలుగు" },
     ],
   },
   GREET_MENU: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "How can I help you today? 😊",
-    buttons: [
+    buttonText: "Choose",
+    rows: [
       { id: "greet_book", title: "Book a room" },
       // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
       // in handle-inbound-message.ts) — same id, so tapping "View rooms" here
@@ -136,9 +144,10 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
   // room's already been named (see resolveStageKey), reusing the two
   // already-deterministic handlers below rather than inventing new ones.
   PRICE_OBJECTION: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "No worries — want a more budget-friendly option, or to see our current offers? 😊",
-    buttons: [
+    buttonText: "Choose",
+    rows: [
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See cheaper room" },
       { id: SHOW_OFFERS_BUTTON_ID, title: "Show me offers" },
       { id: "continue_anyway", title: "Continue anyway" },
@@ -149,9 +158,10 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
   // (the reference code) is never AI-generated. Closes the one moment in the
   // whole flow that used to send as plain text with zero buttons.
   POST_BOOKING: {
-    type: "buttons",
+    type: "list",
     fallbackBody: "Anything else I can help with?",
-    buttons: [
+    buttonText: "Choose",
+    rows: [
       { id: "post_booking_question", title: "I have a question" },
       { id: "post_booking_done", title: "All set, thanks!" },
     ],
@@ -515,23 +525,23 @@ export function predictedStageInstruction(params: {
     hasStatedDates(params.history, params.guestMessage) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) {
-    return "If you recommend a specific room with its price in this reply, Book this room / See other options / View photos buttons will automatically appear underneath — end the reply right after naming the room, don't also ask a follow-up question in the same message.";
+    return "If you recommend a specific room with its price in this reply, a Book this room / See other options / View photos picker will automatically appear underneath — end the reply right after naming the room, don't also ask a follow-up question in the same message.";
   }
 
   const key = resolveStageKey({ ...params, replyText: "" });
   switch (key) {
     case "LANGUAGE_SELECT":
-      return "This is the guest's very first message. English / हिंदी / తెలుగు language-selection buttons will automatically appear under your reply — don't ask which language they prefer yourself, just write your normal short opener.";
+      return "This is the guest's very first message. An English / हिंदी / తెలుగు language-selection picker will automatically appear under your reply — don't ask which language they prefer yourself, just write your normal short opener.";
     case "GREET_MENU":
-      return "This is the guest's very first message and their language is already clear from how they wrote. \"Book a room\" / \"View rooms\" / \"Ask a question\" buttons will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the buttons already are the question.";
+      return "This is the guest's very first message and their language is already clear from how they wrote. A \"Book a room\" / \"View rooms\" / \"Ask a question\" picker will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the picker already is the question.";
     case "GUEST_COUNT":
       return "This reply's job: move toward learning how many people will be staying. A \"Just me\" / \"2 people\" / \"3+ people\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
       return "This reply's job: move toward learning their dates. A \"This weekend\" / \"Next week\" / \"I'll type dates\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask anything else in this same reply.";
     case "PRICE_OBJECTION":
-      return "See cheaper room / Show me offers / Continue anyway buttons will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
+      return "A See cheaper room / Show me offers / Continue anyway picker will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
     case "CONFIRM_BOOKING":
-      return "Confirm booking / Not yet buttons will automatically appear under your reply. Write a short, warm closing line, not a new question — mention that tapping instantly gives them a real reference code to quote at check-in, with nothing to pay right now (pay at the counter when they arrive), so they know what tapping actually does. Never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
+      return "A Confirm booking / Not yet picker will automatically appear under your reply. Write a short, warm closing line, not a new question — mention that tapping instantly gives them a real reference code to quote at check-in, with nothing to pay right now (pay at the counter when they arrive), so they know what tapping actually does. Never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
     default:
       // Nothing predictable — either no booking interest shown yet (plain
       // open chat) or genuinely nothing else applies; write normally.

@@ -157,7 +157,12 @@ async function attemptBookingCompletion(
   await sendAndPersist(
     tenant,
     contact,
-    { type: "interactive", body, buttons: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] },
+    {
+      type: "list",
+      body,
+      buttonText: "Choose",
+      sections: [{ rows: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] }],
+    },
     "Failed to send availability-conflict message"
   );
 }
