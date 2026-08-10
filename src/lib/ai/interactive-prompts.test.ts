@@ -319,6 +319,23 @@ describe("hasStatedGuestCount", () => {
   it("does NOT treat a bare number as a guest count with no prior assistant message at all", () => {
     expect(hasStatedGuestCount([], "2")).toBe(false);
   });
+
+  it("a bare-number answer keeps counting on LATER turns too, not just the one turn right after it was given -- a real regression found live: '2' was correctly recognized for exactly one turn, then silently forgotten the moment the conversation moved on (e.g. to picking dates), funneling the guest straight back into 'how many people will be staying?' again", () => {
+    const historyTwoTurnsLater = [
+      { role: "user", content: "I want to book a room" },
+      { role: "assistant", content: "How many people will be staying? 😊" },
+      { role: "user", content: "2" },
+      { role: "assistant", content: "When are you looking to stay?" },
+    ];
+    expect(hasStatedGuestCount(historyTwoTurnsLater, "Today (Mon, 10 Aug – Tue, 11 Aug)")).toBe(true);
+
+    const historyThreeTurnsLater = [
+      ...historyTwoTurnsLater,
+      { role: "user", content: "Today (Mon, 10 Aug – Tue, 11 Aug)" },
+      { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+    ];
+    expect(hasStatedGuestCount(historyThreeTurnsLater, "View photos")).toBe(true);
+  });
 });
 
 describe("hasStatedDates", () => {

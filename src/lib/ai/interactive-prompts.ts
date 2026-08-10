@@ -348,6 +348,29 @@ export function hasStatedGuestCount(history: { role: string; content: string }[]
     GUEST_COUNT_STATED_PATTERN.test(t)
   );
   if (explicit) return true;
+
+  // Live-caught regression in the bare-count fix above: it only checked
+  // whether the CURRENT message answers the CURRENT last question, so a
+  // bare "2" was correctly recognized for exactly one turn, then silently
+  // "forgotten" the moment the conversation moved on -- the very next turn
+  // re-scans the whole history with GUEST_COUNT_STATED_PATTERN alone, which
+  // never matched a bare number in the first place, so the guest got
+  // funneled straight back into "how many people will be staying?" again.
+  // Scanning every (assistant-asked, guest-bare-answered) pair across the
+  // WHOLE history -- not just the latest one -- makes a bare-number answer
+  // stick for the rest of the conversation the same way an explicit "2
+  // people" always has.
+  for (let i = 0; i < history.length - 1; i++) {
+    if (
+      history[i].role === "assistant" &&
+      history[i + 1].role === "user" &&
+      ASKED_GUEST_COUNT_PATTERN.test(history[i].content) &&
+      BARE_COUNT_REPLY_PATTERN.test(history[i + 1].content.trim())
+    ) {
+      return true;
+    }
+  }
+
   return lastAssistantMessageAskedGuestCount(history) && BARE_COUNT_REPLY_PATTERN.test(latestGuestMessage.trim());
 }
 

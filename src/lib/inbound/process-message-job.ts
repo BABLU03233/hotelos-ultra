@@ -115,11 +115,30 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     try {
       generated = await generateReply(tenantId, latestInbound.content, history, replyContext);
     } catch (err) {
-      // A dead-end here (missing/invalid ANTHROPIC_API_KEY, Voyage/Anthropic
-      // outage, rate limit, ...) must never leave the guest silently
-      // unanswered — surface it the same way an AI-side escalation would, so
-      // a human still finds out even though Anushka itself never got to reply.
+      // A dead-end here (every free-tier provider simultaneously exhausted,
+      // with no configured paid Anthropic key as the safety net -- a real,
+      // live-observed production gap, not hypothetical) previously only
+      // created a staff notification and returned -- the STAFF found out,
+      // but the GUEST got total silence, directly contradicting this
+      // function's own stated intent ("must never leave the guest silently
+      // unanswered") and the real behavior of an AI-side escalation, which
+      // always sends the guest a real holding message too. Now does the
+      // same: a fixed, safe holding reply, sent and persisted exactly like
+      // a normal reply, so the guest always gets *something* even in the
+      // worst-case total-outage scenario.
       console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
+      const holdingText = "Thanks for your message — let me get one of our team to help with that, they'll be with you shortly!";
+      try {
+        const creds = await getWhatsAppCredentials(tenantId);
+        if (creds) {
+          const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: holdingText });
+          await prisma.message.create({
+            data: { tenantId, contactId, direction: "OUT", type: "TEXT", content: holdingText, whatsappMessageId, status: "SENT" },
+          });
+        }
+      } catch (sendErr) {
+        console.error(`Holding-message send also failed for tenant ${tenantId}, contact ${contactId}:`, sendErr);
+      }
       await prisma.staffNotification.create({
         data: { tenantId, contactId, reason: `${agentNameFallback} couldn't generate a reply — needs a manual response.` },
       });
