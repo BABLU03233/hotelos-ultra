@@ -72,6 +72,18 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
   const agentNameFallback = profile?.aiAgentName?.trim() || "Anushka";
 
+  // Real room name + exact dates for the CONFIRM_BOOKING summary below --
+  // only fetched when both are actually known, so a guest sees exactly what
+  // they're confirming instead of a generic nudge with no specifics.
+  const pendingRoom =
+    contact.pendingRoomId && contact.pendingCheckIn && contact.pendingCheckOut
+      ? await prisma.room.findUnique({ where: { id: contact.pendingRoomId }, select: { name: true } })
+      : null;
+  const bookingSummary =
+    pendingRoom && contact.pendingCheckIn && contact.pendingCheckOut
+      ? { roomName: pendingRoom.name, checkIn: contact.pendingCheckIn, checkOut: contact.pendingCheckOut }
+      : undefined;
+
   // Closes a real class of bug found live twice: a weak fallback model
   // writing free text that ignores its own predicted-stage instruction
   // (e.g. asking about dates right under a language-selection list) while
@@ -87,6 +99,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     history,
     guestMessage: latestInbound.content,
     hotelName: profile?.name ?? undefined,
+    bookingSummary,
   });
 
   let generated: Awaited<ReturnType<typeof generateReply>>;

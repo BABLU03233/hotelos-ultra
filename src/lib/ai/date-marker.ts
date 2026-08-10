@@ -1,3 +1,5 @@
+import { todayMidnightIST } from "@/lib/india-time";
+
 /**
  * Tier 2 date capture (see quick-pick-dates.ts for Tier 1, the fully
  * deterministic button-tap path). Free-typed dates ("15th to 17th August")
@@ -23,7 +25,15 @@ export function extractDatesMarker(text: string, now: Date = new Date()): { text
   if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) return { text: cleaned };
   if (checkOut.getTime() <= checkIn.getTime()) return { text: cleaned };
 
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // "Today" here means India's calendar date, not the server's own clock --
+  // this was a live-caught gap this session found in every OTHER date/time
+  // call site (india-time.ts) but missed here: the server runs in UTC, and
+  // for ~5.5 hours nightly it's still on "yesterday" while India has already
+  // rolled over, which would otherwise wrongly reject a guest's genuinely
+  // valid same-day date, or wrongly accept one that's actually already past
+  // in India -- exactly the failure class the original past-date booking bug
+  // this whole session started from belongs to.
+  const todayMidnight = todayMidnightIST(now);
   if (checkIn.getTime() < todayMidnight.getTime()) return { text: cleaned };
 
   return { text: cleaned, dates: { checkIn, checkOut } };

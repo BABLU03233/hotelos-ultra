@@ -867,6 +867,36 @@ describe("resolveDeterministicReply", () => {
     expect(asRows(result?.interactive).map((r) => r.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
   });
 
+  it("restates the exact room and dates before asking to confirm, when the real booking details are known -- a real gap found live: the confirm prompt never actually said what was being confirmed, so a guest had no easy way to double-check before locking it in", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "sounds good",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+      bookingSummary: { roomName: "Deluxe Room", checkIn: new Date("2026-09-15T00:00:00"), checkOut: new Date("2026-09-17T00:00:00") },
+    });
+    expect(result?.text).toContain("Deluxe Room");
+    expect(result?.text).toContain("15 September 2026");
+    expect(result?.text).toContain("17 September 2026");
+    expect(result?.text).toContain("reference code");
+  });
+
+  it("falls back to the generic confirm text when no booking summary is available", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "sounds good",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+      ],
+    });
+    expect(result?.text).toBe(
+      "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!"
+    );
+  });
+
   it("gives a softer, non-repeated reply when the guest taps 'Not yet' -- a real gap found live: it was echoing the exact same push-to-confirm text right back at a guest who'd just declined", () => {
     const result = resolveDeterministicReply({
       ...base,

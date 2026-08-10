@@ -721,6 +721,11 @@ function timeOfDayGreeting(now: Date): string {
   return "Good evening!";
 }
 
+/** "15 September 2026" -- the exact stay dates shown back to the guest before final confirmation. */
+function formatDateHuman(date: Date): string {
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
 /**
  * Closes the exact class of bug found live twice in production: a weak
  * fallback model writes free text that ignores its own predicted-stage
@@ -743,6 +748,7 @@ export function resolveDeterministicReply(params: {
   guestMessage: string;
   hotelName?: string;
   now?: Date;
+  bookingSummary?: { roomName: string; checkIn: Date; checkOut: Date };
 }): { text: string; interactive: InteractivePrompt } | null {
   if (params.languageObvious) return null;
 
@@ -783,9 +789,20 @@ export function resolveDeterministicReply(params: {
     // row) got the exact same push-to-confirm text repeated verbatim right
     // back at them -- reads as not listening. A guest who just declined
     // gets a softer, no-pressure line instead of the identical nudge again.
-    text = /^not yet$/i.test(params.guestMessage.trim())
-      ? "No worries at all — take your time! 😊 Just tap Confirm booking whenever you're ready."
-      : "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
+    if (/^not yet$/i.test(params.guestMessage.trim())) {
+      text = "No worries at all — take your time! 😊 Just tap Confirm booking whenever you're ready.";
+    } else if (params.bookingSummary) {
+      // Live-caught gap: the confirm-booking prompt never actually restated
+      // WHAT was being confirmed -- a guest tapping "Confirm booking" had no
+      // easy way to double-check the room or dates before locking it in.
+      // Shown whenever the real booking details are known at this point in
+      // the conversation (see process-message-job.ts, which fetches the
+      // room name and pending dates from the contact record).
+      const { roomName, checkIn, checkOut } = params.bookingSummary;
+      text = `Just to confirm: ${roomName}, check-in ${formatDateHuman(checkIn)} and check-out ${formatDateHuman(checkOut)}. Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive! 🎉`;
+    } else {
+      text = "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
+    }
   } else {
     text = entry.fallbackBody;
   }
