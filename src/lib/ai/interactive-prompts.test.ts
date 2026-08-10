@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
   SHOW_OFFERS_BUTTON_ID,
@@ -24,6 +25,19 @@ import {
   selectDeterministicInteractive,
 } from "./interactive-prompts";
 
+// GUEST_COUNT/DATE_QUICK_PICK render as List Messages (no reply-arrow icon,
+// one extra tap), every other stage stays instant-tap buttons -- these
+// narrow the union and throw a clear, loud failure (not a silently-skipped
+// assertion) if a prompt's actual shape doesn't match what a test expects.
+function asButtons(prompt: InteractivePrompt | undefined): { id: string; title: string }[] {
+  if (prompt?.type !== "buttons") throw new Error(`expected a buttons-type prompt, got ${prompt?.type}`);
+  return prompt.buttons;
+}
+function asRows(prompt: InteractivePrompt | undefined): { id: string; title: string; description?: string }[] {
+  if (prompt?.type !== "list") throw new Error(`expected a list-type prompt, got ${prompt?.type}`);
+  return prompt.rows;
+}
+
 describe("extractInteractivePrompt", () => {
   it("returns the text unchanged when no BUTTONS marker is present", () => {
     const result = extractInteractivePrompt("Check-out is by 11:00 AM 🕚");
@@ -33,7 +47,7 @@ describe("extractInteractivePrompt", () => {
   it("strips the marker and resolves a known key", () => {
     const result = extractInteractivePrompt("How many guests will be staying?\nBUTTONS: GUEST_COUNT");
     expect(result.text).toBe("How many guests will be staying?");
-    expect(result.interactive?.buttons).toEqual([
+    expect(asRows(result.interactive)).toEqual([
       { id: "guests_1", title: "Just me" },
       { id: "guests_2", title: "2 people" },
       { id: "guests_3plus", title: "3+ people" },
@@ -42,13 +56,13 @@ describe("extractInteractivePrompt", () => {
 
   it("is case-insensitive on the key", () => {
     const result = extractInteractivePrompt("How many guests?\nbuttons: guest_count");
-    expect(result.interactive?.buttons).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(3);
   });
 
   it("resolves the ROOM_RESPONSE key at the RECOMMEND stage", () => {
     const result = extractInteractivePrompt("The Deluxe Room is ₹1,299/night with a great view.\nBUTTONS: ROOM_RESPONSE");
     expect(result.text).toBe("The Deluxe Room is ₹1,299/night with a great view.");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(asButtons(result.interactive).map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("falls back to plain text and warns on an unknown/hallucinated key", () => {
@@ -63,7 +77,7 @@ describe("extractInteractivePrompt", () => {
   it("only resolves the first marker if the model emits more than one", () => {
     const result = extractInteractivePrompt("Hi!\nBUTTONS: GUEST_COUNT\nBUTTONS: GUEST_COUNT");
     expect(result.text).toBe("Hi!");
-    expect(result.interactive?.buttons).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(3);
   });
 
   it("exports a stable CONFIRM_BOOKING_BUTTON_ID for downstream matching", () => {
@@ -73,19 +87,19 @@ describe("extractInteractivePrompt", () => {
   it("resolves a marker that shares a line with prose, keeping the prose", () => {
     const result = extractInteractivePrompt("Awesome, you're going to love it there! BUTTONS: CONFIRM_BOOKING");
     expect(result.text).toBe("Awesome, you're going to love it there!");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+    expect(asButtons(result.interactive).map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
   });
 
   it("resolves a key even with trailing punctuation right after it", () => {
     const result = extractInteractivePrompt("Great choice!\nBUTTONS: ROOM_RESPONSE.");
     expect(result.text).toBe("Great choice!");
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(asButtons(result.interactive).map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 
   it("resolves the CONFIRM_BOOKING key at the CLOSE stage, using the exported button id", () => {
     const result = extractInteractivePrompt("Ready when you are!\nBUTTONS: CONFIRM_BOOKING");
     expect(result.text).toBe("Ready when you are!");
-    expect(result.interactive?.buttons).toEqual([
+    expect(asButtons(result.interactive)).toEqual([
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
       { id: "not_yet", title: "Not yet" },
     ]);
@@ -94,22 +108,22 @@ describe("extractInteractivePrompt", () => {
   it("substitutes a non-empty fallback body when the model emits a bare marker with no sentence in front of it", () => {
     const result = extractInteractivePrompt("BUTTONS: CONFIRM_BOOKING");
     expect(result.text.length).toBeGreaterThan(0);
-    expect(result.interactive?.buttons).toHaveLength(2);
+    expect(asButtons(result.interactive)).toHaveLength(2);
   });
 
   it("substitutes a fallback body when only whitespace is left after stripping the marker", () => {
     const result = extractInteractivePrompt("   \n BUTTONS: GUEST_COUNT \n  ");
     expect(result.text.length).toBeGreaterThan(0);
-    expect(result.interactive?.buttons).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(3);
   });
 
   it("resolves the LANGUAGE_SELECT key, and ROOM_RESPONSE's 'see other options' button matches SEE_OTHER_ROOMS_BUTTON_ID", () => {
     const result = extractInteractivePrompt("Hi there! 😊\nBUTTONS: LANGUAGE_SELECT");
-    expect(result.interactive?.buttons).toHaveLength(3);
-    expect(result.interactive?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+    expect(asButtons(result.interactive)).toHaveLength(3);
+    expect(asButtons(result.interactive).map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
 
     const roomResponse = extractInteractivePrompt("Great room!\nBUTTONS: ROOM_RESPONSE");
-    expect(roomResponse.interactive?.buttons.map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
+    expect(asButtons(roomResponse.interactive).map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
   });
 });
 
@@ -160,28 +174,29 @@ describe("looksLikePriceOrOfferSignal", () => {
 describe("roomResponsePrompt", () => {
   it("returns the same three buttons as the ROOM_RESPONSE catalog entry", () => {
     const prompt = roomResponsePrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
+    expect(asButtons(prompt).map((b) => b.id)).toEqual([ROOM_BOOK_BUTTON_ID, SEE_OTHER_ROOMS_BUTTON_ID, VIEW_PHOTOS_BUTTON_ID]);
   });
 });
 
 describe("guestCountPrompt", () => {
-  it("returns the same three buttons as the GUEST_COUNT catalog entry", () => {
+  it("returns a list (not buttons) with the same three GUEST_COUNT rows -- no reply-arrow icon, per user request", () => {
     const prompt = guestCountPrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+    expect(prompt.type).toBe("list");
+    expect(asRows(prompt).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
   });
 });
 
 describe("confirmBookingPrompt", () => {
   it("returns the same two buttons as the CONFIRM_BOOKING catalog entry, with the stable button id", () => {
     const prompt = confirmBookingPrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+    expect(asButtons(prompt).map((b) => b.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
   });
 });
 
 describe("postBookingPrompt", () => {
   it("returns the same two buttons as the POST_BOOKING catalog entry", () => {
     const prompt = postBookingPrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual(["post_booking_question", "post_booking_done"]);
+    expect(asButtons(prompt).map((b) => b.id)).toEqual(["post_booking_question", "post_booking_done"]);
   });
 });
 
@@ -305,12 +320,13 @@ describe("looksLikeBareGreeting", () => {
 describe("greetMenuPrompt / dateQuickPickPrompt", () => {
   it("greetMenuPrompt's 'View rooms' button reuses SEE_OTHER_ROOMS_BUTTON_ID for the deterministic room-list handler", () => {
     const prompt = greetMenuPrompt();
-    expect(prompt.buttons.map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
+    expect(asButtons(prompt).map((b) => b.id)).toContain(SEE_OTHER_ROOMS_BUTTON_ID);
   });
 
-  it("dateQuickPickPrompt returns three date-shortcut buttons", () => {
+  it("dateQuickPickPrompt returns a list (not buttons) with three date-shortcut rows -- no reply-arrow icon, per user request", () => {
     const prompt = dateQuickPickPrompt();
-    expect(prompt.buttons.map((b) => b.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
+    expect(prompt.type).toBe("list");
+    expect(asRows(prompt).map((r) => r.id)).toEqual(["dates_weekend", "dates_nextweek", "dates_custom"]);
   });
 });
 
@@ -326,7 +342,7 @@ describe("selectDeterministicInteractive", () => {
 
   it("offers LANGUAGE_SELECT on the first reply when language isn't obvious", () => {
     const result = selectDeterministicInteractive({ ...base, isFirstReply: true, languageObvious: false });
-    expect(result?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+    expect(asButtons(result).map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
   });
 
   it("offers GREET_MENU on the first reply when language is already obvious", () => {
@@ -452,7 +468,7 @@ describe("selectDeterministicInteractive", () => {
     // per contact, so a guest (or tester) re-sending "Hi" later got zero
     // buttons at all, which read as "buttons are broken."
     const notObvious = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: false, guestMessage: "Hi" });
-    expect(notObvious?.buttons.map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+    expect(asButtons(notObvious).map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
 
     const obvious = selectDeterministicInteractive({ ...base, isFirstReply: false, languageObvious: true, guestMessage: "hello!" });
     expect(obvious).toEqual(greetMenuPrompt());
@@ -508,7 +524,7 @@ describe("selectDeterministicInteractive", () => {
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
       ],
     });
-    expect(result?.buttons.map((b) => b.id)).toEqual([SEE_OTHER_ROOMS_BUTTON_ID, SHOW_OFFERS_BUTTON_ID, "continue_anyway"]);
+    expect(asButtons(result).map((b) => b.id)).toEqual([SEE_OTHER_ROOMS_BUTTON_ID, SHOW_OFFERS_BUTTON_ID, "continue_anyway"]);
   });
 
   it("does NOT offer PRICE_OBJECTION before any room has ever been recommended", () => {

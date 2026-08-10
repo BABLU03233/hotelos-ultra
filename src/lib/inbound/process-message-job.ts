@@ -97,12 +97,21 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
 
   let whatsappMessageId: string;
   try {
-    // An interactive message carries its body text inside the same payload
-    // as the buttons (unlike IMAGE, which is a genuine separate follow-up
-    // message) — this replaces the text send for the turn, not adds to it.
-    whatsappMessageId = interactive
-      ? await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "interactive", body: reply, buttons: interactive.buttons })
-      : await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply });
+    // An interactive/list message carries its body text inside the same
+    // payload as the buttons/rows (unlike IMAGE, which is a genuine separate
+    // follow-up message) — this replaces the text send for the turn, not
+    // adds to it. GUEST_COUNT/DATE_QUICK_PICK render as a List Message
+    // (no reply-arrow icon, one extra tap to open) — see interactive-prompts.ts.
+    whatsappMessageId = !interactive
+      ? await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply })
+      : interactive.type === "list"
+        ? await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+            type: "list",
+            body: reply,
+            buttonText: interactive.buttonText,
+            sections: [{ rows: interactive.rows }],
+          })
+        : await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "interactive", body: reply, buttons: interactive.buttons });
   } catch (err) {
     console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({

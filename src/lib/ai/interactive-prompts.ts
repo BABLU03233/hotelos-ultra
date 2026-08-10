@@ -36,25 +36,47 @@ export const SHOW_OFFERS_BUTTON_ID = "show_offers";
 // too (shows the tenant's real FAQ list instead of free-texting through the AI).
 export const GREET_QUESTION_BUTTON_ID = "greet_question";
 
-export interface InteractivePrompt {
-  buttons: { id: string; title: string }[];
+// WhatsApp reply-buttons always render a small reply-arrow icon next to
+// every button — a hard, universal platform UI detail (every business,
+// every button, no exceptions; not something the Cloud API exposes any
+// control over). List Messages render as a bottom-sheet menu instead,
+// without that icon, at the cost of one extra tap (open the list, then
+// pick) versus a reply-button being immediately tappable inline. Guest
+// explicitly chose that trade for GUEST_COUNT/DATE_QUICK_PICK specifically
+// (the two most cosmetically-visible, least business-critical stages);
+// every other stage stays instant-tap buttons.
+export type InteractivePrompt =
+  | { type: "buttons"; buttons: { id: string; title: string }[] }
+  | { type: "list"; buttonText: string; rows: { id: string; title: string; description?: string }[] };
+
+type CatalogEntry =
+  | { type: "buttons"; fallbackBody: string; buttons: { id: string; title: string }[] }
+  | { type: "list"; fallbackBody: string; buttonText: string; rows: { id: string; title: string; description?: string }[] };
+
+function catalogToPrompt(entry: CatalogEntry): InteractivePrompt {
+  return entry.type === "list"
+    ? { type: "list", buttonText: entry.buttonText, rows: entry.rows }
+    : { type: "buttons", buttons: entry.buttons };
 }
 
-// fallbackBody: WhatsApp's interactive-button API requires non-empty body
-// text — live testing showed the AI sometimes emits a bare "BUTTONS: KEY"
-// line with no sentence in front of it (nothing left to strip after
-// removing the marker), which would otherwise reach Meta as an empty body
-// and fail to send. Used only when the AI's own text is empty/whitespace.
-const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string }> = {
+// fallbackBody: WhatsApp's interactive API requires non-empty body text —
+// live testing showed the AI sometimes emits a bare "BUTTONS: KEY" line
+// with no sentence in front of it (nothing left to strip after removing the
+// marker), which would otherwise reach Meta as an empty body and fail to
+// send. Used only when the AI's own text is empty/whitespace.
+const BUTTON_CATALOG: Record<string, CatalogEntry> = {
   GUEST_COUNT: {
+    type: "list",
     fallbackBody: "How many people will be staying? 😊",
-    buttons: [
+    buttonText: "Choose",
+    rows: [
       { id: "guests_1", title: "Just me" },
       { id: "guests_2", title: "2 people" },
       { id: "guests_3plus", title: "3+ people" },
     ],
   },
   ROOM_RESPONSE: {
+    type: "buttons",
     fallbackBody: "Would you like to go ahead with this room?",
     buttons: [
       { id: ROOM_BOOK_BUTTON_ID, title: "Book this room" },
@@ -63,6 +85,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     ],
   },
   CONFIRM_BOOKING: {
+    type: "buttons",
     fallbackBody: "Ready to confirm your booking? 🎉",
     buttons: [
       { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
@@ -70,6 +93,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     ],
   },
   LANGUAGE_SELECT: {
+    type: "buttons",
     fallbackBody: "Which language would you like to chat in? 😊",
     buttons: [
       { id: "lang_en", title: "English" },
@@ -78,6 +102,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     ],
   },
   GREET_MENU: {
+    type: "buttons",
     fallbackBody: "How can I help you today? 😊",
     buttons: [
       { id: "greet_book", title: "Book a room" },
@@ -90,6 +115,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     ],
   },
   DATE_QUICK_PICK: {
+    type: "list",
     // Deliberately no 📅/🗓️ emoji here or anywhere else guest-facing dates
     // are discussed — live-reported issue: on some phones' emoji font, the
     // calendar emoji's own artwork prints an arbitrary unrelated date (e.g.
@@ -98,7 +124,8 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
     // forgivable (see pipeline.ts's TONE section for the same rule applied
     // to the AI's own emoji choices).
     fallbackBody: "When are you looking to stay?",
-    buttons: [
+    buttonText: "Choose dates",
+    rows: [
       { id: "dates_weekend", title: "This weekend" },
       { id: "dates_nextweek", title: "Next week" },
       { id: "dates_custom", title: "I'll type dates" },
@@ -109,6 +136,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
   // room's already been named (see resolveStageKey), reusing the two
   // already-deterministic handlers below rather than inventing new ones.
   PRICE_OBJECTION: {
+    type: "buttons",
     fallbackBody: "No worries — want a more budget-friendly option, or to see our current offers? 😊",
     buttons: [
       { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See cheaper room" },
@@ -121,6 +149,7 @@ const BUTTON_CATALOG: Record<string, InteractivePrompt & { fallbackBody: string 
   // (the reference code) is never AI-generated. Closes the one moment in the
   // whole flow that used to send as plain text with zero buttons.
   POST_BOOKING: {
+    type: "buttons",
     fallbackBody: "Anything else I can help with?",
     buttons: [
       { id: "post_booking_question", title: "I have a question" },
@@ -150,12 +179,12 @@ export function extractInteractivePrompt(text: string): { text: string; interact
   if (!matches.length) return { text: cleaned };
 
   const key = matches[0][1].toUpperCase();
-  const prompt = BUTTON_CATALOG[key];
-  if (!prompt) {
+  const entry = BUTTON_CATALOG[key];
+  if (!entry) {
     console.warn(`Anushka emitted an unknown BUTTONS key: "${key}"`);
     return { text: cleaned };
   }
-  return { text: cleaned || prompt.fallbackBody, interactive: { buttons: prompt.buttons } };
+  return { text: cleaned || entry.fallbackBody, interactive: catalogToPrompt(entry) };
 }
 
 // Live testing found a real UX consequence of ROOM_RESPONSE's ~50% marker
@@ -193,19 +222,19 @@ export function looksLikePriceOrOfferSignal(text: string): boolean {
 }
 
 export function roomResponsePrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.ROOM_RESPONSE.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.ROOM_RESPONSE);
 }
 
 export function guestCountPrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.GUEST_COUNT.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.GUEST_COUNT);
 }
 
 export function confirmBookingPrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.CONFIRM_BOOKING.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.CONFIRM_BOOKING);
 }
 
 export function postBookingPrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.POST_BOOKING.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.POST_BOOKING);
 }
 
 // A prompt-only "never recommend a room before you know guest count" rule
@@ -333,11 +362,11 @@ function looksLikeLanguageSelection(text: string): boolean {
 }
 
 export function greetMenuPrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.GREET_MENU.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.GREET_MENU);
 }
 
 export function dateQuickPickPrompt(): InteractivePrompt {
-  return { buttons: BUTTON_CATALOG.DATE_QUICK_PICK.buttons };
+  return catalogToPrompt(BUTTON_CATALOG.DATE_QUICK_PICK);
 }
 
 // The single deterministic waterfall that decides which buttons (if any)
@@ -429,7 +458,7 @@ function resolveStageKey(params: {
 function promptForStageKey(key: StageKey): InteractivePrompt | undefined {
   switch (key) {
     case "LANGUAGE_SELECT":
-      return { buttons: BUTTON_CATALOG.LANGUAGE_SELECT.buttons };
+      return catalogToPrompt(BUTTON_CATALOG.LANGUAGE_SELECT);
     case "GREET_MENU":
       return greetMenuPrompt();
     case "GUEST_COUNT":
@@ -437,7 +466,7 @@ function promptForStageKey(key: StageKey): InteractivePrompt | undefined {
     case "ROOM_RESPONSE":
       return roomResponsePrompt();
     case "PRICE_OBJECTION":
-      return { buttons: BUTTON_CATALOG.PRICE_OBJECTION.buttons };
+      return catalogToPrompt(BUTTON_CATALOG.PRICE_OBJECTION);
     case "CONFIRM_BOOKING":
       return confirmBookingPrompt();
     case "DATE_QUICK_PICK":
@@ -496,9 +525,9 @@ export function predictedStageInstruction(params: {
     case "GREET_MENU":
       return "This is the guest's very first message and their language is already clear from how they wrote. \"Book a room\" / \"View rooms\" / \"Ask a question\" buttons will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the buttons already are the question.";
     case "GUEST_COUNT":
-      return "This reply's job: move toward learning how many people will be staying. \"Just me\" / \"2 people\" / \"3+ people\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask about dates or anything else in this same reply.";
+      return "This reply's job: move toward learning how many people will be staying. A \"Just me\" / \"2 people\" / \"3+ people\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
-      return "This reply's job: move toward learning their dates. \"This weekend\" / \"Next week\" / \"I'll type dates\" buttons will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the buttons cover it), but don't ask anything else in this same reply.";
+      return "This reply's job: move toward learning their dates. A \"This weekend\" / \"Next week\" / \"I'll type dates\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask anything else in this same reply.";
     case "PRICE_OBJECTION":
       return "See cheaper room / Show me offers / Continue anyway buttons will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
     case "CONFIRM_BOOKING":

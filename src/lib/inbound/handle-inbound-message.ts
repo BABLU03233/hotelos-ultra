@@ -2,6 +2,7 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
   SHOW_OFFERS_BUTTON_ID,
@@ -98,6 +99,13 @@ async function sendAndPersist(
   }
 }
 
+/** Converts an InteractivePrompt (buttons or list) plus body text into a ShortCircuitMessage — the one place that has to know both shapes. */
+function toShortCircuitInteractive(body: string, prompt: InteractivePrompt): ShortCircuitMessage {
+  return prompt.type === "list"
+    ? { type: "list", body, buttonText: prompt.buttonText, sections: [{ rows: prompt.rows }] }
+    : { type: "interactive", body, buttons: prompt.buttons };
+}
+
 const OFFER_MATCH_HISTORY_LIMIT = 20;
 
 /** Scans this contact's recent conversation for a real offer code (e.g. "FLAT100") to snapshot onto the booking — see offer-match.ts. */
@@ -138,12 +146,7 @@ async function attemptBookingCompletion(
       offerSnapshot: matchedOffer?.title,
     });
     const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(
-      tenant,
-      contact,
-      { type: "interactive", body: confirmationText, buttons: postBookingPrompt().buttons },
-      "Failed to send booking confirmation"
-    );
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(confirmationText, postBookingPrompt()), "Failed to send booking confirmation");
     return;
   }
 
@@ -299,7 +302,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       const body = contact.pendingRoomId
         ? "Just need your dates to lock this in — when are you thinking?"
         : "Let's get your dates sorted first — when are you thinking?";
-      await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: dateQuickPickPrompt().buttons }, "Failed to send date-quick-pick prompt");
+      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, dateQuickPickPrompt()), "Failed to send date-quick-pick prompt");
       return;
     }
 
@@ -315,12 +318,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // complete without room/date fields so the guest still gets a booking.
     const fallbackBooking = await completeBooking(prisma, tenant.id, contact.id);
     const fallbackText = `You're all set! Your booking reference is ${fallbackBooking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(
-      tenant,
-      contact,
-      { type: "interactive", body: fallbackText, buttons: postBookingPrompt().buttons },
-      "Failed to send booking confirmation"
-    );
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(fallbackText, postBookingPrompt()), "Failed to send booking confirmation");
     return;
   }
 
@@ -360,7 +358,12 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // A guest asked to try different dates after an availability conflict.
   if (msg.interactiveId === "dates_retry") {
     if (contact.aiPaused) return;
-    await sendAndPersist(tenant, contact, { type: "interactive", body: "No problem — when else works for you?", buttons: dateQuickPickPrompt().buttons }, "Failed to send date-retry prompt");
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive("No problem — when else works for you?", dateQuickPickPrompt()),
+      "Failed to send date-retry prompt"
+    );
     return;
   }
 
@@ -478,7 +481,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (room) {
       await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: room.id } });
       const body = `${room.name} — from ₹${room.price}/night. Want to go ahead with this one?`;
-      await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: roomResponsePrompt().buttons }, "Failed to send room-pick response");
+      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt()), "Failed to send room-pick response");
       return;
     }
     // Not found (stale/cross-tenant id) — fall through to the AI queue.
@@ -493,7 +496,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
 
     const body = "Great choice! Ready to confirm your booking? 🎉";
-    await sendAndPersist(tenant, contact, { type: "interactive", body, buttons: confirmBookingPrompt().buttons }, "Failed to send confirm-booking prompt");
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, confirmBookingPrompt()), "Failed to send confirm-booking prompt");
     return;
   }
 
