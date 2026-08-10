@@ -287,6 +287,18 @@ describe("hasStatedDates", () => {
     expect(hasStatedDates([], "2 guests, budget 1500")).toBe(false);
   });
 
+  it("does not false-positive on ordinary words that happen to start with a weekday/month abbreviation -- a real gap found live: 'last month' was read as a stated date, wrongly treating a complaint as booking intent", () => {
+    expect(hasStatedDates([], "I stayed here last month and the wifi was terrible")).toBe(false);
+    expect(hasStatedDates([], "maybe next time")).toBe(false);
+    expect(hasStatedDates([], "do kids under 5 stay free")).toBe(false);
+  });
+
+  it("still detects full weekday/month names, not just the 3-letter abbreviation", () => {
+    expect(hasStatedDates([], "let's say Monday")).toBe(true);
+    expect(hasStatedDates([], "sometime in June")).toBe(true);
+    expect(hasStatedDates([], "arriving in December")).toBe(true);
+  });
+
   it("finds a date stated earlier in history", () => {
     const history = [{ role: "user", content: "checking in this weekend" }];
     expect(hasStatedDates(history, "sounds good")).toBe(true);
@@ -392,6 +404,16 @@ describe("selectDeterministicInteractive", () => {
 
   it("offers GUEST_COUNT whenever guest count is unknown, regardless of what else is in the reply", () => {
     const result = selectDeterministicInteractive({ ...base, guestMessage: "this weekend, budget 1500" });
+    expect(result).toEqual(guestCountPrompt());
+  });
+
+  it("does NOT force GUEST_COUNT when the guest is trying to cancel/change an existing booking -- a real gap found live: 'I need to cancel my booking, reference HOT-9999' was hijacked into asking for a brand-new booking's guest count, completely ignoring the cancellation request", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "I need to cancel my booking, reference HOT-9999" });
+    expect(result).toBeUndefined();
+  });
+
+  it("still offers GUEST_COUNT for a genuine new-booking message that happens to contain 'book'", () => {
+    const result = selectDeterministicInteractive({ ...base, guestMessage: "I want to book a room" });
     expect(result).toEqual(guestCountPrompt());
   });
 

@@ -304,8 +304,23 @@ export function hasStatedGuestCount(history: { role: string; content: string }[]
 // far more ways than guest count is, so a narrow pattern would re-ask
 // annoyingly often; a broad one occasionally skips the prompt when it
 // technically could have fired, which is the safer failure direction here.
+//
+// Live-caught structural bug: the trailing \b was only attached to the very
+// LAST alternative in the group (a regex authoring mistake, not a deliberate
+// choice) -- every earlier alternative had no closing boundary at all, so a
+// 3-letter weekday/month abbreviation matched as a bare PREFIX of any longer
+// unrelated word: "mon" inside "month", "may" inside "maybe". A guest
+// complaining "I stayed here last month..." was wrongly read as having
+// already stated dates, which fed straight into treating the message as
+// booking intent and skipping to "how many guests?" instead of engaging
+// with the actual complaint. Fixed by moving \b to apply to the whole group
+// (every alternative), and spelling out each month's optional full-word
+// suffix the same way the weekday alternatives already do (mon(day)?,
+// fri(day)?, ...) -- needed so "Aug" and "August" both still match, since a
+// blanket trailing boundary alone would otherwise break the intentional
+// prefix-of-a-full-month-name case too.
 const DATE_STATED_PATTERN =
-  /\b(weekend|tonight|tomorrow|today|next week|this week|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th)\b)/i;
+  /\b(weekend|tonight|tomorrow|today|next week|this week|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th))\b/i;
 
 export function hasStatedDates(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
@@ -336,6 +351,21 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
 // meaningfully weakening real intent detection.
 const BOOKING_INTENT_PATTERN =
   /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|accommodation|offers?|discounts?|deals?|promos?|coupons?)\b/i;
+
+// Live-caught: "I need to cancel my booking, reference HOT-9999" matched
+// BOOKING_INTENT_PATTERN via the word "booking" itself, then got funneled
+// straight into "how many people will be staying?" -- a brand-new-booking
+// question that completely ignores a guest trying to CANCEL an existing
+// one. This app has no automated cancellation flow (only a static
+// cancellationPolicy line shown in the system prompt), so a request to
+// manage an existing booking needs to reach the AI's own judgment (which
+// can escalate to staff per the RULES section) rather than being hijacked
+// by the new-booking funnel.
+const EXISTING_BOOKING_REQUEST_PATTERN = /\b(cancel|refund|reschedul(e|ing)|change (my|the) (booking|reservation)|modify (my|the) (booking|reservation))\b/i;
+
+function looksLikeExistingBookingRequest(text: string): boolean {
+  return EXISTING_BOOKING_REQUEST_PATTERN.test(text);
+}
 
 // Real production conversation caught this: it only scanned the GUEST's own
 // words, but a real guest keeps replying in short, contentless
@@ -469,7 +499,7 @@ function resolveStageKey(params: {
   // recommended a specific room (or asked for guest count) was a severe
   // text/button mismatch. Language-select is now the *fallback* for a
   // first reply with nothing more specific to say, not an override.
-  if (intentShown) {
+  if (intentShown && !looksLikeExistingBookingRequest(guestMessage)) {
     if (!hasStatedGuestCount(history, guestMessage)) {
       return "GUEST_COUNT";
     }
