@@ -259,6 +259,11 @@ describe("hasStatedGuestCount", () => {
     expect(hasStatedGuestCount([], "book for 2 nights")).toBe(false);
     expect(hasStatedGuestCount([], "staying for 3 days")).toBe(false);
   });
+
+  it("detects 'log'/'logon' -- Hindi/Hinglish for 'people' (a real gap found live: '2 log ke liye room chahiye' wasn't recognized)", () => {
+    expect(hasStatedGuestCount([], "2 log ke liye room chahiye is weekend")).toBe(true);
+    expect(hasStatedGuestCount([], "3 logon ke liye Premium Room theek hai")).toBe(true);
+  });
 });
 
 describe("hasStatedDates", () => {
@@ -580,6 +585,15 @@ describe("hasExpressedBookingIntent", () => {
     expect(hasExpressedBookingIntent([], "haha nice")).toBe(false);
   });
 
+  it("does not treat a plain factual check-in/check-out question as booking intent -- a real gap found live: this was railroading the guest's actual question straight into a 'how many guests?' funnel instead of answering it", () => {
+    expect(hasExpressedBookingIntent([], "what time is check-in and what's your cancellation policy?")).toBe(false);
+    expect(hasExpressedBookingIntent([], "what's the checkout time?")).toBe(false);
+  });
+
+  it("still detects intent when check-in/check-out appears alongside a stronger booking signal", () => {
+    expect(hasExpressedBookingIntent([], "I want to book a room, check-in tomorrow")).toBe(true);
+  });
+
   it("finds intent stated earlier in history, not just the latest message", () => {
     const history = [{ role: "user", content: "hi, I want to book a room" }];
     expect(hasExpressedBookingIntent(history, "sure")).toBe(true);
@@ -741,6 +755,21 @@ describe("resolveDeterministicReply", () => {
       ],
     });
     expect(result?.text).toContain("reference code");
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
+  });
+
+  it("gives a softer, non-repeated reply when the guest taps 'Not yet' -- a real gap found live: it was echoing the exact same push-to-confirm text right back at a guest who'd just declined", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "Not yet",
+      history: [
+        { role: "user", content: "2 guests" },
+        { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+        { role: "user", content: "sounds good" },
+        { role: "assistant", content: "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code" },
+      ],
+    });
+    expect(result?.text).not.toContain("reference code");
     expect(asRows(result?.interactive).map((r) => r.id)).toEqual([CONFIRM_BOOKING_BUTTON_ID, "not_yet"]);
   });
 

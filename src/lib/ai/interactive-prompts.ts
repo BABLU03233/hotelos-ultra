@@ -284,8 +284,15 @@ export function postBookingPrompt(): InteractivePrompt {
 // "for N" (e.g. "a room for 2") is a real, common phrasing live testing
 // caught this pattern missing — added with a negative lookahead so "for 2
 // nights/days" (a duration, not a headcount) doesn't false-positive.
+// "log"/"logon" (Hindi/Hinglish for "people") is a second real, live-caught
+// gap: a guest typing "2 log ke liye room chahiye" (very natural Hinglish
+// for "need a room for 2 people") wasn't recognized at all, silently
+// re-asking a question the guest had already answered in the same message
+// — exactly the pattern this file's own system prompt tells the AI to
+// expect from real Hyderabad WhatsApp chats (see pipeline.ts's LANGUAGE
+// section), so the deterministic side needs to expect it too.
 const GUEST_COUNT_STATED_PATTERN =
-  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us)/i;
+  /\b(\d+\+?\s*(guests?|people|persons?|pax|adults?|log(?:on)?)|for \d+\+?(?!\s*(nights?|days?|hours?))\b|just me\b|myself\b|solo\b|only me\b|family of \d+|we are \d+|there(?:'s| is) \d+ of us)/i;
 
 export function hasStatedGuestCount(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some((t) =>
@@ -316,8 +323,19 @@ export function hasStatedDates(history: { role: string; content: string }[], lat
 // kick in at all — before that, replies fall through to whatever the AI
 // itself decides (usually nothing, i.e. a normal conversational reply),
 // giving room for a genuine "how can I help" exchange first.
+//
+// Deliberately does NOT include "check-in"/"check-out" — live-caught the
+// same "railroaded" problem this comment describes, just from a different
+// direction: a guest asking a plain factual question ("what time is
+// check-in?", "what's your cancellation policy?") got funneled straight
+// into resolveDeterministicReply's GUEST_COUNT bypass, which skips the AI
+// call entirely, so the guest's actual question never got answered at all.
+// A genuine booking-intent message almost always ALSO contains a stronger
+// signal from this same list ("room", "book", "available", a stated date) —
+// dropping these two specific words closes the false-positive without
+// meaningfully weakening real intent detection.
 const BOOKING_INTENT_PATTERN =
-  /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|check-?in|check-?out|accommodation|offers?|discounts?|deals?|promos?|coupons?)\b/i;
+  /\b(book(ing)?|room|stay(ing)?|available|availability|vacan(t|cy)|reserve|reservation|rate|price|cost|accommodation|offers?|discounts?|deals?|promos?|coupons?)\b/i;
 
 // Real production conversation caught this: it only scanned the GUEST's own
 // words, but a real guest keeps replying in short, contentless
@@ -641,7 +659,13 @@ export function resolveDeterministicReply(params: {
     const from = params.hotelName ? ` from ${params.hotelName}` : "";
     text = `${greeting} 😊 This is Anushka${from} — thank you for reaching out! Which language are you comfortable in?`;
   } else if (key === "CONFIRM_BOOKING") {
-    text = "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
+    // Live-caught: a guest tapping "Not yet" (CONFIRM_BOOKING's own decline
+    // row) got the exact same push-to-confirm text repeated verbatim right
+    // back at them -- reads as not listening. A guest who just declined
+    // gets a softer, no-pressure line instead of the identical nudge again.
+    text = /^not yet$/i.test(params.guestMessage.trim())
+      ? "No worries at all — take your time! 😊 Just tap Confirm booking whenever you're ready."
+      : "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
   } else {
     text = entry.fallbackBody;
   }
