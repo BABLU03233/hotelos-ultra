@@ -8,13 +8,22 @@ import { AIProvider } from "./provider";
  * to the other providers — any single free model can be individually
  * rate-limited or briefly flaky, so multiple independent attempts is real
  * redundancy, not just a nicer default.
+ *
+ * `apiKeyEnvVar` defaults to the original single-account env var for
+ * backward compatibility, but accepts a second account's key too — the same
+ * "second account, not just a second token" reasoning already used for
+ * Groq/Gemini applies here: OpenRouter's free-model cap is 50 requests/day
+ * for the *whole account*, shared across every model on that key, so a
+ * second account's key is real independent quota, not redundant retries
+ * against the same limit.
  */
-export function createOpenRouterProvider(model: string): AIProvider {
+export function createOpenRouterProvider(model: string, apiKeyEnvVar: string = "OPENROUTER_API_KEY"): AIProvider {
+  const label = apiKeyEnvVar === "OPENROUTER_API_KEY" ? `openrouter:${model}` : `openrouter-2:${model}`;
   return {
-    name: `openrouter:${model}`,
+    name: label,
     async chat({ systemPrompt, messages }) {
-      const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set");
+      const apiKey = process.env[apiKeyEnvVar];
+      if (!apiKey) throw new Error(`${apiKeyEnvVar} is not set`);
 
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -39,7 +48,7 @@ export function createOpenRouterProvider(model: string): AIProvider {
       });
 
       if (!res.ok) {
-        throw new Error(`OpenRouter chat failed (${res.status}, model=${model}): ${await res.text()}`);
+        throw new Error(`OpenRouter chat failed (${res.status}, ${label}): ${await res.text()}`);
       }
 
       const json = (await res.json()) as { choices: { message: { content: string } }[] };
@@ -49,7 +58,7 @@ export function createOpenRouterProvider(model: string): AIProvider {
       // any visible answer is written — live-observed on this exact chain.
       // Treating it as success would let the fallback chain hand a guest a
       // blank WhatsApp message; throwing instead sends it to the next model.
-      if (!content.trim()) throw new Error(`OpenRouter returned empty content (model=${model})`);
+      if (!content.trim()) throw new Error(`OpenRouter returned empty content (${label})`);
       return content;
     },
   };
