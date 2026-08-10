@@ -115,7 +115,7 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
     fallbackBody: "How may I help you today? 😊",
     buttonText: "Choose",
     rows: [
-      { id: "greet_book", title: "I want to book a room", description: "Tell us your dates and party size" },
+      { id: "greet_book", title: "I want to book a room" },
       // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
       // in handle-inbound-message.ts) — same id, so tapping this row here
       // gets the exact same real-data List Message as tapping "See other
