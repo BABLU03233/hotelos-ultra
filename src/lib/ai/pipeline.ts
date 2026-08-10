@@ -20,7 +20,7 @@ import { mistralProvider } from "./mistral-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
-import { hasHallucinationRisk, SAFE_REPLY_FALLBACK } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK } from "./reply-safety";
 import { sambanovaProvider } from "./sambanova-provider";
 
 // Curated OpenRouter free-tier models for the fallback tier below, ordered
@@ -161,7 +161,7 @@ async function buildSystemPrompt(
   retrievedContext: string[],
   context?: ReplyContext,
   interactiveState?: { history: ChatMessage[]; guestMessage: string }
-): Promise<{ prompt: string; agentName: string }> {
+): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string> }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
     prisma.room.findMany({ where: { tenantId } }),
@@ -255,7 +255,7 @@ ${faqLines}
 ${retrievedContext.length ? `RELEVANT KNOWLEDGE BASE EXCERPTS\n${retrievedContext.join("\n---\n")}\n` : ""}${buildConversationContext(agentName, context)}
 RULES
 - Your job isn't just to answer questions — it's to nurture every single lead toward an actual booking, whether they came from a Meta ad, messaged you directly, or are from an old contact list (see CONVERSATION CONTEXT below for how to open with each). Never be passive: after answering, always have a sense of "what's the next small step that gets this person closer to booking" and let it shape your reply. That doesn't mean pushing hard on every message — see CONVERSATION FLOW below for pacing — but a purely informational, going-nowhere reply is a missed chance.
-- Only answer using the information above. Never invent prices, policies, room types, or availability that isn't stated here. This includes phone numbers — there is no phone number listed above for guests to call, so never make one up or tell a guest to call anyone.
+- Only answer using the information above. Never invent prices, policies, room types, or availability that isn't stated here. This includes phone numbers — only give one out if it's explicitly listed in the additional instructions from the hotel above; if none is listed, never make one up or tell a guest to call anyone.
 - This applies just as strictly to physical building features — lifts/elevators, wheelchair access, ramps, ground-floor rooms, or any other accessibility detail. If a guest asks and it isn't explicitly stated above, say plainly you'll confirm with the team rather than guessing — a wrong guess here isn't just an inconvenience, it can genuinely strand a guest who can't use stairs.
 - Never claim a booking is confirmed, and never give out a reference/confirmation number yourself — only a tap on the Confirm booking button actually completes a booking. If a guest types something like "yes, book it" instead of tapping, respond with enthusiasm but do not say it's booked or done; just encourage them to tap Confirm booking.
 - If you don't have enough information to answer confidently, reply with EXACTLY: "${ESCALATE_MARKER} <one short reason>" and nothing else — a staff member will take over from there.
@@ -317,7 +317,7 @@ PHOTOS
 - If a guest asks to see a room, photos, or what it looks like — or taps the "View photos" button, which arrives as the guest's message just like any typed text — send the real photo URLs listed for that room above. Since the tap always comes right after you named a specific room, that's the room whose photos to send — don't ask which room they mean. Add a line for each photo in the exact format "IMAGE: <url>" (one per line, at most 3), placed after your normal reply text. Only use URLs that are literally listed above — never invent or guess a URL, and never send a photo for a room that has none listed. If that room genuinely has no photos listed, say so plainly instead of sending nothing silently.
 `.trim();
 
-  return { prompt, agentName };
+  return { prompt, agentName, legitimatePhoneNumbers: extractLegitimatePhoneNumbers(profile?.aiSystemPrompt ?? "") };
 }
 
 export interface GenerateReplyResult {
@@ -347,7 +347,7 @@ export async function generateReply(
   context?: ReplyContext
 ): Promise<GenerateReplyResult> {
   const retrieved = await retrieveRelevantChunks(tenantId, guestMessage).catch(() => []);
-  const { prompt: systemPrompt, agentName } = await buildSystemPrompt(tenantId, retrieved, context, { history, guestMessage });
+  const { prompt: systemPrompt, agentName, legitimatePhoneNumbers } = await buildSystemPrompt(tenantId, retrieved, context, { history, guestMessage });
 
   const reply = await aiProvider.chat({
     systemPrompt,
@@ -372,7 +372,7 @@ export async function generateReply(
   // fabricated phone number or a false "booking confirmed" claim in prose,
   // most often when a guest types confirmation instead of tapping the
   // button. Swapped for a safe generic line rather than a partial rewrite.
-  const text = hasHallucinationRisk(rawText) ? SAFE_REPLY_FALLBACK : rawText;
+  const text = hasHallucinationRisk(rawText, legitimatePhoneNumbers) ? SAFE_REPLY_FALLBACK : rawText;
   // The deterministic waterfall (see selectDeterministicInteractive) is now
   // the primary decision-maker for which buttons accompany a reply, not the
   // AI's own "BUTTONS: X" marker — prompt-only button decisions proved
