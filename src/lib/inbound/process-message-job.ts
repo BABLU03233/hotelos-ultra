@@ -78,6 +78,10 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     leadSource: contact.leadSource,
     sourceDetail: contact.sourceDetail,
     knownGuestCount,
+    // Lets buildSystemPrompt resolve real availability for exactly these
+    // dates before the reply is written, so an already-booked room is never
+    // recommended (see availability.ts).
+    stayDates: contact.pendingCheckIn && contact.pendingCheckOut ? { checkIn: contact.pendingCheckIn, checkOut: contact.pendingCheckOut } : null,
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });

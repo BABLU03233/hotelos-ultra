@@ -30,3 +30,39 @@ export async function isRoomAvailable(prisma: PrismaClient, tenantId: string, ro
   });
   return !conflict;
 }
+
+/**
+ * Every room already taken for a date range, in one query — the same overlap
+ * rule as isRoomAvailable above, asked for the whole inventory at once
+ * instead of once per room.
+ *
+ * This exists because availability used to be consulted at exactly one
+ * moment: the "Confirm booking" tap, i.e. after the guest had already been
+ * shown a room, sent its photos, agreed dates, and committed. Everything
+ * before that point was a promise the hotel might not be able to keep, and
+ * the clash surfaced at the single worst moment in the conversation. Knowing
+ * the taken set up front lets the recommendation itself be honest — the
+ * booking either can't be offered, or it can be kept.
+ *
+ * Returns a Set of roomIds to avoid an N+1 across the room list, and because
+ * every caller wants membership tests rather than the rows themselves.
+ */
+export async function findUnavailableRoomIds(
+  prisma: PrismaClient,
+  tenantId: string,
+  checkIn: Date,
+  checkOut: Date
+): Promise<Set<string>> {
+  const conflicts = await prisma.booking.findMany({
+    where: {
+      tenantId,
+      status: { not: "CANCELLED" },
+      checkIn: { lt: checkOut },
+      checkOut: { gt: checkIn },
+      roomId: { not: null },
+    },
+    select: { roomId: true },
+    distinct: ["roomId"],
+  });
+  return new Set(conflicts.map((c) => c.roomId).filter((id): id is string => id !== null));
+}

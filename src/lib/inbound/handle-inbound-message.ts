@@ -14,7 +14,7 @@ import {
   roomResponsePrompt,
 } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
-import { isRoomAvailable } from "@/lib/booking/availability";
+import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
 import { parseFlowDateRange } from "@/lib/booking/parse-flow-response";
@@ -32,6 +32,23 @@ import { InboundMessage, StatusUpdate } from "@/lib/whatsapp/webhook";
 import { uploadObject } from "@/lib/storage/s3";
 
 const OPT_OUT_CONFIRMATION = "You're unsubscribed from promotional messages and won't get any more offers or reminders. Message us anytime if you still need help with a booking.";
+
+/**
+ * The tenant's rooms, minus any already booked for the dates this guest has
+ * settled on. Both room lists the guest can be shown go through here, for
+ * the same reason the AI's own room list does (see availability.ts): a list
+ * that offers a room the hotel can't actually give them is worse than a
+ * shorter list, and the clash would otherwise only surface at the final tap.
+ *
+ * With no dates agreed yet there's nothing to check against, so the full
+ * list is correct — that's a browsing guest, not a booking one.
+ */
+async function bookableRooms(tenantId: string, contact: { pendingCheckIn: Date | null; pendingCheckOut: Date | null }) {
+  const rooms = await prisma.room.findMany({ where: { tenantId }, orderBy: { price: "asc" } });
+  if (!contact.pendingCheckIn || !contact.pendingCheckOut) return rooms;
+  const taken = await findUnavailableRoomIds(prisma, tenantId, contact.pendingCheckIn, contact.pendingCheckOut).catch(() => new Set<string>());
+  return rooms.filter((r) => !taken.has(r.id));
+}
 
 function mapMessageType(type: InboundMessage["type"]): MessageType {
   switch (type) {
@@ -313,10 +330,23 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       return;
     }
 
-    // Dates known, room missing — ask them to pick one from the real list.
-    const roomsForConfirm = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
+    // Dates known, room missing — ask them to pick one from the real list,
+    // narrowed to what's actually free for those dates.
+    const roomsForConfirm = await bookableRooms(tenant.id, contact);
     if (roomsForConfirm.length) {
       await sendAndPersist(tenant, contact, buildRoomListMessage(roomsForConfirm), "Failed to send room list");
+      return;
+    }
+    // Dates are known here by definition, so an empty list means genuinely
+    // sold out rather than a hotel with no rooms configured.
+    const anyRooms = await prisma.room.count({ where: { tenantId: tenant.id } });
+    if (anyRooms) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt()),
+        "Failed to send fully-booked message"
+      );
       return;
     }
 
@@ -483,9 +513,21 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   if (msg.interactiveId === SEE_OTHER_ROOMS_BUTTON_ID) {
     if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
 
-    const rooms = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
+    const rooms = await bookableRooms(tenant.id, contact);
     if (rooms.length) {
       await sendAndPersist(tenant, contact, buildRoomListMessage(rooms), "Failed to send room list");
+      return;
+    }
+    // Everything is booked for the dates they've settled on -- say so and
+    // reopen dates, rather than sending an empty list or (worse) letting
+    // them keep negotiating for a room that can't be given to them.
+    if (contact.pendingCheckIn && contact.pendingCheckOut) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt()),
+        "Failed to send fully-booked message"
+      );
       return;
     }
     // No rooms configured for this tenant (shouldn't happen operationally,
@@ -506,6 +548,28 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     const roomId = msg.interactiveId.slice("room_pick_".length);
     const room = await prisma.room.findFirst({ where: { id: roomId, tenantId: tenant.id } });
     if (room) {
+      // The lists this tap comes from are already filtered by availability,
+      // but a list sent BEFORE the guest settled their dates stays tappable
+      // in their chat history indefinitely — so the room is re-checked at
+      // the moment of the tap rather than trusting how the list looked when
+      // it was sent. Without this, the stale-list path walks the guest right
+      // back into committing to a room that's gone.
+      const free =
+        !contact.pendingCheckIn || !contact.pendingCheckOut
+          ? true
+          : await isRoomAvailable(prisma, tenant.id, room.id, contact.pendingCheckIn, contact.pendingCheckOut).catch(() => true);
+      if (!free) {
+        await sendAndPersist(
+          tenant,
+          contact,
+          toShortCircuitInteractive(
+            `Ah — the ${room.name} is already booked for those dates 😔 Want to see what else we have free, or try different dates?`,
+            dateQuickPickPrompt()
+          ),
+          "Failed to send room-unavailable message"
+        );
+        return;
+      }
       await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: room.id } });
       const body = `${room.name} — from ₹${room.price}/night. Want to go ahead with this one?`;
       await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt()), "Failed to send room-pick response");

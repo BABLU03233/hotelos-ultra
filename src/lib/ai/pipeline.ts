@@ -1,4 +1,5 @@
 import { LeadSource } from "@/generated/prisma/enums";
+import { findUnavailableRoomIds } from "@/lib/booking/availability";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { extractDatesMarker } from "./date-marker";
@@ -126,6 +127,13 @@ export interface ReplyContext {
    * last 12 messages — see src/lib/booking/guest-count.ts.
    */
   knownGuestCount?: number | null;
+  /**
+   * The dates the guest has settled on so far (Contact.pendingCheckIn /
+   * pendingCheckOut), or null if they're still unknown. When present, room
+   * availability is resolved for exactly this range before the reply is
+   * written, so an already-booked room is never recommended.
+   */
+  stayDates?: { checkIn: Date; checkOut: Date } | null;
 }
 
 function buildConversationContext(agentName: string, context?: ReplyContext): string {
@@ -154,6 +162,17 @@ function buildConversationContext(agentName: string, context?: ReplyContext): st
   return "";
 }
 
+/**
+ * "12 Aug → 14 Aug" for the guest's settled stay. India-timezone-anchored
+ * like every other date this app renders — the server runs in UTC, and for
+ * ~5.5 hours nightly its calendar date is a day behind India's (see
+ * india-time.ts).
+ */
+function formatStayRange(stay: { checkIn: Date; checkOut: Date }): string {
+  const fmt = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+  return `${fmt(stay.checkIn)} → ${fmt(stay.checkOut)}`;
+}
+
 async function buildSystemPrompt(
   tenantId: string,
   retrievedContext: string[],
@@ -169,14 +188,37 @@ async function buildSystemPrompt(
 
   const agentName = profile?.aiAgentName?.trim() || "Anushka";
 
+  // Availability used to be consulted at exactly one moment -- the "Confirm
+  // booking" tap -- which meant Anushka could recommend a room, send its
+  // photos, and negotiate dates for it, only for the clash to surface after
+  // the guest had already committed. Once the guest's dates are known, the
+  // taken rooms are resolved up front (one query, see availability.ts) and
+  // held out of the recommendable set, so the recommendation is something
+  // the hotel can actually honour.
+  const stay = context?.stayDates;
+  const unavailableRoomIds = stay ? await findUnavailableRoomIds(prisma, tenantId, stay.checkIn, stay.checkOut).catch(() => new Set<string>()) : new Set<string>();
+
+  const describeRoom = (r: (typeof rooms)[number]) => {
+    const base = `- ${r.name} (${r.type}): ₹${r.price}/night, sleeps ${r.capacity}. ${r.description ?? ""}`.trim();
+    const photos = r.imageUrls.length ? ` Photos: ${r.imageUrls.join(", ")}` : "";
+    return base + photos;
+  };
+  const bookableRooms = rooms.filter((r) => !unavailableRoomIds.has(r.id));
+  const takenRooms = rooms.filter((r) => unavailableRoomIds.has(r.id));
+
   const roomLines =
-    rooms
-      .map((r) => {
-        const base = `- ${r.name} (${r.type}): ₹${r.price}/night, sleeps ${r.capacity}. ${r.description ?? ""}`.trim();
-        const photos = r.imageUrls.length ? ` Photos: ${r.imageUrls.join(", ")}` : "";
-        return base + photos;
-      })
-      .join("\n") || "No rooms configured yet.";
+    bookableRooms.map(describeRoom).join("\n") ||
+    (rooms.length ? "None of the hotel's rooms are free for those dates." : "No rooms configured yet.");
+  // Named explicitly rather than simply omitted: a guest who asks about a
+  // room by name ("what about the Premium Room?") needs a straight answer
+  // that it's booked for their dates, not silence or a pretence it doesn't
+  // exist -- and the model can only give that answer if it knows the room is
+  // real but taken.
+  const unavailableLines = takenRooms.length
+    ? `\nALREADY BOOKED for the guest's dates — you must NOT recommend, price, or send photos of these. If the guest asks about one by name, say plainly it's already booked for those dates and offer one from the list above instead:\n${takenRooms
+        .map((r) => `- ${r.name}`)
+        .join("\n")}\n`
+    : "";
   const faqLines = faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n") || "None yet.";
   const offerLines =
     offers.map((o) => `- ${o.title}: ${o.description ?? ""}${o.discount ? ` (${o.discount})` : ""}`.trim()).join("\n") ||
@@ -285,9 +327,9 @@ Cancellation policy: ${profile?.cancellationPolicy ?? "—"}
 Refund policy: ${profile?.refundPolicy ?? "—"}
 Nearby attractions: ${profile?.nearbyAttractions ?? "—"}
 
-ROOMS
+ROOMS${stay ? ` — availability below is real, checked just now for ${formatStayRange(stay)}` : ""}
 ${roomLines}
-
+${unavailableLines}
 CURRENT OFFERS
 ${offerLines}
 
