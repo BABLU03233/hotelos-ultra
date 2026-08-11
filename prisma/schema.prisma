@@ -374,6 +374,14 @@ model Contact {
   pendingRoomId   String?
   pendingCheckIn  DateTime?
   pendingCheckOut DateTime?
+  // Party size, captured the turn the guest first states it (see
+  // src/lib/booking/guest-count.ts). Stored rather than re-derived from the
+  // transcript on every turn because the AI pipeline only ever loads the
+  // last 12 messages — in any longer conversation the message where the
+  // guest answered "how many people?" scrolls out of that window and the
+  // answer is silently lost, so they get asked all over again. Persisting it
+  // is the only fix that survives a long chat.
+  pendingGuestCount Int?
   updatedAt       DateTime      @updatedAt
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)

@@ -86,7 +86,19 @@ export async function completeBooking(
 
   await prisma.contact.update({
     where: { id: contactId },
-    data: { bookingStatus: "PENDING", leadStatus: "BOOKED", pendingRoomId: null, pendingCheckIn: null, pendingCheckOut: null },
+    // pendingGuestCount is cleared alongside the rest of the negotiation
+    // state: Contact is a durable per-phone record a repeat guest reuses
+    // across stays, so a party size carried over from a completed booking
+    // would make Anushka silently assume next year's trip has the same
+    // number of people — worse than simply asking again on a fresh enquiry.
+    data: {
+      bookingStatus: "PENDING",
+      leadStatus: "BOOKED",
+      pendingRoomId: null,
+      pendingCheckIn: null,
+      pendingCheckOut: null,
+      pendingGuestCount: null,
+    },
   });
 
   await fireBookingNotification(

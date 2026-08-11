@@ -1,6 +1,7 @@
 import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/interactive-prompts";
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
+import { captureGuestCount } from "@/lib/booking/guest-count";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
@@ -56,6 +57,15 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     .filter((m) => m.id !== latestInbound.id && m.content)
     .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
 
+  // Party size the guest states on THIS turn, if any — read before either
+  // reply path runs, since the deterministic path below never calls
+  // generateReply and this is the only point both paths share. Persisted at
+  // the end of the turn so it survives the 12-message history window, which
+  // is what actually caused guests to be re-asked something they'd already
+  // answered (see src/lib/booking/guest-count.ts).
+  const capturedGuestCount = captureGuestCount(latestInbound.content, history, contact.pendingGuestCount);
+  const knownGuestCount = capturedGuestCount ?? contact.pendingGuestCount ?? null;
+
   // Warm vs. cold framing for Anushka: a fresh ad lead gets an energetic open,
   // a guest who's gone quiet for a while gets a gentle re-spark instead of
   // Anushka just resuming mid-conversation as if no time passed.
@@ -67,6 +77,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
       : null,
     leadSource: contact.leadSource,
     sourceDetail: contact.sourceDetail,
+    knownGuestCount,
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
@@ -100,6 +111,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     guestMessage: latestInbound.content,
     hotelName: profile?.name ?? undefined,
     bookingSummary,
+    knownGuestCount,
   });
 
   let generated: Awaited<ReturnType<typeof generateReply>>;
@@ -248,6 +260,11 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
         leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
         ...(matchedRoomId ? { pendingRoomId: matchedRoomId } : {}),
         ...(pendingDates ? { pendingCheckIn: pendingDates.checkIn, pendingCheckOut: pendingDates.checkOut } : {}),
+        // Same "only merge in when actually found" rule as the two above —
+        // captureGuestCount returns undefined unless this turn stated a
+        // count that differs from what's stored, so an unchanged value never
+        // generates a pointless write.
+        ...(capturedGuestCount != null ? { pendingGuestCount: capturedGuestCount } : {}),
       },
     });
 

@@ -2,6 +2,7 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  GUEST_COUNT_BUTTON_VALUES,
   InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
   SEE_OTHER_ROOMS_BUTTON_ID,
@@ -544,6 +545,17 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
     await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
     await prisma.message.update({ where: { id: messageRow.id }, data: { content: label } });
+  }
+
+  // The guest-count equivalent of the quick-pick block above: resolve the
+  // tap from its stable row id rather than leaving the worker to parse the
+  // party size back out of the row's title text. Storing it here means it
+  // survives the AI pipeline's 12-message history window, which is what
+  // actually caused guests to be asked their party size a second and third
+  // time deep in a conversation (see src/lib/booking/guest-count.ts).
+  const tappedGuestCount = msg.interactiveId ? GUEST_COUNT_BUTTON_VALUES[msg.interactiveId] : undefined;
+  if (tappedGuestCount != null) {
+    await prisma.contact.update({ where: { id: contact.id }, data: { pendingGuestCount: tappedGuestCount } });
   }
 
   // jobId keyed to the inbound message: if this same message is ever

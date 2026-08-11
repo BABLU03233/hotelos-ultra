@@ -119,6 +119,13 @@ export interface ReplyContext {
   daysSinceLastInbound: number | null;
   leadSource: LeadSource;
   sourceDetail: string | null;
+  /**
+   * Party size already captured and stored for this contact
+   * (Contact.pendingGuestCount), or null if it's still unknown. Passed in
+   * rather than re-derived from `history` because history is capped at the
+   * last 12 messages — see src/lib/booking/guest-count.ts.
+   */
+  knownGuestCount?: number | null;
 }
 
 function buildConversationContext(agentName: string, context?: ReplyContext): string {
@@ -183,6 +190,7 @@ async function buildSystemPrompt(
           interactiveState.history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
         history: interactiveState.history,
         guestMessage: interactiveState.guestMessage,
+        knownGuestCount: context?.knownGuestCount,
       })
     : "";
 
@@ -244,9 +252,21 @@ async function buildSystemPrompt(
   // no explicit signal that count is ALREADY settled and shouldn't be
   // reopened. Injected only when it's actually already known, so this never
   // fires while genuinely still needed.
+  //
+  // Now backed by the count actually stored on the contact
+  // (context.knownGuestCount) rather than a scan of the last 12 messages
+  // alone, which is what makes this reminder reliable in exactly the long
+  // conversations where the original bug appeared -- the transcript scan
+  // goes blind the moment the guest's answer scrolls out of the window, and
+  // that window is precisely where "sorting out the check-out date" lands.
+  // When the real number is known it's stated outright, so the model can use
+  // it (recommending for the right party size) instead of only avoiding it.
+  const knownGuestCount = context?.knownGuestCount;
   const guestCountAlreadyKnownReminder =
-    interactiveState && hasStatedGuestCount(interactiveState.history, interactiveState.guestMessage)
-      ? `\nThe guest count has ALREADY been given earlier in this conversation -- never ask for it again or ask them to re-confirm it, even while you're still sorting out other missing details like the exact check-out date.\n`
+    interactiveState && hasStatedGuestCount(interactiveState.history, interactiveState.guestMessage, knownGuestCount)
+      ? knownGuestCount != null
+        ? `\nThe guest has ALREADY told us their party size: ${knownGuestCount} ${knownGuestCount === 1 ? "guest" : "guests"}. Treat that as settled -- never ask for it again or ask them to re-confirm it, even while you're still sorting out other missing details like the exact check-out date. Use it when recommending a room.\n`
+        : `\nThe guest count has ALREADY been given earlier in this conversation -- never ask for it again or ask them to re-confirm it, even while you're still sorting out other missing details like the exact check-out date.\n`
       : "";
 
   const prompt = `
@@ -430,9 +450,11 @@ export async function generateReply(
     guestMessage,
     replyText: text,
     aiInteractive: interactive,
+    knownGuestCount: context?.knownGuestCount,
   });
   return { reply: text, imageUrls, interactive: finalInteractive, shouldEscalate: false, agentName, pendingDates };
 }
+
 
 /** One-sentence CRM summary of a conversation so far, refreshed after each inbound message. */
 export async function summarizeConversation(messages: ChatMessage[], agentName = "Anushka"): Promise<string> {

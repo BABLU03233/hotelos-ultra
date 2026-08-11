@@ -66,6 +66,26 @@ function catalogToPrompt(entry: CatalogEntry): InteractivePrompt {
 // with no sentence in front of it (nothing left to strip after removing the
 // marker), which would otherwise reach Meta as an empty body and fail to
 // send. Used only when the AI's own text is empty/whitespace.
+/**
+ * Party size behind each GUEST_COUNT row, keyed by the row's stable id.
+ *
+ * A tap arrives as its title text ("3+ people"), which the text extractor
+ * can read — but only for as long as nobody rewords a title, and a reworded
+ * title would break capture silently, with the only symptom being guests
+ * getting re-asked their party size again. The id is the durable contract,
+ * so the tap is resolved from it directly (mirroring how the DATE_QUICK_PICK
+ * rows resolve to real dates by id in handle-inbound-message.ts) and the
+ * text extractor is left to handle genuinely typed messages.
+ *
+ * "3+ people" can only be its floor of 3 — see captureGuestCount for why a
+ * later explicit correction is deliberately allowed to overwrite it.
+ */
+export const GUEST_COUNT_BUTTON_VALUES: Readonly<Record<string, number>> = {
+  guests_1: 1,
+  guests_2: 2,
+  guests_3plus: 3,
+};
+
 const BUTTON_CATALOG: Record<string, CatalogEntry> = {
   GUEST_COUNT: {
     type: "list",
@@ -369,7 +389,28 @@ function lastAssistantMessageAskedGuestCount(history: { role: string; content: s
   return lastAssistant ? ASKED_GUEST_COUNT_PATTERN.test(lastAssistant.content) : false;
 }
 
-export function hasStatedGuestCount(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
+/**
+ * `knownGuestCount` is the value already captured and persisted on the
+ * contact (Contact.pendingGuestCount — see src/lib/booking/guest-count.ts).
+ * When present it settles the question outright, and every text scan below
+ * is skipped.
+ *
+ * This is what makes the answer survive a long conversation. The scans below
+ * can only ever see the last 12 messages the pipeline loads, so in a chat
+ * longer than that, the turn where the guest actually gave their count drops
+ * out of the window and every pattern here starts returning false again —
+ * the guest gets re-asked something they already answered, no matter how
+ * good the patterns get. The scans remain as the fallback for conversations
+ * already in flight with nothing stored yet, and as the detector that feeds
+ * the store in the first place.
+ */
+export function hasStatedGuestCount(
+  history: { role: string; content: string }[],
+  latestGuestMessage: string,
+  knownGuestCount?: number | null
+): boolean {
+  if (knownGuestCount != null) return true;
+
   const explicit = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some(
     (t) => GUEST_COUNT_STATED_PATTERN.test(t) || TELUGU_GUEST_COUNT_PATTERN.test(t)
   );
@@ -590,6 +631,8 @@ export function selectDeterministicInteractive(params: {
   guestMessage: string;
   replyText: string;
   aiInteractive?: InteractivePrompt;
+  /** Already-captured party size for this contact — see hasStatedGuestCount. */
+  knownGuestCount?: number | null;
 }): InteractivePrompt | undefined {
   const key = resolveStageKey(params);
   return key ? promptForStageKey(key) : params.aiInteractive;
@@ -611,8 +654,9 @@ function resolveStageKey(params: {
   history: { role: string; content: string }[];
   guestMessage: string;
   replyText: string;
+  knownGuestCount?: number | null;
 }): StageKey {
-  const { isFirstReply, languageObvious, history, guestMessage, replyText } = params;
+  const { isFirstReply, languageObvious, history, guestMessage, replyText, knownGuestCount } = params;
 
   const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
   const intentShown = hasExpressedBookingIntent(history, guestMessage) || roomMentionedEver;
@@ -625,7 +669,7 @@ function resolveStageKey(params: {
   // text/button mismatch. Language-select is now the *fallback* for a
   // first reply with nothing more specific to say, not an override.
   if (intentShown && !looksLikeExistingBookingRequest(guestMessage)) {
-    if (!hasStatedGuestCount(history, guestMessage)) {
+    if (!hasStatedGuestCount(history, guestMessage, knownGuestCount)) {
       return "GUEST_COUNT";
     }
     if (mentionsRoomPrice(replyText)) {
@@ -732,6 +776,7 @@ export function predictedStageInstruction(params: {
   languageObvious: boolean;
   history: { role: string; content: string }[];
   guestMessage: string;
+  knownGuestCount?: number | null;
 }): string {
   // Checked first, regardless of isFirstReply or what the resolver below
   // would otherwise predict: if guest count and dates are already both
@@ -745,7 +790,7 @@ export function predictedStageInstruction(params: {
   // exists) would actually be ROOM_RESPONSE — the exact mismatch this
   // whole mechanism exists to prevent.
   const readyToRecommend =
-    hasStatedGuestCount(params.history, params.guestMessage) &&
+    hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
     hasStatedDates(params.history, params.guestMessage) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) {
@@ -830,11 +875,12 @@ export function resolveDeterministicReply(params: {
   hotelName?: string;
   now?: Date;
   bookingSummary?: { roomName: string; checkIn: Date; checkOut: Date };
+  knownGuestCount?: number | null;
 }): { text: string; interactive: InteractivePrompt } | null {
   if (params.languageObvious) return null;
 
   const readyToRecommend =
-    hasStatedGuestCount(params.history, params.guestMessage) &&
+    hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
     hasStatedDates(params.history, params.guestMessage) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) return null;

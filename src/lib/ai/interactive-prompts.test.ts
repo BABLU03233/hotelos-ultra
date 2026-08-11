@@ -14,6 +14,7 @@ import {
   guestCountPrompt,
   hasExpressedBookingIntent,
   hasStatedDates,
+  GUEST_COUNT_BUTTON_VALUES,
   hasStatedGuestCount,
   looksLikeBareGreeting,
   looksLikeObviousLanguage,
@@ -198,6 +199,22 @@ describe("guestCountPrompt", () => {
     expect(prompt.type).toBe("list");
     expect(asRows(prompt).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
   });
+
+  it("has a stored party size for every row, so no tap can go uncaptured", () => {
+    // Guards the failure this map exists to prevent: adding a row (or
+    // renaming one) without teaching handle-inbound-message.ts what party
+    // size it means, whose only visible symptom is guests being asked their
+    // headcount all over again several turns later.
+    for (const row of asRows(guestCountPrompt())) {
+      expect(GUEST_COUNT_BUTTON_VALUES[row.id]).toBeGreaterThan(0);
+    }
+  });
+
+  it("maps each row to the party size its title actually claims", () => {
+    expect(GUEST_COUNT_BUTTON_VALUES.guests_1).toBe(1);
+    expect(GUEST_COUNT_BUTTON_VALUES.guests_2).toBe(2);
+    expect(GUEST_COUNT_BUTTON_VALUES.guests_3plus).toBe(3);
+  });
 });
 
 describe("confirmBookingPrompt", () => {
@@ -224,6 +241,37 @@ describe("GREET_QUESTION_BUTTON_ID / SHOW_OFFERS_BUTTON_ID", () => {
 describe("ROOM_BOOK_BUTTON_ID", () => {
   it("is a stable id used both in the catalog and for the deterministic short-circuit", () => {
     expect(ROOM_BOOK_BUTTON_ID).toBe("room_book");
+  });
+});
+
+describe("hasStatedGuestCount with a stored count", () => {
+  // The regression this whole mechanism exists to prevent. Every text scan
+  // in this file can only see the last 12 messages the pipeline loads, so a
+  // count stated before that window is invisible to all of them -- which is
+  // exactly the live-reported bug (a guest asked to re-confirm their party
+  // size on three separate later turns, deep into sorting out dates).
+  const historyWithNoMentionOfCount = [
+    { role: "user", content: "what time is check-in?" },
+    { role: "assistant", content: "Check-in is from 12pm!" },
+    { role: "user", content: "and check-out?" },
+    { role: "assistant", content: "11am — but we can usually be flexible." },
+  ];
+
+  it("treats the count as known once stored, even when nothing in the window mentions it", () => {
+    expect(hasStatedGuestCount(historyWithNoMentionOfCount, "ok what about the 14th", 3)).toBe(true);
+  });
+
+  it("still returns false when nothing is stored and the window has scrolled past the answer", () => {
+    expect(hasStatedGuestCount(historyWithNoMentionOfCount, "ok what about the 14th")).toBe(false);
+  });
+
+  it("treats a stored count of 1 as known (a falsy-number trap)", () => {
+    expect(hasStatedGuestCount(historyWithNoMentionOfCount, "and parking?", 1)).toBe(true);
+  });
+
+  it("falls back to scanning the transcript when nothing is stored yet", () => {
+    expect(hasStatedGuestCount([], "2 guests please", null)).toBe(true);
+    expect(hasStatedGuestCount([], "what about parking", null)).toBe(false);
   });
 });
 
@@ -903,6 +951,31 @@ describe("resolveDeterministicReply", () => {
     const result = resolveDeterministicReply({ ...base, guestMessage: "2 guests please" });
     expect(result?.text).toBe("When are you looking to stay?");
     expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["dates_today", "dates_tomorrow", "dates_weekend", "dates_nextweek", "dates_custom"]);
+  });
+
+  it("never re-asks guest count once it's stored, even deep in a conversation whose window no longer mentions it", () => {
+    // The exact live-reported failure: the guest had tapped "3+ people"
+    // many turns earlier, then got asked "how many guests total" again
+    // while the two of them were still working out dates. With the count
+    // stored, GUEST_COUNT can't fire, so the turn moves on to dates.
+    const deepInDateTalk = [
+      { role: "assistant", content: "Are you looking to book a room with us today? 😊" },
+      { role: "user", content: "yes" },
+      { role: "assistant", content: "When are you looking to stay?" },
+      { role: "user", content: "checking in on the 12th" },
+    ];
+    const result = resolveDeterministicReply({
+      ...base,
+      guestMessage: "and leaving the 14th",
+      history: deepInDateTalk,
+      knownGuestCount: 3,
+    });
+    expect(result?.text).not.toBe("How many people will be staying? 😊");
+  });
+
+  it("still asks for guest count when nothing is stored and the transcript doesn't have it", () => {
+    const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room", knownGuestCount: null });
+    expect(result?.text).toBe("How many people will be staying? 😊");
   });
 
   it("gives a fixed CONFIRM_BOOKING reply mentioning the reference code, once a room has been discussed", () => {
