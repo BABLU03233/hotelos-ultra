@@ -157,8 +157,11 @@ describe("deterministic replies follow the chosen language", () => {
   const base = {
     isFirstReply: false,
     languageObvious: false,
-    history: [] as { role: string; content: string }[],
-    guestMessage: "I want to book a room",
+    history: [{ role: "user", content: "I want to book a room" }, { role: "assistant", content: "Happy to help!" }] as { role: string; content: string }[],
+    // Filler, deliberately: a substantive message now goes to the AI for a
+    // real reply (see deservesRealAnswer), so the deterministic TEXT is what
+    // filler produces. Button localisation is asserted separately above.
+    guestMessage: "ok",
     knownGuestCount: null,
   };
 
@@ -172,11 +175,17 @@ describe("deterministic replies follow the chosen language", () => {
   it("still serves a guest writing in native script, instead of bailing to the AI", () => {
     // This bail-out existed because the strings were English-only; leaving
     // it would deny non-English guests the localised buttons entirely.
+    //
+    // "हाँ" rather than "ठीक है": the latter contains the copula "है", which
+    // deservesRealAnswer treats as a question marker on purpose. Dropping
+    // "है" would swallow real questions like "nashta included hai", and
+    // ignoring a genuine question is worse than spending one AI turn on
+    // filler — so the filler used here simply avoids the copula.
     const result = resolveDeterministicReply({
       ...base,
       languageObvious: true,
       language: "hi",
-      guestMessage: "मुझे कमरा बुक करना है",
+      guestMessage: "हाँ",
     });
     expect(result).not.toBeNull();
     expect(/[ऀ-ॿ]/.test(result?.text ?? "")).toBe(true);

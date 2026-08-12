@@ -445,6 +445,41 @@ export function looksLikeRoomObjection(text: string): boolean {
 const AGREEMENT_PATTERN =
   /^(y|ya|yes|yeah|yep|yup|ok|okay|k|sure|done|fine|great|perfect|good|nice|cool|👍|✅)\b|^(sounds good|that works|go ahead|book it|lets book|let'?s book|i'?ll take it|works for me|haan|haa|ji|theek hai|thik hai|sahi|sari|ok done|yes please|please book|book kar do|confirm)\b/i;
 
+// Question words and markers, across the registers this hotel actually
+// sees. Deliberately broad — see deservesRealAnswer for why the cost of a
+// false positive here is one extra AI turn, and the cost of a false
+// negative is ignoring what the guest asked.
+const QUESTION_MARKER =
+  /\b(what|where|when|why|which|who|how|is|are|was|were|do|does|did|can|could|would|will|should|any|anyone|need|want|tell me|please tell)\b|\b(kya|kaisa|kaise|kitna|kitne|kitni|kahan|kab|kaun|hai|hain|milega|milegi|chahiye|chahta|chahti|batao|bataye)\b|ఎక్కడ|ఎప్పుడు|ఎంత|ఎలా|ఏమి|ఏమిటి|ఉందా|ఉన్నాయా|కావాలి|ఇస్తారా|చేస్తారా|చెప్పండి|क्या|कहाँ|कहां|कब|कितना|कितने|कितनी|कैसे|कौन|कौनसा|है|हैं|चाहिए|चाहता|चाहती|मिलेगा|मिलेगी|बताओ|बताइए/i;
+
+/**
+ * True when the guest's message is asking or telling us something that
+ * needs a genuine reply, rather than being a slot answer or filler.
+ *
+ * This gates the deterministic funnel short-circuit, which does not merely
+ * choose buttons — it replaces the reply entirely, so the AI never sees the
+ * message at all. The previous guard was `endsWith("?")`, and an audit of
+ * 105 ordinary guest messages found 66.7% of them swallowed: nobody
+ * punctuates on WhatsApp, so "do you have wifi" and "kitna hai price" were
+ * answered with "How many people will be staying?" — which reads exactly
+ * like not listening, because functionally nothing listened.
+ *
+ * Deliberately generous. A false positive costs one AI turn on a message
+ * the funnel could have handled; a false negative ignores a real question.
+ * Those are not comparable. The waterfall still re-derives the right buttons
+ * from whatever the AI writes, so the funnel isn't lost — only deferred.
+ */
+export function deservesRealAnswer(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (t.endsWith("?")) return true;
+  if (QUESTION_MARKER.test(t)) return true;
+  // A sentence rather than a tap or a grunt. Button titles and slot answers
+  // ("2 people", "Just me", "ok") sit well under this; a real remark
+  // ("my flight lands at 2am") does not.
+  return t.split(/\s+/).filter(Boolean).length >= 4;
+}
+
 export function looksLikeAgreement(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
@@ -974,7 +1009,7 @@ function resolveStageKey(params: {
     // this lets the AI actually respond (send real photos, answer the
     // question); the post-hoc call re-derives real buttons from what it
     // actually wrote, same mechanism ROOM_RESPONSE already relies on.
-    if (roomMentionedEver && (looksLikePhotoRequest(guestMessage) || guestMessage.trim().endsWith("?"))) {
+    if (roomMentionedEver && (looksLikePhotoRequest(guestMessage) || deservesRealAnswer(guestMessage))) {
       return null;
     }
     // The worst instance of this bug class yet, caught in a real booking: a
@@ -1224,7 +1259,12 @@ export function resolveDeterministicReply(params: {
   // waterfall still re-attaches the right buttons afterward based on what
   // the AI's real reply ends up saying, same mechanism ROOM_RESPONSE and
   // CONFIRM_BOOKING already rely on.
-  if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && params.guestMessage.trim().endsWith("?")) return null;
+  // Widened from `endsWith("?")`, which only caught punctuated questions and
+  // let two thirds of ordinary guest messages be swallowed by the funnel —
+  // see deservesRealAnswer. This branch replaces the whole reply, not just
+  // the buttons, so anything that reads as a real question or remark has to
+  // reach the AI.
+  if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && deservesRealAnswer(params.guestMessage)) return null;
 
   const lang = resolveLanguage(params.language);
   const s = t(lang);

@@ -670,7 +670,7 @@ describe("selectDeterministicInteractive", () => {
     // still be false -- must not block a guest who's ready to book.
     const result = selectDeterministicInteractive({
       ...base,
-      guestMessage: "yes let's book it",
+      guestMessage: "yes",
       replyText: "Awesome, you're all set to go!",
       history: [
         { role: "user", content: "2 guests" },
@@ -942,6 +942,78 @@ describe("predictedStageInstruction", () => {
   });
 });
 
+describe("a real question is never swallowed by the funnel", () => {
+  // The deterministic funnel doesn't just choose buttons — it REPLACES the
+  // reply, so the AI never sees the message. The guard used to be
+  // endsWith("?"), and an audit of 105 ordinary guest messages found 66.7%
+  // swallowed, because nobody punctuates on WhatsApp. "do you have wifi" was
+  // answered with "How many people will be staying?", which reads as not
+  // listening because functionally nothing listened.
+  const intentShown = [
+    { role: "user", content: "I want to book a room" },
+    { role: "assistant", content: "How many people will be staying? 😊" },
+  ];
+  const CANNED = ["How many people will be staying? 😊", "When are you looking to stay?"];
+
+  const unpunctuated = [
+    "do you have wifi",
+    "is breakfast included",
+    "where are you located",
+    "what time is check in",
+    "do you allow pets",
+    "how far is the airport",
+    "can I get an early check in",
+    "kitna hai price",
+    "wifi hai kya",
+    "parking milega",
+    "मुझे wifi चाहिए",
+    "क्या पार्किंग है",
+    "వైఫై ఉందా",
+    "my flight lands at 2am",
+    "we are celebrating an anniversary",
+  ];
+
+  for (const msg of unpunctuated) {
+    it(`reaches the AI: "${msg}"`, () => {
+      const result = resolveDeterministicReply({
+        isFirstReply: false,
+        languageObvious: /[ऀ-ॿఀ-౿]/.test(msg),
+        history: intentShown,
+        guestMessage: msg,
+        knownGuestCount: null,
+        language: /[ఀ-౿]/.test(msg) ? "te" : /[ऀ-ॿ]/.test(msg) ? "hi" : "en",
+      });
+      expect(result === null || !CANNED.includes(result.text)).toBe(true);
+    });
+  }
+
+  it("still funnels pure filler, where the canned prompt IS the right reply", () => {
+    for (const filler of ["ok", "yes", "hmm", "k", "👍", "sure"]) {
+      const result = resolveDeterministicReply({
+        isFirstReply: false,
+        languageObvious: false,
+        history: intentShown,
+        guestMessage: filler,
+        knownGuestCount: null,
+      });
+      expect(result?.text, `"${filler}" should still be funnelled`).toBe("How many people will be staying? 😊");
+    }
+  });
+
+  it("still attaches the funnel buttons when the AI takes the turn", () => {
+    // The funnel isn't lost by deferring — the guest gets a real answer AND
+    // the picker, rather than the picker instead of an answer.
+    const buttons = selectDeterministicInteractive({
+      isFirstReply: false,
+      languageObvious: false,
+      history: intentShown,
+      guestMessage: "do you have wifi",
+      replyText: "Yes, free high-speed WiFi throughout! 😊",
+    });
+    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+});
+
 describe("resolveDeterministicReply", () => {
   const base = {
     isFirstReply: false,
@@ -977,10 +1049,28 @@ describe("resolveDeterministicReply", () => {
     expect(result).toBeNull();
   });
 
-  it("gives a fixed GUEST_COUNT reply once booking intent is shown", () => {
-    const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room" });
+  it("gives a fixed GUEST_COUNT reply to filler once booking intent is shown", () => {
+    // Filler carries nothing to engage with, so the canned prompt IS the
+    // right reply and skipping the AI is pure win.
+    const result = resolveDeterministicReply({ ...base, history: [{ role: "user", content: "I want to book a room" }, { role: "assistant", content: "Happy to help!" }], guestMessage: "ok" });
     expect(result?.text).toBe("How many people will be staying? 😊");
     expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+  });
+
+  it("hands a substantive opener to the AI, but still attaches the guest-count picker", () => {
+    // "I'd like to book a room" deserves a warm, written reply rather than a
+    // canned question fired back at it. An audit found the old blanket
+    // short-circuit swallowing 67% of real guest messages — see
+    // deservesRealAnswer. The funnel isn't lost, only deferred: the buttons
+    // are still attached to whatever the AI writes.
+    const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room" });
+    expect(result).toBeNull();
+    const buttons = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "I'd like to book a room",
+      replyText: "Lovely — happy to help you book!",
+    });
+    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
   });
 
   it("returns null (lets the AI actually answer) for a genuine question, even once booking intent is already shown -- a real gap found live: 'am I talking to a real person or a bot?' was silently swallowed and funneled straight into 'how many people will be staying?' just because the assistant's own earlier message had mentioned 'book a room'", () => {
@@ -1057,7 +1147,7 @@ describe("resolveDeterministicReply", () => {
   });
 
   it("still asks for guest count when nothing is stored and the transcript doesn't have it", () => {
-    const result = resolveDeterministicReply({ ...base, guestMessage: "I'd like to book a room", knownGuestCount: null });
+    const result = resolveDeterministicReply({ ...base, history: [{ role: "user", content: "I want to book a room" }, { role: "assistant", content: "Happy to help!" }], guestMessage: "ok", knownGuestCount: null });
     expect(result?.text).toBe("How many people will be staying? 😊");
   });
 
