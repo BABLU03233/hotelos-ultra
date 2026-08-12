@@ -2,6 +2,7 @@ import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/in
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
 import { captureGuestCount } from "@/lib/booking/guest-count";
+import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +67,18 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   const capturedGuestCount = captureGuestCount(latestInbound.content, history, contact.pendingGuestCount);
   const knownGuestCount = capturedGuestCount ?? contact.pendingGuestCount ?? null;
 
+  // Tier-1.5 date capture, between the tapped rows (fully deterministic) and
+  // the AI's DATES: marker (best-effort): a guest who TYPES "this weekend"
+  // or "kal" gets the same real, structured range a tap would have produced.
+  // Without this the most common phrasing in the funnel resolved to nothing
+  // storable, so availability couldn't be checked for it and the dates
+  // question re-fired once the turn scrolled out of the history window.
+  // Only fills a gap — never overwrites dates already agreed.
+  const typedDates =
+    contact.pendingCheckIn && contact.pendingCheckOut ? null : resolveTypedRelativeDates(latestInbound.content);
+  const effectiveCheckIn = contact.pendingCheckIn ?? typedDates?.checkIn ?? null;
+  const effectiveCheckOut = contact.pendingCheckOut ?? typedDates?.checkOut ?? null;
+
   // Warm vs. cold framing for Anushka: a fresh ad lead gets an energetic open,
   // a guest who's gone quiet for a while gets a gentle re-spark instead of
   // Anushka just resuming mid-conversation as if no time passed.
@@ -81,7 +94,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // Lets buildSystemPrompt resolve real availability for exactly these
     // dates before the reply is written, so an already-booked room is never
     // recommended (see availability.ts).
-    stayDates: contact.pendingCheckIn && contact.pendingCheckOut ? { checkIn: contact.pendingCheckIn, checkOut: contact.pendingCheckOut } : null,
+    stayDates: effectiveCheckIn && effectiveCheckOut ? { checkIn: effectiveCheckIn, checkOut: effectiveCheckOut } : null,
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
@@ -116,6 +129,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     hotelName: profile?.name ?? undefined,
     bookingSummary,
     knownGuestCount,
+    datesKnown: Boolean(effectiveCheckIn && effectiveCheckOut),
   });
 
   let generated: Awaited<ReturnType<typeof generateReply>>;
@@ -263,7 +277,16 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
         aiSummary: summary,
         leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
         ...(matchedRoomId ? { pendingRoomId: matchedRoomId } : {}),
-        ...(pendingDates ? { pendingCheckIn: pendingDates.checkIn, pendingCheckOut: pendingDates.checkOut } : {}),
+        // The AI's own DATES: marker wins when it fired this turn (it can
+        // parse specifics like "15th to 17th" that the typed-relative
+        // resolver deliberately won't guess at); the typed fallback fills in
+        // otherwise. Either way this only ever writes when nothing was
+        // already agreed — see the guard on typedDates above.
+        ...(pendingDates
+          ? { pendingCheckIn: pendingDates.checkIn, pendingCheckOut: pendingDates.checkOut }
+          : typedDates
+            ? { pendingCheckIn: typedDates.checkIn, pendingCheckOut: typedDates.checkOut }
+            : {}),
         // Same "only merge in when actually found" rule as the two above —
         // captureGuestCount returns undefined unless this turn stated a
         // count that differs from what's stored, so an unchanged value never

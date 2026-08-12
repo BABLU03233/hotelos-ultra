@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, CheckCircle2, CircleAlert, Copy, PlugZap } from "lucide-react";
+import { CalendarDays, Check, CheckCircle2, CircleAlert, Copy, PlugZap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ interface WhatsAppStatus {
   connected: boolean;
   phoneNumberId: string | null;
   wabaId: string | null;
+  bookingFlowId: string | null;
+  roomCount: number;
 }
 
 interface TestResult {
@@ -31,7 +33,75 @@ export function WhatsAppSettings() {
 
   if (loading || !data) return <Skeleton className="h-64 w-full" />;
 
-  return <WhatsAppSettingsForm data={data} reload={reload} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <WhatsAppSettingsForm data={data} reload={reload} />
+      <BookingCalendarCard data={data} reload={reload} />
+    </div>
+  );
+}
+
+/**
+ * Publishes the native in-WhatsApp booking calendar. Separate card from the
+ * connection above because it's a genuinely different action with its own
+ * prerequisites (a live connection AND at least one room), and because
+ * publishing is one-way at Meta's end — worth its own deliberate button
+ * rather than riding along with "Save connection".
+ */
+function BookingCalendarCard({ data, reload }: { data: WhatsAppStatus; reload: () => void }) {
+  const [publishing, setPublishing] = React.useState(false);
+  const blocked = !data.connected ? "Connect WhatsApp above first." : data.roomCount === 0 ? "Add at least one room in Settings → Rooms first." : null;
+
+  async function publish() {
+    setPublishing(true);
+    try {
+      const res = await apiFetch<{ flowId: string; roomCount: number }>("/api/settings/whatsapp/booking-flow", { method: "POST" });
+      toast.success(`Booking calendar published with ${res.roomCount} room${res.roomCount === 1 ? "" : "s"}`);
+      reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't publish the booking calendar");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Booking calendar
+          {data.bookingFlowId ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <CheckCircle2 className="size-3.5" /> Live
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+              <CircleAlert className="size-3.5" /> Not published
+            </span>
+          )}
+        </CardTitle>
+        <CardDescription>
+          Lets guests pick their room and dates on a real calendar inside WhatsApp, then book in one tap — instead of
+          answering questions one at a time.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <InfoCallout title="Your rooms are baked in when you publish" tone="warning">
+          The calendar carries a snapshot of your room names and prices taken at the moment you publish. If you change
+          rooms or rates later, publish again so guests see the new ones.
+        </InfoCallout>
+
+        {blocked && <p className="text-xs text-amber-600">{blocked}</p>}
+
+        <div className="flex items-center gap-2">
+          <Button onClick={publish} disabled={publishing || Boolean(blocked)}>
+            <CalendarDays /> {publishing ? "Publishing…" : data.bookingFlowId ? "Publish again" : "Publish booking calendar"}
+          </Button>
+          {data.bookingFlowId && <code className="truncate rounded bg-muted px-1.5 py-1 text-xs">Flow {data.bookingFlowId}</code>}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function SetupGuide() {

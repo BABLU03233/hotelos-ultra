@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "test": "vitest run"
+    "test": "vitest run",
+    "soak": "tsx scripts/soak-conversations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

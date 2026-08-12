@@ -1,8 +1,9 @@
-import { BookOpen, Clock, LayoutDashboard, LayoutTemplate, Megaphone, MessagesSquare, Settings } from "lucide-react";
+import { BookOpen, CalendarRange, Clock, LayoutDashboard, LayoutTemplate, Megaphone, MessagesSquare, Settings } from "lucide-react";
 
 export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/crm", label: "CRM", icon: MessagesSquare },
+  { href: "/calendar", label: "Calendar", icon: CalendarRange },
   { href: "/follow-ups", label: "Follow-ups", icon: Clock },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },

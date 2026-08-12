@@ -233,6 +233,7 @@ async function buildSystemPrompt(
         history: interactiveState.history,
         guestMessage: interactiveState.guestMessage,
         knownGuestCount: context?.knownGuestCount,
+        datesKnown: Boolean(context?.stayDates),
       })
     : "";
 
@@ -493,6 +494,7 @@ export async function generateReply(
     replyText: text,
     aiInteractive: interactive,
     knownGuestCount: context?.knownGuestCount,
+    datesKnown: Boolean(context?.stayDates),
   });
   return { reply: text, imageUrls, interactive: finalInteractive, shouldEscalate: false, agentName, pendingDates };
 }

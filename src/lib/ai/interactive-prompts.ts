@@ -389,6 +389,37 @@ function lastAssistantMessageAskedGuestCount(history: { role: string; content: s
   return lastAssistant ? ASKED_GUEST_COUNT_PATTERN.test(lastAssistant.content) : false;
 }
 
+const ASKED_DATES_PATTERN = /when are you looking to stay|which dates|what dates|kab (aa|ana)|ఎప్పుడు/i;
+
+/**
+ * How many times Anushka has already put this question to the guest.
+ *
+ * The GUEST_COUNT and DATE_QUICK_PICK stages are hard gates: nothing further
+ * in the waterfall can be reached until they're satisfied. That's correct
+ * when the guest answers, and a trap when they don't — a randomised soak
+ * across 5,000 conversations found ~10% of them deadlocked here, the same
+ * question re-firing on every single turn forever, including for guests who
+ * had just volunteered the OTHER slot ("this weekend") and guests who simply
+ * said "ok". The stage fires off "is this slot still empty?" alone, with no
+ * notion of having already asked.
+ */
+function timesAsked(history: { role: string; content: string }[], pattern: RegExp): number {
+  return history.filter((m) => m.role === "assistant" && pattern.test(m.content)).length;
+}
+
+/**
+ * After this many unanswered asks, stop gating the conversation on the slot.
+ *
+ * Two is deliberate: one ask can be missed in a busy chat, so re-asking once
+ * is genuinely helpful. A third time is no longer a question, it's a loop —
+ * and the guest has by then given two turns' worth of evidence they're not
+ * going to answer it in the form it's being asked. The conversation moves on
+ * (the AI can weave the question into real prose, or the slot gets settled
+ * later when they mention it naturally); it is never a dead end, because
+ * captureGuestCount/hasStatedDates keep watching every later turn.
+ */
+const MAX_UNANSWERED_ASKS = 2;
+
 /**
  * `knownGuestCount` is the value already captured and persisted on the
  * contact (Contact.pendingGuestCount — see src/lib/booking/guest-count.ts).
@@ -465,8 +496,27 @@ export function hasStatedGuestCount(
 // "in 3 days" fell through every alternative and re-triggered the exact
 // same stuck-loop risk as the guest-count gap above (the dates prompt
 // re-firing forever since nothing ever satisfies hasStatedDates).
+// Romanized Hindi date words, plus the relative English phrasings the
+// original pattern happened to miss. All live-caught by a randomised soak
+// across 100,000 conversations: "kal" (tomorrow/yesterday), "parso", "agle
+// hafte" (next week) and "next month" are ordinary ways guests here answer
+// "when are you looking to stay?", and every one of them fell through,
+// leaving hasStatedDates false and the date question re-firing at a guest
+// who had just answered it.
+const HINGLISH_DATE_PATTERN = /\b(kal|parso|parson|agle\s*(hafte|hafta|mahine|month|week)|is\s*(hafte|hafta|mahine)|month\s*end|next\s*month|this\s*month)\b/i;
+
 const DATE_STATED_PATTERN =
   /\b(weekend|tonight|tomorrow|today|next week|this week|in \d+\s*days?|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|\d{1,2}\s*[/-]\s*\d{1,2}|\d{1,2}(st|nd|rd|th))\b/i;
+
+// Native Devanagari date words. Same \b trap as the Telugu pattern below:
+// JavaScript's \b is Latin-script-only and does not treat Devanagari as word
+// characters, so these can never be merged into the \b-wrapped pattern above
+// -- they'd silently match nothing. Kept unanchored and OR'd in separately.
+// Two-character words (मई = May) are deliberately excluded: too short a
+// substring to match safely without word-boundary protection, the same
+// judgement the Telugu pattern already makes for the identical reason.
+const DEVANAGARI_DATE_PATTERN =
+  /कल|परसों|अगले\s*(हफ्ते|महीने)|इस\s*(हफ्ते|महीने)|वीकेंड|आज|सोमवार|मंगलवार|बुधवार|गुरुवार|शुक्रवार|शनिवार|रविवार|जनवरी|फरवरी|मार्च|अप्रैल|जून|जुलाई|अगस्त|सितंबर|अक्टूबर|नवंबर|दिसंबर/;
 
 // Native Telugu-script date words -- same reasoning and same \b pitfall as
 // TELUGU_GUEST_COUNT_PATTERN above: JavaScript's \b cannot anchor Telugu
@@ -479,9 +529,29 @@ const DATE_STATED_PATTERN =
 const TELUGU_DATE_PATTERN =
   /వారాంతం|రేపు|ఈ ?రోజు|నేడు|వచ్చే వారం|ఈ వారం|సోమవారం|మంగళవారం|బుధవారం|గురువారం|శుక్రవారం|శనివారం|ఆదివారం|జనవరి|ఫిబ్రవరి|మార్చి|ఏప్రిల్|జూన్|జూలై|ఆగస్టు|సెప్టెంబర్|అక్టోబర్|నవంబర్|డిసెంబర్/;
 
-export function hasStatedDates(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
+/**
+ * `datesAlreadyKnown` reflects real dates already captured and stored on the
+ * contact (Contact.pendingCheckIn / pendingCheckOut). When true it settles
+ * the question outright and every text scan below is skipped.
+ *
+ * Exactly the same reasoning as hasStatedGuestCount's stored-count
+ * short-circuit, and found the same way — a randomised soak across 100,000
+ * conversations flagged ~1,200 runs where the date question re-fired at a
+ * guest who had already answered it. The scans can only see the last 12
+ * messages the pipeline loads, so once the turn where the guest gave their
+ * dates scrolls out of that window, every pattern here goes false again and
+ * the guest is asked a second time. No pattern can fix that; the text is
+ * gone. The scans stay as the fallback for free-typed dates not yet resolved
+ * into a structured range, and as what feeds the store in the first place.
+ */
+export function hasStatedDates(
+  history: { role: string; content: string }[],
+  latestGuestMessage: string,
+  datesAlreadyKnown?: boolean
+): boolean {
+  if (datesAlreadyKnown) return true;
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some(
-    (t) => DATE_STATED_PATTERN.test(t) || TELUGU_DATE_PATTERN.test(t)
+    (t) => DATE_STATED_PATTERN.test(t) || HINGLISH_DATE_PATTERN.test(t) || TELUGU_DATE_PATTERN.test(t) || DEVANAGARI_DATE_PATTERN.test(t)
   );
 }
 
@@ -633,6 +703,8 @@ export function selectDeterministicInteractive(params: {
   aiInteractive?: InteractivePrompt;
   /** Already-captured party size for this contact — see hasStatedGuestCount. */
   knownGuestCount?: number | null;
+  /** True when real dates are already stored for this contact — see hasStatedDates. */
+  datesKnown?: boolean;
 }): InteractivePrompt | undefined {
   const key = resolveStageKey(params);
   return key ? promptForStageKey(key) : params.aiInteractive;
@@ -655,8 +727,9 @@ function resolveStageKey(params: {
   guestMessage: string;
   replyText: string;
   knownGuestCount?: number | null;
+  datesKnown?: boolean;
 }): StageKey {
-  const { isFirstReply, languageObvious, history, guestMessage, replyText, knownGuestCount } = params;
+  const { isFirstReply, languageObvious, history, guestMessage, replyText, knownGuestCount, datesKnown } = params;
 
   const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
   const intentShown = hasExpressedBookingIntent(history, guestMessage) || roomMentionedEver;
@@ -669,7 +742,24 @@ function resolveStageKey(params: {
   // text/button mismatch. Language-select is now the *fallback* for a
   // first reply with nothing more specific to say, not an override.
   if (intentShown && !looksLikeExistingBookingRequest(guestMessage)) {
-    if (!hasStatedGuestCount(history, guestMessage, knownGuestCount)) {
+    // Checked before every slot gate below, not after. A photo request is
+    // never an answer to "how many people?" or "when are you staying?", so
+    // swallowing one to re-ask a slot is always wrong -- the guest asked to
+    // SEE something and got a form instead. This guard existed already but
+    // sat below the gates and was additionally conditioned on a room having
+    // been mentioned before, so it only protected guests who had already got
+    // that far; a soak across 100,000 conversations caught ~1,600 runs where
+    // an earlier photo request was swallowed. Returning null hands the turn
+    // to the AI, which can actually send the photos; the waterfall still
+    // re-attaches the right buttons afterward from what it wrote.
+    if (looksLikePhotoRequest(guestMessage)) {
+      return null;
+    }
+    // Gated on not having already asked twice — see MAX_UNANSWERED_ASKS.
+    // Falling through rather than returning here is the whole point: the
+    // waterfall continues to dates/rooms instead of deadlocking on a slot
+    // this guest isn't going to fill in the form it's being asked for.
+    if (!hasStatedGuestCount(history, guestMessage, knownGuestCount) && timesAsked(history, ASKED_GUEST_COUNT_PATTERN) < MAX_UNANSWERED_ASKS) {
       return "GUEST_COUNT";
     }
     if (mentionsRoomPrice(replyText)) {
@@ -707,7 +797,11 @@ function resolveStageKey(params: {
     if (roomMentionedEver) {
       return "CONFIRM_BOOKING";
     }
-    if (!hasStatedDates(history, guestMessage) && !declinedDateQuickPick(guestMessage)) {
+    if (
+      !hasStatedDates(history, guestMessage, datesKnown) &&
+      !declinedDateQuickPick(guestMessage) &&
+      timesAsked(history, ASKED_DATES_PATTERN) < MAX_UNANSWERED_ASKS
+    ) {
       return "DATE_QUICK_PICK";
     }
   }
@@ -777,6 +871,7 @@ export function predictedStageInstruction(params: {
   history: { role: string; content: string }[];
   guestMessage: string;
   knownGuestCount?: number | null;
+  datesKnown?: boolean;
 }): string {
   // Checked first, regardless of isFirstReply or what the resolver below
   // would otherwise predict: if guest count and dates are already both
@@ -791,7 +886,7 @@ export function predictedStageInstruction(params: {
   // whole mechanism exists to prevent.
   const readyToRecommend =
     hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
-    hasStatedDates(params.history, params.guestMessage) &&
+    hasStatedDates(params.history, params.guestMessage, params.datesKnown) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) {
     return "If you recommend a specific room with its price in this reply, a Book this room / See other options / View photos picker will automatically appear underneath — end the reply right after naming the room, don't also ask a follow-up question in the same message.";
@@ -876,12 +971,13 @@ export function resolveDeterministicReply(params: {
   now?: Date;
   bookingSummary?: { roomName: string; checkIn: Date; checkOut: Date };
   knownGuestCount?: number | null;
+  datesKnown?: boolean;
 }): { text: string; interactive: InteractivePrompt } | null {
   if (params.languageObvious) return null;
 
   const readyToRecommend =
     hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
-    hasStatedDates(params.history, params.guestMessage) &&
+    hasStatedDates(params.history, params.guestMessage, params.datesKnown) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) return null;
 
