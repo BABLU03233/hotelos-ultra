@@ -90,8 +90,15 @@ export async function completeBooking(
     throw new PastDateBookingError(extra.checkIn);
   }
 
+  // The idempotency window must ignore CANCELLED rows. Without that filter a
+  // guest who cancels and immediately rebooks gets handed the cancelled
+  // booking straight back — same reference code, status CANCELLED — so they
+  // believe they hold a reservation that does not exist and that frees the
+  // room for someone else. Caught by an end-to-end test the moment
+  // cancellation became reachable; before that, nothing could be cancelled
+  // inside the window, so the filter was never needed.
   const recent = await prisma.booking.findFirst({
-    where: { tenantId, contactId, createdAt: { gte: new Date(Date.now() - IDEMPOTENCY_WINDOW_MS) } },
+    where: { tenantId, contactId, status: { not: "CANCELLED" }, createdAt: { gte: new Date(Date.now() - IDEMPOTENCY_WINDOW_MS) } },
     orderBy: { createdAt: "desc" },
   });
   if (recent) return recent;

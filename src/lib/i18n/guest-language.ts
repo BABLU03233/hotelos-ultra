@@ -155,6 +155,18 @@ interface Strings {
   roomListDesc: (price: number, capacity: number) => string;
   fullyBooked: string;
   pastDateRejected: string;
+  mediaNoticed: string;
+  manageBookingBody: (ref: string, room: string, dates: string) => string;
+  manageBookingButton: string;
+  manageCancel: string;
+  manageChangeDates: string;
+  manageKeep: string;
+  bookingCancelled: (ref: string) => string;
+  rescheduleStart: string;
+  bookingKept: (ref: string) => string;
+  noBookingFound: string;
+  continueAnyway: string;
+  farewell: string;
 }
 
 const EN: Strings = {
@@ -223,6 +235,18 @@ const EN: Strings = {
   roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} guest${capacity === 1 ? "" : "s"}`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
+  mediaNoticed: "Thanks for sending that! 😊 I can't open attachments here — could you tell me in a message what you need?",
+  manageBookingBody: (ref, room, dates) => `You're booked: ${room} · ${dates} · ref ${ref}. What would you like to do?`,
+  manageBookingButton: "Choose",
+  manageCancel: "Cancel booking",
+  manageChangeDates: "Change dates",
+  manageKeep: "Keep it as is",
+  bookingCancelled: (ref) => `Done — booking ${ref} is cancelled. Sorry it didn't work out! Message me anytime if you'd like to rebook. 😊`,
+  rescheduleStart: "No problem — let's find you new dates. When would you like to stay?",
+  bookingKept: (ref) => `Great — booking ${ref} stays as it is. See you soon! 🎉`,
+  noBookingFound: "I can't find an active booking for this number. If you booked under a different number, our team can help — shall I pass this on?",
+  continueAnyway: "Perfect — shall I lock this room in for you?",
+  farewell: "Lovely — see you soon! 😊 Message me anytime if anything comes up.",
 };
 
 const HI: Strings = {
@@ -291,6 +315,18 @@ const HI: Strings = {
   roomListDesc: (price, capacity) => `₹${price}/रात से · ${capacity} लोग तक`,
   fullyBooked: "अरे, उन तारीख़ों पर सब बुक है 😔 कोई और तारीख़ चलेगी?",
   pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
+  mediaNoticed: "भेजने के लिए शुक्रिया! 😊 मैं यहाँ अटैचमेंट नहीं खोल पाती — मैसेज में बता दीजिए आपको क्या चाहिए?",
+  manageBookingBody: (ref, room, dates) => `आपकी बुकिंग: ${room} · ${dates} · रेफ़ ${ref}। आप क्या करना चाहेंगे?`,
+  manageBookingButton: "चुनें",
+  manageCancel: "बुकिंग रद्द करें",
+  manageChangeDates: "तारीख़ बदलें",
+  manageKeep: "ऐसे ही रहने दें",
+  bookingCancelled: (ref) => `हो गया — बुकिंग ${ref} रद्द कर दी गई है। दोबारा बुक करना हो तो कभी भी मैसेज कीजिए। 😊`,
+  rescheduleStart: "कोई बात नहीं — नई तारीख़ें देख लेते हैं। आप कब ठहरना चाहेंगे?",
+  bookingKept: (ref) => `बढ़िया — बुकिंग ${ref} वैसी ही रहेगी। जल्दी मिलते हैं! 🎉`,
+  noBookingFound: "इस नंबर पर कोई चालू बुकिंग नहीं मिली। अगर किसी और नंबर से बुक की थी, तो हमारी टीम मदद कर देगी — भेज दूँ?",
+  continueAnyway: "बढ़िया — यही कमरा बुक कर दूँ?",
+  farewell: "बहुत बढ़िया — जल्दी मिलते हैं! 😊 कुछ भी हो तो मैसेज कीजिए।",
 };
 
 const TE: Strings = {
@@ -359,6 +395,18 @@ const TE: Strings = {
   roomListDesc: (price, capacity) => `₹${price}/రాత్రి నుండి · ${capacity} మంది వరకు`,
   fullyBooked: "అయ్యో, ఆ తేదీలకు అన్నీ బుక్ అయ్యాయి 😔 వేరే తేదీ కుదురుతుందా?",
   pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
+  mediaNoticed: "పంపినందుకు ధన్యవాదాలు! 😊 ఇక్కడ అటాచ్‌మెంట్‌లు తెరవలేను — మీకు ఏం కావాలో మెసేజ్‌లో చెప్పండి?",
+  manageBookingBody: (ref, room, dates) => `మీ బుకింగ్: ${room} · ${dates} · రెఫ్ ${ref}. మీరు ఏం చేయాలనుకుంటున్నారు?`,
+  manageBookingButton: "ఎంచుకోండి",
+  manageCancel: "బుకింగ్ రద్దు చేయండి",
+  manageChangeDates: "తేదీలు మార్చండి",
+  manageKeep: "ఇలాగే ఉంచండి",
+  bookingCancelled: (ref) => `అయ్యింది — బుకింగ్ ${ref} రద్దు చేయబడింది. మళ్లీ బుక్ చేయాలంటే ఎప్పుడైనా మెసేజ్ చేయండి. 😊`,
+  rescheduleStart: "పర్వాలేదు — కొత్త తేదీలు చూద్దాం. మీరు ఎప్పుడు ఉండాలనుకుంటున్నారు?",
+  bookingKept: (ref) => `చాలా బాగుంది — బుకింగ్ ${ref} అలాగే ఉంటుంది. త్వరలో కలుద్దాం! 🎉`,
+  noBookingFound: "ఈ నంబర్‌కి యాక్టివ్ బుకింగ్ కనిపించలేదు. వేరే నంబర్‌తో బుక్ చేసి ఉంటే మా టీమ్ సహాయం చేస్తుంది — పంపమంటారా?",
+  continueAnyway: "చాలా బాగుంది — ఈ రూమ్ ఖరారు చేయనా?",
+  farewell: "చాలా బాగుంది — త్వరలో కలుద్దాం! 😊 ఏదైనా ఉంటే మెసేజ్ చేయండి.",
 };
 
 const TABLE: Record<GuestLanguage, Strings> = { en: EN, hi: HI, te: TE };

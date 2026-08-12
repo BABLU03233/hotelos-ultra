@@ -10,6 +10,7 @@ import {
   confirmBookingPrompt,
   dateQuickPickPrompt,
   greetMenuPrompt,
+  looksLikeExistingBookingRequest,
   looksLikeRoomObjection,
   postBookingPrompt,
   roomResponsePrompt,
@@ -21,6 +22,7 @@ import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availabil
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
+import { CANCEL_BOOKING_ID, CHANGE_DATES_ID, KEEP_BOOKING_ID, beginReschedule, cancelBooking, findActiveBooking } from "@/lib/booking/manage-booking";
 import { parseFlowDateRange } from "@/lib/booking/parse-flow-response";
 import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
 import {
@@ -695,6 +697,94 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // live: create and upload succeed, publish returns 139000/4233020 while
   // the display name sits DECLINED), which every hotel would hit before its
   // guests could pick a date. See date-picker-message.ts.
+  // ---- Managing a booking the guest already has ----
+  // Cancel/reschedule used to be recognised only in the negative: enough to
+  // stop it being hijacked into a NEW booking funnel, after which it fell to
+  // the model, which can only escalate. Every completed booking was a future
+  // support call. Handled deterministically for the same reason the confirm
+  // tap is — cancelling someone's stay must not depend on a free-tier
+  // model's reading of "cancel my booking".
+  if (msg.interactiveId === CANCEL_BOOKING_ID || msg.interactiveId === CHANGE_DATES_ID || msg.interactiveId === KEEP_BOOKING_ID) {
+    if (contact.aiPaused) return;
+    const booking = await findActiveBooking(prisma, tenant.id, contact.id);
+    if (!booking) {
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).noBookingFound }, "Failed to send no-booking message");
+      return;
+    }
+    if (msg.interactiveId === KEEP_BOOKING_ID) {
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).bookingKept(booking.referenceCode) }, "Failed to send keep-booking message");
+      return;
+    }
+    if (msg.interactiveId === CANCEL_BOOKING_ID) {
+      await cancelBooking(prisma, tenant.id, contact.id, booking.id);
+      await fireBookingNotification(prisma, tenant.id, contact.id, `${contact.name || contact.phone} cancelled booking ${booking.referenceCode} via WhatsApp.`);
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).bookingCancelled(booking.referenceCode) }, "Failed to send cancellation");
+      return;
+    }
+    // Change dates: the old booking is released first so the guest isn't
+    // competing with themselves for the room they're trying to move.
+    await beginReschedule(prisma, tenant.id, contact.id, booking);
+    await fireBookingNotification(prisma, tenant.id, contact.id, `${contact.name || contact.phone} is rescheduling booking ${booking.referenceCode} via WhatsApp.`);
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(t(lang).rescheduleStart, dateQuickPickPrompt(lang)),
+      "Failed to send reschedule prompt"
+    );
+    return;
+  }
+
+  // A typed "cancel my booking" / "can I reschedule?" — show them the real
+  // booking with real options rather than escalating.
+  if (!msg.interactiveId && content && looksLikeExistingBookingRequest(content)) {
+    if (contact.aiPaused) return;
+    const booking = await findActiveBooking(prisma, tenant.id, contact.id);
+    if (booking) {
+      const dates =
+        booking.checkIn && booking.checkOut ? describeStay(booking.checkIn, booking.checkOut) : "dates not set";
+      await sendAndPersist(
+        tenant,
+        contact,
+        {
+          type: "list",
+          body: t(lang).manageBookingBody(booking.referenceCode, booking.roomNameSnapshot ?? "your room", dates),
+          buttonText: t(lang).manageBookingButton,
+          sections: [
+            {
+              rows: [
+                { id: CHANGE_DATES_ID, title: t(lang).manageChangeDates },
+                { id: CANCEL_BOOKING_ID, title: t(lang).manageCancel },
+                { id: KEEP_BOOKING_ID, title: t(lang).manageKeep },
+              ],
+            },
+          ],
+        },
+        "Failed to send manage-booking options"
+      );
+      return;
+    }
+    // No booking on this number — say so plainly instead of pretending.
+    await sendAndPersist(tenant, contact, { type: "text", text: t(lang).noBookingFound }, "Failed to send no-booking message");
+    return;
+  }
+
+  // PRICE_OBJECTION's "Continue anyway" — the guest accepting the room at
+  // its price. Previously fell through as bare label text; now it moves
+  // straight to the close, which is what the tap means.
+  if (msg.interactiveId === "continue_anyway") {
+    if (contact.aiPaused) return;
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(t(lang).continueAnyway, confirmBookingPrompt(lang)), "Failed to send continue-anyway");
+    return;
+  }
+
+  // POST_BOOKING's "All set, thanks!" — a sign-off, not a question. Answer
+  // it as one and stop, rather than handing a conversation-ender to the AI.
+  if (msg.interactiveId === "post_booking_done") {
+    if (contact.aiPaused) return;
+    await sendAndPersist(tenant, contact, { type: "text", text: t(lang).farewell }, "Failed to send farewell");
+    return;
+  }
+
   // Every date-picker tap routes through one pure decision function, which
   // is what makes the "no row may re-open its own list" invariant testable
   // exhaustively — see date-picker-router.ts for the loop this prevents.

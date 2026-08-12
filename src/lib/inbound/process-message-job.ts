@@ -2,7 +2,7 @@ import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/in
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
 import { captureGuestCount } from "@/lib/booking/guest-count";
-import { resolveLanguage } from "@/lib/i18n/guest-language";
+import { resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
@@ -53,7 +53,29 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   const chronological = [...recentMessages].reverse();
   const inboundMessages = chronological.filter((m) => m.direction === "IN");
   const latestInbound = inboundMessages.at(-1);
-  if (!latestInbound?.content) return; // nothing textual to react to (e.g. an image with no caption)
+
+  // An attachment with no caption used to return here, silently. That made
+  // this the only path in the whole flow capable of leaving a guest with no
+  // reply at all — someone sends a photo and the conversation simply stops,
+  // which contradicts the principle every other branch follows. There is
+  // nothing for the AI to read (transcription already ran and produced
+  // nothing), so this is answered deterministically: acknowledge what
+  // arrived and ask for it in words, in the guest's own language.
+  if (!latestInbound) return;
+  if (!latestInbound.content) {
+    const creds = await getWhatsAppCredentials(tenantId);
+    if (!creds) return;
+    const text = t(resolveLanguage(contact.language)).mediaNoticed;
+    try {
+      const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text });
+      await prisma.message.create({
+        data: { tenantId, contactId, direction: "OUT", type: "TEXT", content: text, whatsappMessageId, status: "SENT" },
+      });
+    } catch (err) {
+      console.error(`Media acknowledgement failed for tenant ${tenantId}, contact ${contactId}:`, err);
+    }
+    return;
+  }
 
   const history: ChatMessage[] = chronological
     .filter((m) => m.id !== latestInbound.id && m.content)

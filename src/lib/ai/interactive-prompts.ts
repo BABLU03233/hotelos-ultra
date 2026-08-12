@@ -829,7 +829,7 @@ const DEVANAGARI_BOOKING_INTENT_PATTERN = /कमरा|कमरे|रूम|�
 // by the new-booking funnel.
 const EXISTING_BOOKING_REQUEST_PATTERN = /\b(cancel|refund|reschedul(e|ing)|change (my|the) (booking|reservation)|modify (my|the) (booking|reservation))\b/i;
 
-function looksLikeExistingBookingRequest(text: string): boolean {
+export function looksLikeExistingBookingRequest(text: string): boolean {
   return EXISTING_BOOKING_REQUEST_PATTERN.test(text);
 }
 
