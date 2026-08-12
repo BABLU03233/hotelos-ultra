@@ -19,6 +19,16 @@ import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
 import { parseFlowDateRange } from "@/lib/booking/parse-flow-response";
 import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
+import {
+  buildCheckInPickerMessage,
+  buildNightsPickerMessage,
+  CHECK_IN_PREFIX,
+  describeStay,
+  NIGHTS_PREFIX,
+  parseCheckInId,
+  parseNightsId,
+  TYPE_DATES_ID,
+} from "@/lib/whatsapp/date-picker-message";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
@@ -609,6 +619,65 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
     await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
     await prisma.message.update({ where: { id: messageRow.id }, data: { content: label } });
+  }
+
+  // ---- The tappable calendar ----
+  // "I'll type dates"/"Another date" used to be a dead end: it fell through
+  // to the AI as free text, so the guest who wanted a specific date got
+  // prose instead of anything to tap. It now opens a real date picker built
+  // from List Messages. This is the same experience the native in-WhatsApp
+  // CalendarPicker gives, without depending on a published Flow -- Flow
+  // publishing is gated behind Meta's per-number integrity check (verified
+  // live: create and upload succeed, publish returns 139000/4233020 while
+  // the display name sits DECLINED), which every hotel would hit before its
+  // guests could pick a date. See date-picker-message.ts.
+  if (msg.interactiveId === TYPE_DATES_ID) {
+    if (contact.aiPaused) return;
+    // Once a check-in is already settled, "longer stay" means they want more
+    // nights, not a different arrival day.
+    const picker = contact.pendingCheckIn ? buildNightsPickerMessage(contact.pendingCheckIn) : buildCheckInPickerMessage();
+    await sendAndPersist(tenant, contact, picker, "Failed to send date picker");
+    return;
+  }
+
+  if (msg.interactiveId?.startsWith(CHECK_IN_PREFIX)) {
+    if (contact.aiPaused) return;
+    const checkIn = parseCheckInId(msg.interactiveId);
+    if (checkIn) {
+      // Check-out is deliberately cleared: a half-set range left over from an
+      // earlier attempt would otherwise pair a new arrival with a stale
+      // departure, which is how a check-out lands before its check-in.
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: null } });
+      await sendAndPersist(tenant, contact, buildNightsPickerMessage(checkIn), "Failed to send nights picker");
+      return;
+    }
+    // Stale row (a picker sent days ago, now naming a past date) — reopen it
+    // on today's dates rather than silently booking the wrong day.
+    await sendAndPersist(tenant, contact, buildCheckInPickerMessage(), "Failed to re-send date picker");
+    return;
+  }
+
+  if (msg.interactiveId?.startsWith(NIGHTS_PREFIX)) {
+    if (contact.aiPaused) return;
+    if (contact.pendingCheckIn) {
+      const checkOut = parseNightsId(msg.interactiveId, contact.pendingCheckIn);
+      if (checkOut) {
+        await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckOut: checkOut } });
+        // Rewritten to the resolved range for the same reason the quick-pick
+        // rows are: Anushka's next reply is then grounded in real dates
+        // rather than the phrase "3 nights".
+        await prisma.message.update({
+          where: { id: messageRow.id },
+          data: { content: describeStay(contact.pendingCheckIn, checkOut) },
+        });
+        // Falls through to the AI queue, which now has real dates and so can
+        // check availability and recommend a room it can actually deliver.
+      }
+    } else {
+      // Nights tapped with no arrival day settled — ask for that first.
+      await sendAndPersist(tenant, contact, buildCheckInPickerMessage(), "Failed to send date picker");
+      return;
+    }
   }
 
   // The guest-count equivalent of the quick-pick block above: resolve the

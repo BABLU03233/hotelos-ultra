@@ -160,7 +160,12 @@ const BUTTON_CATALOG: Record<string, CatalogEntry> = {
       { id: "dates_tomorrow", title: "Tomorrow" },
       { id: "dates_weekend", title: "This weekend" },
       { id: "dates_nextweek", title: "Next week" },
-      { id: "dates_custom", title: "I'll type dates" },
+      // Renamed from "I'll type dates": tapping this used to fall through to
+      // the AI as free text (a dead end for a guest who wanted a specific
+      // day), and now opens a real tappable date picker — see
+      // date-picker-message.ts. The id is unchanged so nothing downstream
+      // has to care.
+      { id: "dates_custom", title: "Pick exact dates" },
     ],
   },
   // HANDLE OBJECTIONS was 100% free-text before this — a guest pushing back
@@ -654,7 +659,9 @@ export function looksLikeBareGreeting(text: string): boolean {
 // favor of typing a real date next, so re-showing the same three buttons
 // on the very next reply would be exactly the redundant loop this is
 // meant to prevent.
-const DECLINED_DATE_QUICK_PICK_PATTERN = /^i'?ll type dates$/i;
+// Matches the row's current title and its former one ("I'll type dates"),
+// since a guest's transcript can still contain the old wording.
+const DECLINED_DATE_QUICK_PICK_PATTERN = /^(i'?ll type dates|pick exact dates|another date)$/i;
 
 function declinedDateQuickPick(text: string): boolean {
   return DECLINED_DATE_QUICK_PICK_PATTERN.test(text.trim());
