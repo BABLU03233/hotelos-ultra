@@ -79,6 +79,35 @@ describe("publishBookingFlow", () => {
     await expect(uploadBookingFlowAsset(CREDS, "flow123", ROOMS)).rejects.toThrow(/invalid min-date/);
   });
 
+  it("explains the integrity block instead of repeating Meta's undiagnosable message", async () => {
+    // The real response seen live on a WABA that was green on every other
+    // signal — the blocker was an unapproved phone-number display name.
+    mockFetch([
+      (u) =>
+        u.endsWith("/flows")
+          ? json(
+              {
+                error: {
+                  message: "Blocked by Integrity",
+                  code: 139000,
+                  error_subcode: 4233020,
+                  error_user_title: "Flow publishing failed",
+                  error_user_msg: "Integrity requirements not met.",
+                },
+              },
+              400
+            )
+          : undefined,
+    ]);
+    const err = await publishBookingFlow(CREDS, ROOMS, NOW).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(Error);
+    const msg = (err as Error).message;
+    expect(msg).toMatch(/display name/i);
+    expect(msg).toMatch(/WhatsApp Manager/);
+    // The bare Meta string on its own would be a dead end.
+    expect(msg).not.toBe("Integrity requirements not met.");
+  });
+
   it("sends the flow json as a multipart FLOW_JSON asset", async () => {
     const calls = mockFetch([(u) => (u.endsWith("/assets") ? json({ success: true }) : undefined)]);
     await uploadBookingFlowAsset(CREDS, "flow123", ROOMS);

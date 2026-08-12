@@ -286,16 +286,32 @@ function report(violations: Violation[]): string {
   return lines.join("\n");
 }
 
-describe("conversation soak", () => {
-  it("holds every invariant across 5,000 randomised conversations", () => {
-    const violations: Violation[] = [];
-    for (let seed = 1; seed <= 5000; seed++) {
-      violations.push(...runConversation(seed));
-    }
-    expect(violations.length, report(violations)).toBe(0);
-  });
+/**
+ * These drive tens of thousands of state-machine transitions each, which is
+ * the point of them — but that puts them well outside vitest's 5s default,
+ * and only sometimes: they normally finish in ~2-5s and tip over the edge
+ * whenever the machine is busy. That showed up as a flaky failure with a
+ * timeout message and no invariant violation, which is exactly the kind of
+ * noise that teaches people to re-run a red suite instead of reading it.
+ * Generous explicit budget — far above the real runtime, so a failure here
+ * means a genuine hang or a real regression, never a loaded CI box.
+ */
+const SOAK_TIMEOUT_MS = 120_000;
 
-  it("holds when guest count arrives before any booking intent", () => {
+describe("conversation soak", () => {
+  it(
+    "holds every invariant across 5,000 randomised conversations",
+    () => {
+      const violations: Violation[] = [];
+      for (let seed = 1; seed <= 5000; seed++) {
+        violations.push(...runConversation(seed));
+      }
+      expect(violations.length, report(violations)).toBe(0);
+    },
+    SOAK_TIMEOUT_MS
+  );
+
+  it("holds when guest count arrives before any booking intent", { timeout: SOAK_TIMEOUT_MS }, () => {
     const violations: Violation[] = [];
     for (let seed = 90001; seed <= 91000; seed++) {
       const rng = makeRng(seed);
@@ -313,7 +329,7 @@ describe("conversation soak", () => {
     expect(violations.length, report(violations)).toBe(0);
   });
 
-  it("never loses a guest count once stored, however long the conversation runs", () => {
+  it("never loses a guest count once stored, however long the conversation runs", { timeout: SOAK_TIMEOUT_MS }, () => {
     // Directly targets the window bug: drive far past 12 messages.
     for (let seed = 70001; seed <= 71000; seed++) {
       const rng = makeRng(seed);

@@ -33,11 +33,37 @@ function requireWabaId(creds: WhatsAppCredentials): string {
   return creds.wabaId;
 }
 
+/**
+ * Meta's integrity block on Flow publishing (code 139000, subcode 4233020).
+ *
+ * Its own message is the single word-salad "Integrity requirements not met."
+ * — literally true and completely undiagnosable. Hit live on a WABA where
+ * every other signal was green (business verified, account APPROVED, quality
+ * GREEN, can_send_message AVAILABLE, zero Flow validation errors); the only
+ * failing field anywhere was the phone number's display name, which showed
+ * `name_status: NON_EXISTS` with `new_name_status: DECLINED`.
+ *
+ * A hotel owner cannot be expected to work that out from "Integrity
+ * requirements not met", so the likely cause and the exact fix are attached
+ * to it. Worth being specific: this is a per-number gate, so every hotel
+ * onboarded hits it independently until its own display name is approved.
+ */
+const INTEGRITY_BLOCK_SUBCODE = 4233020;
+
+const INTEGRITY_GUIDANCE =
+  "Meta blocked publishing (\"Integrity requirements not met\"). This is almost always the phone number's " +
+  "display name: it has to be approved by Meta, and it must be the hotel's own business name — a software " +
+  "or brand name on a hotel's number gets declined. Fix it in WhatsApp Manager → Account tools → Phone " +
+  "numbers → your number → Settings → Display name, submit the hotel's registered name, and publish again " +
+  "once it shows as approved (usually a few hours). Nothing in this app can bypass this check.";
+
 async function metaError(res: Response, fallback: string): Promise<string> {
   const json = await res.json().catch(() => null);
+  const err = json?.error as { message?: string; error_user_msg?: string; error_subcode?: number } | undefined;
+  if (err?.error_subcode === INTEGRITY_BLOCK_SUBCODE) return INTEGRITY_GUIDANCE;
   // error_user_msg is Meta's human-readable form and is far more useful to a
   // hotel owner than the raw internal message, when it's present at all.
-  return json?.error?.error_user_msg || json?.error?.message || `${fallback} (${res.status})`;
+  return err?.error_user_msg || err?.message || `${fallback} (${res.status})`;
 }
 
 /** Step 1 — create the Flow shell. Returns its id. */
