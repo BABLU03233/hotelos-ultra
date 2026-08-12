@@ -10,6 +10,7 @@ import {
   confirmBookingPrompt,
   dateQuickPickPrompt,
   greetMenuPrompt,
+  looksLikeRoomObjection,
   postBookingPrompt,
   roomResponsePrompt,
 } from "@/lib/ai/interactive-prompts";
@@ -17,6 +18,7 @@ import { transcribeAudio } from "@/lib/ai/transcription";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
+import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { parseFlowDateRange } from "@/lib/booking/parse-flow-response";
 import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
 import {
@@ -669,6 +671,55 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
         where: { id: messageRow.id },
         data: { content: describeStay(contact.pendingCheckIn, pickerAction.checkOut) },
       });
+    }
+  }
+
+  // ---- The guest names the room they actually want ----
+  // Caught in a real booking: after a Classic Room recommendation the guest
+  // said "No I only want premium room" and was pushed to confirm — and then
+  // booked into — the Classic. Two things were wrong: the rejection didn't
+  // stop the close (fixed in resolveStageKey), and the room they DID name
+  // was never acted on.
+  //
+  // Handled deterministically rather than left to the model, for the same
+  // reason room-picker taps already are: which room a guest is buying is
+  // business-critical and must not depend on a free-tier model reading a
+  // negation correctly. Requires an objection/preference signal too, so a
+  // genuine question ("is the Premium Room quieter?") is still answered
+  // rather than being silently converted into a room switch.
+  if (!msg.interactiveId && content && looksLikeRoomObjection(content) && !content.trim().endsWith("?")) {
+    const allRooms = await prisma.room.findMany({ where: { tenantId: tenant.id }, orderBy: { price: "asc" } });
+    const namedRoomId = matchRecommendedRoom(content, allRooms);
+    const named = namedRoomId ? allRooms.find((r) => r.id === namedRoomId) : null;
+    if (named && named.id !== contact.pendingRoomId) {
+      if (contact.aiPaused) return;
+      const free =
+        contact.pendingCheckIn && contact.pendingCheckOut
+          ? await isRoomAvailable(prisma, tenant.id, named.id, contact.pendingCheckIn, contact.pendingCheckOut).catch(() => true)
+          : true;
+      if (!free) {
+        await sendAndPersist(
+          tenant,
+          contact,
+          toShortCircuitInteractive(
+            `Sorry — the ${named.name} is already booked for those dates 😔 Want to try different dates, or see what else is free?`,
+            dateQuickPickPrompt()
+          ),
+          "Failed to send named-room-unavailable message"
+        );
+        return;
+      }
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: named.id } });
+      await sendAndPersist(
+        tenant,
+        contact,
+        toShortCircuitInteractive(
+          `Of course — the ${named.name}, from ₹${named.price}/night, sleeps up to ${named.capacity}. Shall I lock it in?`,
+          roomResponsePrompt()
+        ),
+        "Failed to send named-room switch"
+      );
+      return;
     }
   }
 

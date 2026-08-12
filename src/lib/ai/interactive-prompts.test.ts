@@ -992,6 +992,44 @@ describe("resolveDeterministicReply", () => {
     expect(result).toBeNull();
   });
 
+  it("never pushes Confirm booking at a guest who just rejected the room", () => {
+    // The real incident, verbatim: a Classic Room recommendation answered
+    // with "No I only want premium room" fell through to CONFIRM_BOOKING,
+    // which restated the CLASSIC room and pushed them to confirm it. They
+    // tapped, and were booked into the room they had just refused.
+    const afterRecommendation = [
+      { role: "user", content: "I want to book a room" },
+      { role: "assistant", content: "For 1 guest, I'd recommend our Classic Room, from ₹999/night. What do you think?" },
+    ];
+    const result = resolveDeterministicReply({
+      ...base,
+      history: afterRecommendation,
+      guestMessage: "No I only want premium room",
+      knownGuestCount: 1,
+    });
+    expect(result?.text ?? "").not.toMatch(/Confirm booking/i);
+  });
+
+  it("does not push Confirm booking on any plain rejection", () => {
+    const afterRecommendation = [
+      { role: "assistant", content: "Our Deluxe Room is ₹1,299/night — shall I lock it in?" },
+    ];
+    for (const reply of ["no", "nope", "not this one", "I don't want that", "something else please", "koi aur room", "nahi"]) {
+      const result = resolveDeterministicReply({ ...base, history: afterRecommendation, guestMessage: reply, knownGuestCount: 2 });
+      expect(result?.text ?? "", `"${reply}" was answered with a push to confirm`).not.toMatch(/Confirm booking/i);
+    }
+  });
+
+  it("still closes normally when the guest is happy", () => {
+    const result = resolveDeterministicReply({
+      ...base,
+      history: [{ role: "assistant", content: "Our Classic Room is ₹999/night." }],
+      guestMessage: "sounds good",
+      knownGuestCount: 2,
+    });
+    expect(result?.text ?? "").toMatch(/Confirm booking/i);
+  });
+
   it("gives a fixed DATE_QUICK_PICK reply once guest count is known", () => {
     const result = resolveDeterministicReply({ ...base, guestMessage: "2 guests please" });
     expect(result?.text).toBe("When are you looking to stay?");

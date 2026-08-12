@@ -100,6 +100,19 @@ const QUESTIONS = [
 const OBJECTIONS = ["that's too expensive", "any discount?", "anything cheaper?", "koi offer hai?", "bahut mehenga hai"];
 const PHOTOS = ["send photos", "can I see pictures?", "View photos", "photo bhejo"];
 const CANCELS = ["cancel my booking", "I want to cancel", "can I reschedule my booking?", "change my reservation"];
+// A guest turning down the room they were offered. Answering any of these
+// with "tap Confirm booking" is how someone gets booked into a room they
+// explicitly refused — which happened in production.
+const REJECTIONS = [
+  "No I only want premium room",
+  "no",
+  "not this one",
+  "I don't want that room",
+  "something else please",
+  "koi aur room dikhao",
+  "nahi",
+  "I'd prefer the deluxe room",
+];
 const NOISE = ["ok", "hmm", "sounds good", "thanks", "👍", "achha", "k", "...", "yes", "no"];
 
 const AI_PLAIN = [
@@ -207,7 +220,8 @@ function runOne(seed: number): Violation[] {
     else if (r < 0.35) msgs.push(pick(rng, OBJECTIONS));
     else if (r < 0.5) msgs.push(pick(rng, PHOTOS));
     else if (r < 0.7) msgs.push(pick(rng, NOISE));
-    else if (r < 0.85) msgs.push(pick(rng, DATES));
+    else if (r < 0.8) msgs.push(pick(rng, DATES));
+    else if (r < 0.9) msgs.push(pick(rng, REJECTIONS));
     else msgs.push(pick(rng, COUNTS));
   }
 
@@ -231,6 +245,7 @@ function runOne(seed: number): Violation[] {
     const meaningSurvived = !CONTENTLESS.includes(msg.trim());
     const isPhotoReq = PHOTOS.includes(clean) && meaningSurvived;
     const isCancel = CANCELS.includes(clean) && meaningSurvived;
+    const isRejection = REJECTIONS.includes(clean) && meaningSurvived;
 
     const { text, interactive } = step(st, msg, rng);
     tr.push(`  guest> ${msg}`);
@@ -285,6 +300,13 @@ function runOne(seed: number): Violation[] {
     }
 
     // 6. a cancel/reschedule request must never be hijacked into booking
+    // The production incident: a guest who says "no, I want the premium
+    // room" must never be answered with a push to confirm the room they
+    // just turned down — tapping it books the wrong room.
+    if (isRejection && /confirm booking/i.test(text)) {
+      add("pushed Confirm booking at a guest who rejected the room", `turn ${turn}`);
+    }
+
     if (isCancel && (text === GUEST_COUNT_ASK || text === DATE_ASK)) {
       add("cancel/reschedule hijacked into the booking funnel", `turn ${turn}`);
     }

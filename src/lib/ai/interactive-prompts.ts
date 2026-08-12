@@ -359,13 +359,74 @@ const PHOTO_WORDS = ["photo", "photos", "picture", "pictures"];
  * got swallowed by a funnel prompt, so the guest was asked their party size
  * instead of being shown the room they asked to see.
  */
-function looksLikePhotoRequest(text: string): boolean {
-  if (PHOTO_REQUEST_PATTERN.test(text)) return true;
+function fuzzyContains(text: string, targets: string[]): boolean {
   return text
     .toLowerCase()
     .split(/[^a-z]+/)
     .filter((w) => w.length >= FUZZY_WORD_MIN_LENGTH)
-    .some((w) => PHOTO_WORDS.some((p) => p.length >= FUZZY_TARGET_MIN_LENGTH && (withinOneEdit(w, p) || isTransposition(w, p))));
+    .some((w) => targets.some((t) => t.length >= FUZZY_TARGET_MIN_LENGTH && (withinOneEdit(w, t) || isTransposition(w, t))));
+}
+
+function looksLikePhotoRequest(text: string): boolean {
+  return PHOTO_REQUEST_PATTERN.test(text) || fuzzyContains(text, PHOTO_WORDS);
+}
+
+/**
+ * The guest pushing back on the room being offered, or asking for a
+ * different one — "no", "not this one", "I only want the premium room",
+ * "something else", "koi aur room".
+ *
+ * Deliberately broad, and the breadth is the point: this only ever
+ * SUPPRESSES the push-to-confirm. A false positive costs one turn of
+ * momentum; a false negative books someone into a room they refused, which
+ * is exactly what happened in production before this existed. Those two
+ * outcomes are not remotely symmetric.
+ */
+const ROOM_OBJECTION_PATTERN =
+  /\b(no|nope|nah|nahi|not (this|that|it|interested)|don'?t want|do not want|instead|rather|prefer|only want|another|different|other room|something else|change (the )?room|koi aur|dusra|dusri|వేరే|नहीं|दूसरा)\b/i;
+
+// Fuzzy-matched too, for the same reason photo requests are: a soak with
+// realistic typing noise found "I'd preferr the deluxe room" sailing through
+// a \b-anchored "prefer" and getting answered with a push to confirm the
+// rejected room. Chasing spellings one at a time is a losing game; matching
+// within one edit is not.
+const ROOM_OBJECTION_WORDS = ["prefer", "another", "different", "instead", "rather", "dusra", "dusri"];
+
+/** CONFIRM_BOOKING's own "Not yet" decline row — see resolveStageKey. */
+const DECLINED_CONFIRM_PATTERN = /^not yet$/i;
+
+export function looksLikeRoomObjection(text: string): boolean {
+  return ROOM_OBJECTION_PATTERN.test(text) || fuzzyContains(text, ROOM_OBJECTION_WORDS);
+}
+
+/**
+ * The guest signalling they're happy to go ahead.
+ *
+ * This gates the push-to-confirm, which used to be the waterfall's CATCH-ALL:
+ * once any room had been mentioned, literally any message that didn't match
+ * an earlier branch was answered with "tap Confirm booking". That is how a
+ * guest who said "No I only want premium room" got pushed to confirm — and
+ * then booked into — the Classic Room they'd just refused.
+ *
+ * Enumerating rejections to suppress the close was the first attempt and it
+ * loses: a soak with realistic typing noise kept finding new spellings
+ * ("preferr", "soomething else") that slipped through. Requiring positive
+ * agreement inverts the failure. An unrecognised message now goes to the AI,
+ * which answers it in context, instead of being steamrolled with a close.
+ * The waterfall still re-derives buttons from whatever the AI writes, so a
+ * genuine "shall I book it?" reply still gets its Confirm row.
+ */
+const AGREEMENT_PATTERN =
+  /^(y|ya|yes|yeah|yep|yup|ok|okay|k|sure|done|fine|great|perfect|good|nice|cool|👍|✅)\b|^(sounds good|that works|go ahead|book it|lets book|let'?s book|i'?ll take it|works for me|haan|haa|ji|theek hai|thik hai|sahi|sari|ok done|yes please|please book|book kar do|confirm)\b/i;
+
+export function looksLikeAgreement(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (AGREEMENT_PATTERN.test(t)) return true;
+  // Deliberately NOT "please": it is a politeness marker, not agreement, and
+  // it attaches to refusals just as readily as acceptances — "something else
+  // please" was being read as a yes and answered with a push to confirm.
+  return fuzzyContains(t, ["sounds", "perfect", "great", "confirm"]);
 }
 
 export function roomResponsePrompt(): InteractivePrompt {
@@ -870,13 +931,40 @@ function resolveStageKey(params: {
     if (roomMentionedEver && (looksLikePhotoRequest(guestMessage) || guestMessage.trim().endsWith("?"))) {
       return null;
     }
+    // The worst instance of this bug class yet, caught in a real booking: a
+    // guest answered a Classic Room recommendation with "No I only want
+    // premium room" and, because that is not a photo request and does not
+    // end in "?", fell straight through to CONFIRM_BOOKING -- which restated
+    // the CLASSIC room and pushed them to confirm it. They tapped, and were
+    // booked into the room they had just explicitly refused.
+    //
+    // A rejection is the one message that must never be answered with
+    // "ready to confirm?". Handing the turn to the AI lets it engage with
+    // what they actually asked for; handle-inbound-message.ts additionally
+    // switches the pending room outright when they name a real one, so the
+    // recovery is deterministic rather than left to the model.
+    if (roomMentionedEver && looksLikeRoomObjection(guestMessage)) {
+      return null;
+    }
     // Checked before the dates nudge, not after: dates detection is
     // necessarily broad/imprecise (guests phrase dates far more ways than
     // guest counts), so if a room's already been discussed, prioritize
     // moving the guest toward confirming over risking a guest who's ready
     // to book getting stuck being asked for dates on a loop because their
     // phrasing didn't match the pattern.
-    if (roomMentionedEver) {
+    //
+    // Now requires actual agreement rather than firing as the catch-all for
+    // "a room was mentioned at some point". As a catch-all this branch
+    // answered ANY unmatched message with a push to confirm — which is how a
+    // guest who said "No I only want premium room" was pushed to confirm the
+    // Classic Room, tapped, and got booked into it. See looksLikeAgreement
+    // for why suppressing rejections was the wrong shape of fix.
+    // "Not yet" is CONFIRM_BOOKING's own decline row, so it stays on this
+    // branch deliberately — not to push again, but because the stage owns a
+    // dedicated soft, no-pressure reply for exactly this tap (see
+    // resolveDeterministicReply). Dropping it here would hand a declining
+    // guest to the AI and lose that.
+    if (roomMentionedEver && (looksLikeAgreement(guestMessage) || DECLINED_CONFIRM_PATTERN.test(guestMessage.trim()))) {
       return "CONFIRM_BOOKING";
     }
     if (
@@ -1094,7 +1182,7 @@ export function resolveDeterministicReply(params: {
     // row) got the exact same push-to-confirm text repeated verbatim right
     // back at them -- reads as not listening. A guest who just declined
     // gets a softer, no-pressure line instead of the identical nudge again.
-    if (/^not yet$/i.test(params.guestMessage.trim())) {
+    if (DECLINED_CONFIRM_PATTERN.test(params.guestMessage.trim())) {
       text = "No worries at all — take your time! 😊 Just tap Confirm booking whenever you're ready.";
     } else if (params.bookingSummary) {
       // Live-caught gap: the confirm-booking prompt never actually restated
