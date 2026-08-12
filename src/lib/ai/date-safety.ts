@@ -23,6 +23,10 @@ import { dateFieldsIST, todayMidnightIST } from "@/lib/india-time";
  * class through the server's own clock instead of the guest's phrasing.
  */
 export function guestDateLooksPast(text: string, now: Date = new Date()): boolean {
+  return numericDateLooksPast(text, now) || monthNameDateLooksPast(text, now);
+}
+
+function numericDateLooksPast(text: string, now: Date): boolean {
   const match = text.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
   if (!match) return false;
 
@@ -39,4 +43,45 @@ export function guestDateLooksPast(text: string, now: Date = new Date()): boolea
   const parsed = new Date(year, month - 1, day);
   const todayMidnight = todayMidnightIST(now);
   return parsed.getTime() < todayMidnight.getTime();
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+// Both branches allow the month name to continue past its 3-letter stem
+// ([a-z]*). Without that on the day-first branch, "5 August" matched
+// nothing: the trailing \b sat immediately after "aug", and "u" follows —
+// both word characters, so there is no boundary there and the whole match
+// failed. "5 Aug" worked, "5 August" didn't, which is the more common way
+// to write it.
+const MONTH_NAME_DATE =
+  /\b(?:(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?)\b/i;
+
+/**
+ * "5 August" / "Aug 5th" when today is the 12th.
+ *
+ * The numeric check above was written for a day-first/month-first AMBIGUITY
+ * incident, and its comment concluded month-name dates were out of scope
+ * because they aren't ambiguous. True, and beside the point: an unambiguous
+ * date can still be firmly in the past. That gap let a guest name a date
+ * that had already gone and be walked forward into booking it — the exact
+ * failure the numeric check exists to prevent, just reached through a
+ * different phrasing.
+ *
+ * Bare "May" is excluded by requiring a day number alongside the month, so
+ * an ordinary sentence containing the word "may" can't be read as a date.
+ * A year is never inferred backwards: with no year given, this only fires
+ * when the date is earlier in the CURRENT year, since "5 August" in
+ * December plainly means next August.
+ */
+function monthNameDateLooksPast(text: string, now: Date): boolean {
+  const m = text.match(MONTH_NAME_DATE);
+  if (!m) return false;
+
+  const day = parseInt(m[1] ?? m[4], 10);
+  const monthToken = (m[2] ?? m[3]).toLowerCase().slice(0, 3);
+  const month = MONTHS.indexOf(monthToken);
+  if (month < 0 || !day || day < 1 || day > 31) return false;
+
+  const { year } = dateFieldsIST(now);
+  const parsed = new Date(year, month, day);
+  return parsed.getTime() < todayMidnightIST(now).getTime();
 }

@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
+import { todayMidnightIST } from "@/lib/india-time";
 import { derivePrefix, randomReferenceCode } from "./reference-code";
 
 const IDEMPOTENCY_WINDOW_MS = 5 * 60 * 1000;
@@ -56,12 +57,39 @@ async function createBookingWithUniqueCode(
  * ids that sail past the normal whatsappMessageId dedup check; without this,
  * a double-tap would create two Booking rows and fire two notifications.
  */
+export class PastDateBookingError extends Error {
+  constructor(readonly checkIn: Date) {
+    super(`Refusing to create a booking with a check-in already in the past: ${checkIn.toISOString()}`);
+    this.name = "PastDateBookingError";
+  }
+}
+
 export async function completeBooking(
   prisma: PrismaClient,
   tenantId: string,
   contactId: string,
   extra?: { roomId?: string; checkIn?: Date; checkOut?: Date; offerId?: string; offerSnapshot?: string }
 ): Promise<Prisma.BookingGetPayload<object>> {
+  // The one hard, unconditional stop against booking a date that has
+  // already gone.
+  //
+  // Every INPUT path had a past-date check — the AI's DATES: marker, the
+  // date-picker tap, the quick-picks — and this function, the only place
+  // that actually creates a Booking, had none. It documents itself above as
+  // never deciding *whether* to book, and that was the gap: a check spread
+  // across five callers is five chances to miss one, and a past-date
+  // booking was reported live. This is not a policy decision, it is an
+  // invariant: there is no caller, present or future, for which creating a
+  // stay that started in the past is correct.
+  //
+  // Throws rather than silently correcting, because every sensible recovery
+  // (ask for new dates, escalate) needs conversational context this
+  // boundary deliberately doesn't have. Callers catch it and reopen the
+  // date picker; see attemptBookingCompletion.
+  if (extra?.checkIn && extra.checkIn.getTime() < todayMidnightIST().getTime()) {
+    throw new PastDateBookingError(extra.checkIn);
+  }
+
   const recent = await prisma.booking.findFirst({
     where: { tenantId, contactId, createdAt: { gte: new Date(Date.now() - IDEMPOTENCY_WINDOW_MS) } },
     orderBy: { createdAt: "desc" },

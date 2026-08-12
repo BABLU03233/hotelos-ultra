@@ -1,3 +1,5 @@
+import { todayMidnightIST } from "@/lib/india-time";
+
 function asString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
@@ -34,5 +36,12 @@ export function parseFlowDateRange(raw: unknown): { checkIn: Date; checkOut: Dat
   const checkOut = new Date(endStr);
   if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) return null;
   if (checkOut.getTime() <= checkIn.getTime()) return null;
+  // Every other date-capture path rejects a past check-in (the DATES:
+  // marker, the picker taps, the quick-picks) and this one didn't — a gap
+  // that mattered because a Flow submission goes straight to booking
+  // completion with no conversational turn in between to catch it. India's
+  // calendar date, not the server's: for ~5.5 hours nightly UTC is still on
+  // yesterday, which would reject a genuinely valid same-day booking.
+  if (checkIn.getTime() < todayMidnightIST().getTime()) return null;
   return { checkIn, checkOut };
 }

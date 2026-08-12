@@ -9,6 +9,7 @@ import {
 } from "../src/lib/ai/interactive-prompts";
 import { captureGuestCount } from "../src/lib/booking/guest-count";
 import { resolveTypedRelativeDates } from "../src/lib/booking/quick-pick-dates";
+import { guestDateLooksPast } from "../src/lib/ai/date-safety";
 
 const TOTAL = Number(process.argv[2] ?? 100000);
 
@@ -113,6 +114,19 @@ const REJECTIONS = [
   "nahi",
   "I'd prefer the deluxe room",
 ];
+// Dates that have already gone. A guest naming one must never be carried
+// forward as though the date question were settled — that is how a booking
+// for a date that cannot happen gets made.
+function pastDates(): string[] {
+  const d = (back: number) => new Date(Date.now() - back * 86_400_000);
+  const numeric = (x: Date) => `${x.getDate()}/${x.getMonth() + 1}`;
+  const month = (x: Date) => x.toLocaleDateString("en-IN", { day: "numeric", month: "long" });
+  // Generated relative to today rather than hardcoded, so these stay
+  // genuinely past however long from now the suite is run.
+  return [numeric(d(3)), numeric(d(20)), month(d(5)), month(d(15)), `book for ${month(d(9))}`];
+}
+const PAST_DATES = pastDates();
+
 const NOISE = ["ok", "hmm", "sounds good", "thanks", "👍", "achha", "k", "...", "yes", "no"];
 
 const AI_PLAIN = [
@@ -221,7 +235,8 @@ function runOne(seed: number): Violation[] {
     else if (r < 0.5) msgs.push(pick(rng, PHOTOS));
     else if (r < 0.7) msgs.push(pick(rng, NOISE));
     else if (r < 0.8) msgs.push(pick(rng, DATES));
-    else if (r < 0.9) msgs.push(pick(rng, REJECTIONS));
+    else if (r < 0.86) msgs.push(pick(rng, REJECTIONS));
+    else if (r < 0.9) msgs.push(pick(rng, PAST_DATES));
     else msgs.push(pick(rng, COUNTS));
   }
 
@@ -246,6 +261,9 @@ function runOne(seed: number): Violation[] {
     const isPhotoReq = PHOTOS.includes(clean) && meaningSurvived;
     const isCancel = CANCELS.includes(clean) && meaningSurvived;
     const isRejection = REJECTIONS.includes(clean) && meaningSurvived;
+    // Read from the MANGLED text: if a typo destroyed the date, it is no
+    // longer a past date and holding the invariant would be unfair.
+    const isPastDate = guestDateLooksPast(msg);
 
     const { text, interactive } = step(st, msg, rng);
     tr.push(`  guest> ${msg}`);
@@ -303,6 +321,11 @@ function runOne(seed: number): Violation[] {
     // The production incident: a guest who says "no, I want the premium
     // room" must never be answered with a push to confirm the room they
     // just turned down — tapping it books the wrong room.
+    // A past date must never be treated as a settled answer and closed on.
+    if (isPastDate && /confirm booking/i.test(text)) {
+      add("pushed Confirm booking after the guest named a past date", `turn ${turn}`);
+    }
+
     if (isRejection && /confirm booking/i.test(text)) {
       add("pushed Confirm booking at a guest who rejected the room", `turn ${turn}`);
     }

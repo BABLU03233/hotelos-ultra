@@ -15,6 +15,7 @@ import {
   roomResponsePrompt,
 } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
+import { todayMidnightIST } from "@/lib/india-time";
 import { GuestLanguage, LANGUAGE_BUTTON_VALUES, detectScriptLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
@@ -178,6 +179,25 @@ async function attemptBookingCompletion(
   checkOut: Date
 ): Promise<void> {
   const lang = replyLanguage(contact);
+
+  // Checked before availability, because a date that has already gone is not
+  // an availability question at all. Reported live: a guest named a past
+  // date and was walked all the way forward into a confirmed booking for it.
+  // completeBooking now refuses this outright as a backstop; catching it
+  // here is what turns that refusal into a real conversation rather than a
+  // silent failure — the stale dates are cleared and the picker reopened, so
+  // the guest lands somewhere they can actually recover from.
+  if (checkIn.getTime() < todayMidnightIST().getTime()) {
+    await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: null, pendingCheckOut: null } });
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(t(lang).pastDateRejected, dateQuickPickPrompt(lang)),
+      "Failed to send past-date message"
+    );
+    return;
+  }
+
   const available = await isRoomAvailable(prisma, tenant.id, roomId, checkIn, checkOut);
   if (available) {
     const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);

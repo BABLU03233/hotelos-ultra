@@ -129,6 +129,7 @@ interface Strings {
   roomListButton: string;
   roomListDesc: (price: number, capacity: number) => string;
   fullyBooked: string;
+  pastDateRejected: string;
 }
 
 const EN: Strings = {
@@ -196,6 +197,7 @@ const EN: Strings = {
   roomListButton: "See rooms",
   roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} guest${capacity === 1 ? "" : "s"}`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
+  pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
 };
 
 const HI: Strings = {
@@ -263,6 +265,7 @@ const HI: Strings = {
   roomListButton: "कमरे देखें",
   roomListDesc: (price, capacity) => `₹${price}/रात से · ${capacity} लोग तक`,
   fullyBooked: "अरे, उन तारीख़ों पर सब बुक है 😔 कोई और तारीख़ चलेगी?",
+  pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
 };
 
 const TE: Strings = {
@@ -330,6 +333,7 @@ const TE: Strings = {
   roomListButton: "రూమ్‌లు చూడండి",
   roomListDesc: (price, capacity) => `₹${price}/రాత్రి నుండి · ${capacity} మంది వరకు`,
   fullyBooked: "అయ్యో, ఆ తేదీలకు అన్నీ బుక్ అయ్యాయి 😔 వేరే తేదీ కుదురుతుందా?",
+  pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
 };
 
 const TABLE: Record<GuestLanguage, Strings> = { en: EN, hi: HI, te: TE };

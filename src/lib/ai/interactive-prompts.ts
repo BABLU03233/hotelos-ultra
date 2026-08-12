@@ -1,5 +1,6 @@
 import { GuestLanguage, isGuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { currentHourIST } from "@/lib/india-time";
+import { guestDateLooksPast } from "./date-safety";
 
 /**
  * Anushka never authors WhatsApp button/list payloads directly — the
@@ -716,6 +717,13 @@ export function hasStatedDates(
   datesAlreadyKnown?: boolean
 ): boolean {
   if (datesAlreadyKnown) return true;
+  // A date that has already gone is NOT a usable answer, however clearly it
+  // was stated. Counting it as "dates known" is how a guest naming a past
+  // date got carried forward through the funnel as though the question were
+  // settled — the waterfall stopped asking, and the conversation marched on
+  // toward a booking for a date that cannot happen. Treating it as unstated
+  // sends them back to the picker, which is the only useful outcome.
+  if (guestDateLooksPast(latestGuestMessage)) return false;
   return [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage].some(
     (t) => DATE_STATED_PATTERN.test(t) || HINGLISH_DATE_PATTERN.test(t) || TELUGU_DATE_PATTERN.test(t) || DEVANAGARI_DATE_PATTERN.test(t)
   );
