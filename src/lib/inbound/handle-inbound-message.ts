@@ -16,7 +16,7 @@ import {
 } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
 import { todayMidnightIST } from "@/lib/india-time";
-import { GuestLanguage, LANGUAGE_BUTTON_VALUES, detectScriptLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
+import { GuestLanguage, LANGUAGE_BUTTON_VALUES, resolveContactLanguageUpdate, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
@@ -283,8 +283,10 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     where: { tenantId_whatsappNumber: { tenantId: tenant.id, whatsappNumber: msg.waId } },
     select: { language: true },
   });
-  const inferredLanguage = content ? detectScriptLanguage(content) : null;
-  const contactLanguageUpdate = !existingContact?.language && inferredLanguage ? inferredLanguage : undefined;
+  // See resolveContactLanguageUpdate for the rule and why it's a named,
+  // tested function rather than an inline condition.
+  const contactLanguageUpdate = resolveContactLanguageUpdate(existingContact?.language, content);
+  const inferredLanguage = contactLanguageUpdate;
 
   const contact = await prisma.contact.upsert({
     where: { tenantId_whatsappNumber: { tenantId: tenant.id, whatsappNumber: msg.waId } },

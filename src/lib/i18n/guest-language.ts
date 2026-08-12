@@ -58,6 +58,31 @@ export function resolveLanguage(stored: string | null | undefined): GuestLanguag
   return isGuestLanguage(stored) ? stored : DEFAULT_LANGUAGE;
 }
 
+/**
+ * The language to write to the contact for this message, or undefined to
+ * leave whatever is stored untouched.
+ *
+ * Extracted rather than left inline in the message handler because the rule
+ * is subtler than it looks and got it wrong once: the first version only
+ * ever filled a null, so a guest who picked English and then began writing
+ * in Telugu kept receiving English indefinitely — the precise opposite of
+ * adapting to them.
+ *
+ * Switching script mid-conversation IS switching language, and following it
+ * is safe here only because detectScriptLanguage refuses to guess from Roman
+ * letters. A Hindi-picker typing "wifi hai kya" yields null and their choice
+ * stands, which is the case the original stickiness existed to protect.
+ */
+export function resolveContactLanguageUpdate(
+  stored: string | null | undefined,
+  messageText: string | null | undefined
+): GuestLanguage | undefined {
+  if (!messageText) return undefined;
+  const detected = detectScriptLanguage(messageText);
+  if (!detected) return undefined; // ambiguous script — never overrides a choice
+  return detected === stored ? undefined : detected; // no pointless write when unchanged
+}
+
 /** What to call the language in a prompt to the model. */
 export const LANGUAGE_NAMES: Record<GuestLanguage, string> = {
   en: "English",

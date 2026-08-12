@@ -5,6 +5,7 @@ import {
   GuestLanguage,
   isGuestLanguage,
   LANGUAGE_BUTTON_VALUES,
+  resolveContactLanguageUpdate,
   resolveLanguage,
   t,
 } from "./guest-language";
@@ -44,6 +45,41 @@ describe("language selection", () => {
     expect(resolveLanguage("fr")).toBe(DEFAULT_LANGUAGE);
     expect(isGuestLanguage("hi")).toBe(true);
     expect(isGuestLanguage("fr")).toBe(false);
+  });
+});
+
+describe("switching language mid-conversation", () => {
+  // A guest who picked English and then started writing in Telugu kept
+  // getting English forever, because the rule only ever filled a null. That
+  // is the opposite of adapting to them.
+
+  it("follows a switch into another script", () => {
+    expect(resolveContactLanguageUpdate("en", "రూమ్ కావాలి")).toBe("te");
+    expect(resolveContactLanguageUpdate("en", "मुझे कमरा चाहिए")).toBe("hi");
+    expect(resolveContactLanguageUpdate("hi", "రూమ్ కావాలి")).toBe("te");
+  });
+
+  it("never lets Roman letters override a choice", () => {
+    // The case the original stickiness existed to protect: a Hindi-picker
+    // typing Hinglish must stay in Hindi, not be dropped back to English.
+    expect(resolveContactLanguageUpdate("hi", "wifi hai kya aapke yaha")).toBeUndefined();
+    expect(resolveContactLanguageUpdate("te", "room kavali")).toBeUndefined();
+    expect(resolveContactLanguageUpdate("en", "I want a room")).toBeUndefined();
+  });
+
+  it("adopts a language with no prior choice at all", () => {
+    expect(resolveContactLanguageUpdate(null, "రూమ్ కావాలి")).toBe("te");
+    expect(resolveContactLanguageUpdate(undefined, "नमस्ते")).toBe("hi");
+  });
+
+  it("writes nothing when the language is unchanged", () => {
+    expect(resolveContactLanguageUpdate("hi", "मुझे कमरा चाहिए")).toBeUndefined();
+    expect(resolveContactLanguageUpdate("te", "రూమ్ కావాలి")).toBeUndefined();
+  });
+
+  it("ignores an empty or media-only message", () => {
+    expect(resolveContactLanguageUpdate("en", null)).toBeUndefined();
+    expect(resolveContactLanguageUpdate("en", "")).toBeUndefined();
   });
 });
 

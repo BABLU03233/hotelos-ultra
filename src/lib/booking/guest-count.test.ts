@@ -125,6 +125,36 @@ describe("captureGuestCount", () => {
   });
 });
 
+describe("a guest contradicting their own headcount", () => {
+  // Found by deliberately flip-flopping mid-conversation. Corrections that
+  // carried a person-noun ("actually 4 people") already worked; a bare
+  // downward one silently did not, so the guest watched their own
+  // correction get dropped.
+  it("follows a correction up and back down again", () => {
+    let count: number | null = null;
+    const say = (m: string) => (count = captureGuestCount(m, [], count) ?? count);
+
+    expect(say("2 people")).toBe(2);
+    expect(say("actually 4 people")).toBe(4);
+    expect(say("sorry make it 3 people")).toBe(3);
+    expect(say("no wait 2")).toBe(2); // bare number, no person-noun
+    expect(say("just me now")).toBe(1);
+  });
+
+  it("accepts a bare number when a correction marker gives it context", () => {
+    expect(captureGuestCount("no wait 2", [], 4)).toBe(2);
+    expect(captureGuestCount("actually 5", [], 2)).toBe(5);
+    expect(captureGuestCount("make it 3", [], 2)).toBe(3);
+    expect(captureGuestCount("change it to 6", [], 2)).toBe(6);
+  });
+
+  it("does not read a room number as a correction", () => {
+    // "no" alone is not a correction marker, precisely for this.
+    expect(captureGuestCount("room no 2", [], 4)).toBeUndefined();
+    expect(captureGuestCount("is it ₹2000?", [], 4)).toBeUndefined();
+  });
+});
+
 describe("messageAsksGuestCount", () => {
   it("recognizes the ask in each language the prompt uses", () => {
     expect(messageAsksGuestCount("How many people will be staying? 😊")).toBe(true);

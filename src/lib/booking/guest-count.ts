@@ -174,6 +174,20 @@ export function extractGuestCount(text: string, opts: ExtractGuestCountOptions =
   const forN = raw.match(/\bfor\s+(\d+)\+?(?!\s*(?:nights?|days?|hours?|weeks?|months?))\b/i);
   if (forN) return inRange(Number(forN[1]));
 
+  // --- An explicit correction: "no wait 2", "actually 4", "make it 3" ---
+  // A bare number is normally only trusted right after the question is asked
+  // (it could be a room number, a price, anything). But a correction marker
+  // is itself the context: someone saying "no wait 2" is unambiguously
+  // revising their headcount, and dropping it means the guest watches their
+  // own correction ignored — the "not listening" failure this slot exists to
+  // prevent. Found by deliberately contradicting the count mid-conversation:
+  // upward corrections carrying a person-noun ("actually 4 people") already
+  // worked, and a bare downward one silently did not.
+  //
+  // "no" alone is deliberately NOT a marker — "room no 2" is a room number.
+  const corrected = raw.match(/\b(?:actually|wait|make it|change it to|instead)\s*,?\s*(\d{1,2})\b/i);
+  if (corrected) return inRange(Number(corrected[1]));
+
   // --- Bare reply, only right after being asked ---
   if (opts.answeringGuestCountQuestion) {
     const bare = raw.match(BARE_COUNT);
