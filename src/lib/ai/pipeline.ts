@@ -1,5 +1,6 @@
 import { LeadSource } from "@/generated/prisma/enums";
 import { findUnavailableRoomIds } from "@/lib/booking/availability";
+import { GuestLanguage, LANGUAGE_NAMES, resolveLanguage } from "@/lib/i18n/guest-language";
 import { prisma } from "@/lib/prisma";
 import { anthropicProvider } from "./anthropic-provider";
 import { extractDatesMarker } from "./date-marker";
@@ -134,6 +135,8 @@ export interface ReplyContext {
    * written, so an already-booked room is never recommended.
    */
   stayDates?: { checkIn: Date; checkOut: Date } | null;
+  /** The guest's chosen chat language — obeyed unconditionally, see the LANGUAGE instruction. */
+  language?: GuestLanguage | null;
 }
 
 function buildConversationContext(agentName: string, context?: ReplyContext): string {
@@ -279,11 +282,30 @@ async function buildSystemPrompt(
   // selection. Reinforced here as an explicit, per-turn reminder the same
   // way the date-safety warnings above are, rather than trusting the
   // general rule alone.
+  //
+  // Rewritten once the language picker became real. The old wording told the
+  // model to ignore the pick outright ("match how they're typing RIGHT NOW,
+  // not an earlier language pick"), which was defensible when nothing stored
+  // the choice — and became the reason picking a language appeared to do
+  // nothing once it did. It conflated two separate things:
+  //
+  //   LANGUAGE is what the guest chose. It is durable and must be obeyed.
+  //   SCRIPT   is how they happen to be typing. It varies turn to turn.
+  //
+  // A guest who picks हिंदी and types "wifi hai kya" wants Hindi written in
+  // Roman letters — not English, and not Devanagari forced back at them.
+  // So the language instruction below is unconditional, and this reminder
+  // now speaks only to script.
+  const chosenLanguage = resolveLanguage(context?.language);
+  const languageInstruction =
+    chosenLanguage === "en"
+      ? ""
+      : `\nLANGUAGE: this guest has chosen to chat in ${LANGUAGE_NAMES[chosenLanguage]}. Write EVERY reply in that language — not English — unless they clearly switch languages themselves.\n`;
   const scriptReminder =
     interactiveState &&
     !looksLikeObviousLanguage(interactiveState.guestMessage) &&
     interactiveState.history.some((m) => looksLikeObviousLanguage(m.content))
-      ? `\nThe guest's last message was typed in plain Roman/Latin letters, not Devanagari or Telugu script -- reply in that same Roman-letter Hinglish/Tenglish style, even if they earlier selected Hindi or Telugu as their language. Match how they're typing RIGHT NOW, not an earlier language pick.\n`
+      ? `\nThe guest's last message was typed in plain Roman/Latin letters rather than Devanagari or Telugu script. Keep replying in their chosen LANGUAGE, but write it in Roman letters (Hinglish/Tenglish) to match how they're typing right now — don't force the native script back at them, and don't switch to English either.\n`
       : "";
   // Live-caught, real and visible to the guest: after tapping "3+ people"
   // once, the guest was asked to re-confirm "how many guests total" on
@@ -316,7 +338,7 @@ async function buildSystemPrompt(
 You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text a friend — quick, warm, to the point. Every reply should feel like it took five seconds to write, not five minutes. Never sound like a corporate script, a formal letter, or a customer-support bot reading from a manual.
 
 Today is ${todayFormatted}. Use this as your anchor for every date the guest mentions.
-${dateWarning}${quickPickDateConfirmed}${scriptReminder}${guestCountAlreadyKnownReminder}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
+${languageInstruction}${dateWarning}${quickPickDateConfirmed}${scriptReminder}${guestCountAlreadyKnownReminder}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
 HOTEL INFORMATION
 Address: ${profile?.address ?? "—"}
 Google Maps link: ${profile?.googleMapsUrl ?? "—"}

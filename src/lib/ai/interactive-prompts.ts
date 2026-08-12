@@ -1,3 +1,4 @@
+import { GuestLanguage, isGuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { currentHourIST } from "@/lib/india-time";
 
 /**
@@ -86,116 +87,140 @@ export const GUEST_COUNT_BUTTON_VALUES: Readonly<Record<string, number>> = {
   guests_3plus: 3,
 };
 
-const BUTTON_CATALOG: Record<string, CatalogEntry> = {
-  GUEST_COUNT: {
-    type: "list",
-    fallbackBody: "How many people will be staying? 😊",
-    buttonText: "Choose",
-    rows: [
-      { id: "guests_1", title: "Just me" },
-      { id: "guests_2", title: "2 people" },
-      { id: "guests_3plus", title: "3+ people" },
-    ],
-  },
-  ROOM_RESPONSE: {
-    type: "list",
-    fallbackBody: "Would you like to go ahead with this room?",
-    buttonText: "Choose",
-    rows: [
-      { id: ROOM_BOOK_BUTTON_ID, title: "Book this room" },
-      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other options" },
-      { id: VIEW_PHOTOS_BUTTON_ID, title: "View photos" },
-    ],
-  },
-  // The actual booking-commitment tap -- converted to a list too per
-  // explicit user request (no arrow anywhere, even here), accepting the
-  // one extra tap (open the list, then pick) at the highest-stakes moment
-  // in the whole flow.
-  CONFIRM_BOOKING: {
-    type: "list",
-    fallbackBody: "Ready to confirm your booking? 🎉",
-    buttonText: "Confirm",
-    rows: [
-      { id: CONFIRM_BOOKING_BUTTON_ID, title: "Confirm booking" },
-      { id: "not_yet", title: "Not yet" },
-    ],
-  },
-  LANGUAGE_SELECT: {
-    type: "list",
-    fallbackBody: "Which language would you like to chat in? 😊",
-    buttonText: "Select language",
-    rows: [
-      { id: "lang_en", title: "English" },
-      { id: "lang_hi", title: "हिंदी" },
-      { id: "lang_te", title: "తెలుగు" },
-    ],
-  },
-  GREET_MENU: {
-    type: "list",
-    fallbackBody: "How may I help you today? 😊",
-    buttonText: "Choose",
-    rows: [
-      { id: "greet_book", title: "I want to book a room" },
-      // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
-      // in handle-inbound-message.ts) — same id, so tapping this row here
-      // gets the exact same real-data List Message as tapping "See other
-      // options" mid-RECOMMEND, no separate handling needed.
-      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "Availability & price", description: "See our real rooms and rates" },
-      { id: GREET_QUESTION_BUTTON_ID, title: "I need more details", description: "Check-in, parking, policies & more" },
-    ],
-  },
-  DATE_QUICK_PICK: {
-    type: "list",
-    // Deliberately no 📅/🗓️ emoji here or anywhere else guest-facing dates
-    // are discussed — live-reported issue: on some phones' emoji font, the
-    // calendar emoji's own artwork prints an arbitrary unrelated date (e.g.
-    // "FEB 24") right onto the glyph, which reads as a real, wrong date in
-    // exactly the one context where that's most confusing and least
-    // forgivable (see pipeline.ts's TONE section for the same rule applied
-    // to the AI's own emoji choices).
-    fallbackBody: "When are you looking to stay?",
-    buttonText: "Choose dates",
-    rows: [
-      { id: "dates_today", title: "Today" },
-      { id: "dates_tomorrow", title: "Tomorrow" },
-      { id: "dates_weekend", title: "This weekend" },
-      { id: "dates_nextweek", title: "Next week" },
-      // Renamed from "I'll type dates": tapping this used to fall through to
-      // the AI as free text (a dead end for a guest who wanted a specific
-      // day), and now opens a real tappable date picker — see
-      // date-picker-message.ts. The id is unchanged so nothing downstream
-      // has to care.
-      { id: "dates_custom", title: "Pick exact dates" },
-    ],
-  },
-  // HANDLE OBJECTIONS was 100% free-text before this — a guest pushing back
-  // on price got only prose, no tappable recovery path. Fires only after a
-  // room's already been named (see resolveStageKey), reusing the two
-  // already-deterministic handlers below rather than inventing new ones.
-  PRICE_OBJECTION: {
-    type: "list",
-    fallbackBody: "No worries — want a more budget-friendly option, or to see our current offers? 😊",
-    buttonText: "Choose",
-    rows: [
-      { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See cheaper room" },
-      { id: SHOW_OFFERS_BUTTON_ID, title: "Show me offers" },
-      { id: "continue_anyway", title: "Continue anyway" },
-    ],
-  },
-  // Sent directly by the CONFIRM_BOOKING_BUTTON_ID handler in
-  // handle-inbound-message.ts, never through the AI/waterfall — that reply
-  // (the reference code) is never AI-generated. Closes the one moment in the
-  // whole flow that used to send as plain text with zero buttons.
-  POST_BOOKING: {
-    type: "list",
-    fallbackBody: "Anything else I can help with?",
-    buttonText: "Choose",
-    rows: [
-      { id: "post_booking_question", title: "I have a question" },
-      { id: "post_booking_done", title: "All set, thanks!" },
-    ],
-  },
-};
+/**
+ * The button catalog, rendered in the guest's chosen language.
+ *
+ * This was a flat constant of English strings, which quietly made the
+ * language picker cosmetic: tapping "हिंदी" produced one Hindi greeting and
+ * then every button — and every deterministic reply, which is most of them —
+ * came back in English. Built per-language now, so a choice actually governs
+ * the whole conversation.
+ *
+ * Row IDS are deliberately unchanged across languages. Every downstream
+ * decision (which room, how many guests, which date) resolves from the id,
+ * never the title, so translating titles cannot break routing — the exact
+ * property that made this refactor safe to do at all.
+ */
+function buildCatalog(lang: GuestLanguage): Record<string, CatalogEntry> {
+  const s = t(lang);
+  return {
+    GUEST_COUNT: {
+      type: "list",
+      fallbackBody: s.guestCountBody,
+      buttonText: s.chooseButton,
+      rows: [
+        { id: "guests_1", title: s.guestJustMe },
+        { id: "guests_2", title: s.guest2 },
+        { id: "guests_3plus", title: s.guest3Plus },
+      ],
+    },
+    ROOM_RESPONSE: {
+      type: "list",
+      fallbackBody: s.roomResponseBody,
+      buttonText: s.chooseButton,
+      rows: [
+        { id: ROOM_BOOK_BUTTON_ID, title: s.roomBook },
+        { id: SEE_OTHER_ROOMS_BUTTON_ID, title: s.roomOther },
+        { id: VIEW_PHOTOS_BUTTON_ID, title: s.roomPhotos },
+      ],
+    },
+    // The actual booking-commitment tap -- converted to a list too per
+    // explicit user request (no arrow anywhere, even here), accepting the
+    // one extra tap (open the list, then pick) at the highest-stakes moment
+    // in the whole flow.
+    CONFIRM_BOOKING: {
+      type: "list",
+      fallbackBody: s.confirmBody,
+      buttonText: s.confirmButton,
+      rows: [
+        { id: CONFIRM_BOOKING_BUTTON_ID, title: s.confirmYes },
+        { id: "not_yet", title: s.confirmNotYet },
+      ],
+    },
+    // Never translated: this is the picker that ASKS which language, so it
+    // has to be legible before one has been chosen. Each row is written in
+    // the language it selects.
+    LANGUAGE_SELECT: {
+      type: "list",
+      fallbackBody: "Which language would you like to chat in? 😊",
+      buttonText: "Select language",
+      rows: [
+        { id: "lang_en", title: "English" },
+        { id: "lang_hi", title: "हिंदी" },
+        { id: "lang_te", title: "తెలుగు" },
+      ],
+    },
+    GREET_MENU: {
+      type: "list",
+      fallbackBody: s.greetMenuBody,
+      buttonText: s.chooseButton,
+      rows: [
+        { id: "greet_book", title: s.greetBook },
+        // Reuses the deterministic room-list handler (see SEE_OTHER_ROOMS_BUTTON_ID
+        // in handle-inbound-message.ts) — same id, so tapping this row here
+        // gets the exact same real-data List Message as tapping "See other
+        // options" mid-RECOMMEND, no separate handling needed.
+        { id: SEE_OTHER_ROOMS_BUTTON_ID, title: s.greetAvailability, description: s.greetAvailabilityDesc },
+        { id: GREET_QUESTION_BUTTON_ID, title: s.greetQuestion, description: s.greetQuestionDesc },
+      ],
+    },
+    DATE_QUICK_PICK: {
+      type: "list",
+      // Deliberately no 📅/🗓️ emoji here or anywhere else guest-facing dates
+      // are discussed — live-reported issue: on some phones' emoji font, the
+      // calendar emoji's own artwork prints an arbitrary unrelated date (e.g.
+      // "FEB 24") right onto the glyph, which reads as a real, wrong date in
+      // exactly the one context where that's most confusing and least
+      // forgivable (see pipeline.ts's TONE section for the same rule applied
+      // to the AI's own emoji choices).
+      fallbackBody: s.datesBody,
+      buttonText: s.datesButton,
+      rows: [
+        { id: "dates_today", title: s.dateToday },
+        { id: "dates_tomorrow", title: s.dateTomorrow },
+        { id: "dates_weekend", title: s.dateWeekend },
+        { id: "dates_nextweek", title: s.dateNextWeek },
+        // Renamed from "I'll type dates": tapping this used to fall through to
+        // the AI as free text (a dead end for a guest who wanted a specific
+        // day), and now opens a real tappable date picker — see
+        // date-picker-message.ts. The id is unchanged so nothing downstream
+        // has to care.
+        { id: "dates_custom", title: s.dateExact },
+      ],
+    },
+    // HANDLE OBJECTIONS was 100% free-text before this — a guest pushing back
+    // on price got only prose, no tappable recovery path. Fires only after a
+    // room's already been named (see resolveStageKey), reusing the two
+    // already-deterministic handlers below rather than inventing new ones.
+    PRICE_OBJECTION: {
+      type: "list",
+      fallbackBody: s.priceObjectionBody,
+      buttonText: s.chooseButton,
+      rows: [
+        { id: SEE_OTHER_ROOMS_BUTTON_ID, title: s.priceCheaper },
+        { id: SHOW_OFFERS_BUTTON_ID, title: s.priceOffers },
+        { id: "continue_anyway", title: s.priceContinue },
+      ],
+    },
+    // Sent directly by the CONFIRM_BOOKING_BUTTON_ID handler in
+    // handle-inbound-message.ts, never through the AI/waterfall — that reply
+    // (the reference code) is never AI-generated. Closes the one moment in the
+    // whole flow that used to send as plain text with zero buttons.
+    POST_BOOKING: {
+      type: "list",
+      fallbackBody: s.postBookingBody,
+      buttonText: s.chooseButton,
+      rows: [
+        { id: "post_booking_question", title: s.postBookingQuestion },
+        { id: "post_booking_done", title: s.postBookingDone },
+      ],
+    },
+  };
+}
+
+/** English catalog — the shape-only reference used where language is irrelevant (e.g. the AI's BUTTONS: marker lookup). */
+const BUTTON_CATALOG = buildCatalog("en");
+
 
 // Deliberately NOT anchored to "start of its own line" — live testing showed
 // weak/fast models sometimes tack "BUTTONS: KEY" onto the same line as the
@@ -429,20 +454,20 @@ export function looksLikeAgreement(text: string): boolean {
   return fuzzyContains(t, ["sounds", "perfect", "great", "confirm"]);
 }
 
-export function roomResponsePrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.ROOM_RESPONSE);
+export function roomResponsePrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).ROOM_RESPONSE);
 }
 
-export function guestCountPrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.GUEST_COUNT);
+export function guestCountPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).GUEST_COUNT);
 }
 
-export function confirmBookingPrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.CONFIRM_BOOKING);
+export function confirmBookingPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).CONFIRM_BOOKING);
 }
 
-export function postBookingPrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.POST_BOOKING);
+export function postBookingPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).POST_BOOKING);
 }
 
 // A prompt-only "never recommend a room before you know guest count" rule
@@ -729,6 +754,17 @@ const BOOKING_INTENT_PATTERN =
 // available?", ధర/రేటు = price/rate, ఆఫర్ = offer (loanword).
 const TELUGU_BOOKING_INTENT_PATTERN = /రూమ్|బుక్|కావాలి|అందుబాటులో|దొరుకుతుందా|ధర|రేటు|ఆఫర్/;
 
+// The Devanagari counterpart, and a gap that existed for as long as the
+// Telugu one has been closed: a guest writing "मुझे कमरा बुक करना है" (I want
+// to book a room) expressed no detectable booking intent at all, so the
+// whole waterfall stayed shut to them. Found while making the language
+// picker real — Hindi speakers could pick Hindi and then not be understood
+// when they actually asked for a room in it. Same \b caveat as Telugu:
+// unanchored by necessity, since \b cannot anchor Devanagari either.
+// कमरा/रूम = room, बुक = book, चाहिए/चाहता = want/need, ठहरना = to stay,
+// उपलब्ध = available, कीमत/दाम/रेट = price/rate, छूट = discount.
+const DEVANAGARI_BOOKING_INTENT_PATTERN = /कमरा|कमरे|रूम|बुक|चाहिए|चाहता|चाहती|ठहरना|रुकना|उपलब्ध|कीमत|दाम|रेट|छूट|ऑफर/;
+
 // Live-caught: "I need to cancel my booking, reference HOT-9999" matched
 // BOOKING_INTENT_PATTERN via the word "booking" itself, then got funneled
 // straight into "how many people will be staying?" -- a brand-new-booking
@@ -759,7 +795,9 @@ function looksLikeExistingBookingRequest(text: string): boolean {
 export function hasExpressedBookingIntent(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
   const allTexts = [...history.map((m) => m.content), latestGuestMessage];
   return (
-    allTexts.some((t) => BOOKING_INTENT_PATTERN.test(t) || TELUGU_BOOKING_INTENT_PATTERN.test(t)) ||
+    allTexts.some(
+      (t) => BOOKING_INTENT_PATTERN.test(t) || TELUGU_BOOKING_INTENT_PATTERN.test(t) || DEVANAGARI_BOOKING_INTENT_PATTERN.test(t)
+    ) ||
     hasStatedGuestCount(history, latestGuestMessage) ||
     hasStatedDates(history, latestGuestMessage)
   );
@@ -820,12 +858,12 @@ function looksLikeLanguageSelection(text: string): boolean {
   return LANGUAGE_SELECTED_PATTERN.test(text.trim());
 }
 
-export function greetMenuPrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.GREET_MENU);
+export function greetMenuPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).GREET_MENU);
 }
 
-export function dateQuickPickPrompt(): InteractivePrompt {
-  return catalogToPrompt(BUTTON_CATALOG.DATE_QUICK_PICK);
+export function dateQuickPickPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return catalogToPrompt(buildCatalog(resolveLanguage(lang)).DATE_QUICK_PICK);
 }
 
 // The single deterministic waterfall that decides which buttons (if any)
@@ -997,22 +1035,22 @@ function resolveStageKey(params: {
   return null;
 }
 
-function promptForStageKey(key: StageKey): InteractivePrompt | undefined {
+function promptForStageKey(key: StageKey, lang?: GuestLanguage | null): InteractivePrompt | undefined {
   switch (key) {
     case "LANGUAGE_SELECT":
       return catalogToPrompt(BUTTON_CATALOG.LANGUAGE_SELECT);
     case "GREET_MENU":
-      return greetMenuPrompt();
+      return greetMenuPrompt(lang);
     case "GUEST_COUNT":
-      return guestCountPrompt();
+      return guestCountPrompt(lang);
     case "ROOM_RESPONSE":
-      return roomResponsePrompt();
+      return roomResponsePrompt(lang);
     case "PRICE_OBJECTION":
-      return catalogToPrompt(BUTTON_CATALOG.PRICE_OBJECTION);
+      return catalogToPrompt(buildCatalog(resolveLanguage(lang)).PRICE_OBJECTION);
     case "CONFIRM_BOOKING":
-      return confirmBookingPrompt();
+      return confirmBookingPrompt(lang);
     case "DATE_QUICK_PICK":
-      return dateQuickPickPrompt();
+      return dateQuickPickPrompt(lang);
     default:
       return undefined;
   }
@@ -1142,8 +1180,17 @@ export function resolveDeterministicReply(params: {
   bookingSummary?: { roomName: string; checkIn: Date; checkOut: Date };
   knownGuestCount?: number | null;
   datesKnown?: boolean;
+  /** The guest's chosen chat language — governs every string below. */
+  language?: GuestLanguage | null;
 }): { text: string; interactive: InteractivePrompt } | null {
-  if (params.languageObvious) return null;
+  // A guest writing in Devanagari or Telugu used to bail out of the entire
+  // deterministic path here, because every string it produced was hardcoded
+  // English and answering them in English was worse than handing the turn to
+  // the AI. Now that the catalog is translated, that bail-out is exactly
+  // backwards: it would deny non-English guests the localised buttons this
+  // whole mechanism exists to give them, which is the reported bug. Only a
+  // language we have no translations for still falls through to the AI.
+  if (params.languageObvious && !isGuestLanguage(params.language)) return null;
 
   const readyToRecommend =
     hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
@@ -1171,9 +1218,13 @@ export function resolveDeterministicReply(params: {
   // CONFIRM_BOOKING already rely on.
   if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && params.guestMessage.trim().endsWith("?")) return null;
 
-  const entry = BUTTON_CATALOG[key];
+  const lang = resolveLanguage(params.language);
+  const s = t(lang);
+  const entry = buildCatalog(lang)[key];
   let text: string;
   if (key === "LANGUAGE_SELECT") {
+    // Stays English by construction: this is the message that ASKS which
+    // language, so it has to be readable before one has been chosen.
     const greeting = timeOfDayGreeting(params.now ?? new Date());
     const from = params.hotelName ? ` from ${params.hotelName}` : "";
     text = `${greeting} 😊 This is Anushka${from} — thank you for reaching out! Which language are you comfortable in?`;
@@ -1183,7 +1234,7 @@ export function resolveDeterministicReply(params: {
     // back at them -- reads as not listening. A guest who just declined
     // gets a softer, no-pressure line instead of the identical nudge again.
     if (DECLINED_CONFIRM_PATTERN.test(params.guestMessage.trim())) {
-      text = "No worries at all — take your time! 😊 Just tap Confirm booking whenever you're ready.";
+      text = s.confirmSoftDecline;
     } else if (params.bookingSummary) {
       // Live-caught gap: the confirm-booking prompt never actually restated
       // WHAT was being confirmed -- a guest tapping "Confirm booking" had no
@@ -1192,9 +1243,9 @@ export function resolveDeterministicReply(params: {
       // the conversation (see process-message-job.ts, which fetches the
       // room name and pending dates from the contact record).
       const { roomName, checkIn, checkOut } = params.bookingSummary;
-      text = `Just to confirm: ${roomName}, check-in ${formatDateHuman(checkIn)} and check-out ${formatDateHuman(checkOut)}. Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive! 🎉`;
+      text = s.confirmWithSummary(roomName, formatDateHuman(checkIn), formatDateHuman(checkOut));
     } else {
-      text = "Great, glad that works for you! 🎉 Tap Confirm booking below and I'll get you an instant reference code — pay at the counter when you arrive!";
+      text = s.confirmGeneric;
     }
   } else {
     text = entry.fallbackBody;

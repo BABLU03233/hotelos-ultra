@@ -382,6 +382,15 @@ model Contact {
   // answer is silently lost, so they get asked all over again. Persisting it
   // is the only fix that survives a long chat.
   pendingGuestCount Int?
+  // The language this guest chats in — "en" | "hi" | "te". Set when they tap
+  // the language picker, and inferred when they write in Devanagari or
+  // Telugu script. Stored rather than re-read from the transcript for the
+  // same reason the slots above are: the AI pipeline only loads the last 12
+  // messages, so the turn where they chose is lost in any longer chat. It
+  // also has to outlive the transcript entirely, because every button title
+  // is rendered in this language — the choice governs the whole UI, not just
+  // one reply.
+  language        String?
   updatedAt       DateTime      @updatedAt
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)

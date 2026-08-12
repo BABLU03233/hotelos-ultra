@@ -15,6 +15,7 @@ import {
   roomResponsePrompt,
 } from "@/lib/ai/interactive-prompts";
 import { transcribeAudio } from "@/lib/ai/transcription";
+import { GuestLanguage, LANGUAGE_BUTTON_VALUES, detectScriptLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
@@ -53,6 +54,18 @@ const OPT_OUT_CONFIRMATION = "You're unsubscribed from promotional messages and 
  * With no dates agreed yet there's nothing to check against, so the full
  * list is correct — that's a browsing guest, not a booking one.
  */
+/**
+ * The language this reply should be written in.
+ *
+ * An explicit pick wins and keeps winning — that is what picking it means.
+ * Script is only consulted when nothing has been chosen yet, so a guest who
+ * selected Hindi and then types a word in Roman letters doesn't get silently
+ * switched back to English.
+ */
+function replyLanguage(contact: { language: string | null }): GuestLanguage {
+  return resolveLanguage(contact.language);
+}
+
 async function bookableRooms(tenantId: string, contact: { pendingCheckIn: Date | null; pendingCheckOut: Date | null }) {
   const rooms = await prisma.room.findMany({ where: { tenantId }, orderBy: { price: "asc" } });
   if (!contact.pendingCheckIn || !contact.pendingCheckOut) return rooms;
@@ -159,11 +172,12 @@ async function matchOfferForBooking(tenantId: string, contactId: string): Promis
  */
 async function attemptBookingCompletion(
   tenant: { id: string },
-  contact: { id: string; name: string | null; phone: string; whatsappNumber: string },
+  contact: { id: string; name: string | null; phone: string; whatsappNumber: string; language: string | null },
   roomId: string,
   checkIn: Date,
   checkOut: Date
 ): Promise<void> {
+  const lang = replyLanguage(contact);
   const available = await isRoomAvailable(prisma, tenant.id, roomId, checkIn, checkOut);
   if (available) {
     const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
@@ -175,7 +189,7 @@ async function attemptBookingCompletion(
       offerSnapshot: matchedOffer?.title,
     });
     const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(confirmationText, postBookingPrompt()), "Failed to send booking confirmation");
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(confirmationText, postBookingPrompt(lang)), "Failed to send booking confirmation");
     return;
   }
 
@@ -242,6 +256,16 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   const now = new Date();
   const optingOut = isOptOutSignal(msg);
 
+  // Script is a strong, free signal of language, but only worth acting on
+  // before a real choice exists — see the `language` field on the update
+  // below for why an explicit pick must never be overwritten by it.
+  const existingContact = await prisma.contact.findUnique({
+    where: { tenantId_whatsappNumber: { tenantId: tenant.id, whatsappNumber: msg.waId } },
+    select: { language: true },
+  });
+  const inferredLanguage = content ? detectScriptLanguage(content) : null;
+  const contactLanguageUpdate = !existingContact?.language && inferredLanguage ? inferredLanguage : undefined;
+
   const contact = await prisma.contact.upsert({
     where: { tenantId_whatsappNumber: { tenantId: tenant.id, whatsappNumber: msg.waId } },
     create: {
@@ -258,14 +282,27 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       sourceDetail: msg.referral?.headline ?? null,
       ctwaClid: msg.referral?.ctwaClid ?? null,
       optedOutAt: optingOut ? now : undefined,
+      language: inferredLanguage ?? undefined,
     },
     update: {
       name: msg.contactName ?? undefined,
       lastInboundAt: now,
       lastMessage: preview,
       optedOutAt: optingOut ? now : undefined,
+      // Inferred from script ONLY while nothing has been chosen — a guest
+      // writing in Devanagari or Telugu clearly wants that language, and
+      // shouldn't have to find the picker to say so. An explicit pick is
+      // never overwritten here: `language: undefined` leaves it untouched,
+      // so someone who chose Hindi and then types one Roman-letter word is
+      // not silently switched back.
+      language: contactLanguageUpdate,
     },
   });
+
+  // Every reply below is rendered in this language — buttons, prompts and
+  // deterministic copy alike. Read after the upsert so a language chosen or
+  // inferred on THIS turn already applies to this turn's reply.
+  const lang = replyLanguage(contact);
 
   const messageRow = await prisma.message.create({
     data: {
@@ -336,7 +373,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       const body = contact.pendingRoomId
         ? "Just need your dates to lock this in — when are you thinking?"
         : "Let's get your dates sorted first — when are you thinking?";
-      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, dateQuickPickPrompt()), "Failed to send date-quick-pick prompt");
+      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, dateQuickPickPrompt(lang)), "Failed to send date-quick-pick prompt");
       return;
     }
 
@@ -354,7 +391,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       await sendAndPersist(
         tenant,
         contact,
-        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt()),
+        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt(lang)),
         "Failed to send fully-booked message"
       );
       return;
@@ -365,7 +402,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // complete without room/date fields so the guest still gets a booking.
     const fallbackBooking = await completeBooking(prisma, tenant.id, contact.id);
     const fallbackText = `You're all set! Your booking reference is ${fallbackBooking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(fallbackText, postBookingPrompt()), "Failed to send booking confirmation");
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(fallbackText, postBookingPrompt(lang)), "Failed to send booking confirmation");
     return;
   }
 
@@ -408,7 +445,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     await sendAndPersist(
       tenant,
       contact,
-      toShortCircuitInteractive("No problem — when else works for you?", dateQuickPickPrompt()),
+      toShortCircuitInteractive("No problem — when else works for you?", dateQuickPickPrompt(lang)),
       "Failed to send date-retry prompt"
     );
     return;
@@ -437,15 +474,20 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // asking about dates) while those GREET_MENU buttons render underneath —
   // a real text/button mismatch this sidesteps entirely, same reasoning as
   // every other zero-ambiguity tap (ROOM_BOOK_BUTTON_ID, etc.) in this file.
-  if (msg.interactiveId === "lang_en" || msg.interactiveId === "lang_hi" || msg.interactiveId === "lang_te") {
+  if (msg.interactiveId && LANGUAGE_BUTTON_VALUES[msg.interactiveId]) {
     if (contact.aiPaused) return;
-
-    const greetings: Record<string, string> = {
-      lang_en: "Great! How can I help you today? 😊",
-      lang_hi: "Bilkul! Aaj main aapki kaise madad karoon? 😊",
-      lang_te: "Sare! Ivvala meeku ela help cheyagalanu? 😊",
-    };
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(greetings[msg.interactiveId], greetMenuPrompt()), "Failed to send greet-menu after language select");
+    const chosen = LANGUAGE_BUTTON_VALUES[msg.interactiveId];
+    // Persisted, which is the whole fix. Before this the tap produced one
+    // localised greeting and nothing else: the choice was never stored, so
+    // every later button and every deterministic reply came back in English
+    // and the picker was, from the guest's side, decorative.
+    await prisma.contact.update({ where: { id: contact.id }, data: { language: chosen } });
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(t(chosen).greetAfterLanguage, greetMenuPrompt(chosen)),
+      "Failed to send greet-menu after language select"
+    );
     return;
   }
 
@@ -535,7 +577,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       await sendAndPersist(
         tenant,
         contact,
-        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt()),
+        toShortCircuitInteractive("Ah, we're fully booked for those dates 😔 Would another date work for you?", dateQuickPickPrompt(lang)),
         "Failed to send fully-booked message"
       );
       return;
@@ -574,7 +616,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
           contact,
           toShortCircuitInteractive(
             `Ah — the ${room.name} is already booked for those dates 😔 Want to see what else we have free, or try different dates?`,
-            dateQuickPickPrompt()
+            dateQuickPickPrompt(lang)
           ),
           "Failed to send room-unavailable message"
         );
@@ -582,7 +624,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       }
       await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: room.id } });
       const body = `${room.name} — from ₹${room.price}/night. Want to go ahead with this one?`;
-      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt()), "Failed to send room-pick response");
+      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt(lang)), "Failed to send room-pick response");
       return;
     }
     // Not found (stale/cross-tenant id) — fall through to the AI queue.
@@ -597,7 +639,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
 
     const body = "Great choice! Ready to confirm your booking? 🎉";
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, confirmBookingPrompt()), "Failed to send confirm-booking prompt");
+    await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, confirmBookingPrompt(lang)), "Failed to send confirm-booking prompt");
     return;
   }
 
@@ -639,7 +681,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     if (contact.aiPaused) return;
 
     if (pickerAction.kind === "openCheckInPicker") {
-      await sendAndPersist(tenant, contact, buildCheckInPickerMessage(), "Failed to send date picker");
+      await sendAndPersist(tenant, contact, buildCheckInPickerMessage(new Date(), lang), "Failed to send date picker");
       return;
     }
 
@@ -657,7 +699,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
         where: { id: contact.id },
         data: { pendingCheckIn: pickerAction.checkIn, pendingCheckOut: null },
       });
-      await sendAndPersist(tenant, contact, buildNightsPickerMessage(pickerAction.checkIn), "Failed to send nights picker");
+      await sendAndPersist(tenant, contact, buildNightsPickerMessage(pickerAction.checkIn, lang), "Failed to send nights picker");
       return;
     }
 
@@ -703,7 +745,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
           contact,
           toShortCircuitInteractive(
             `Sorry — the ${named.name} is already booked for those dates 😔 Want to try different dates, or see what else is free?`,
-            dateQuickPickPrompt()
+            dateQuickPickPrompt(lang)
           ),
           "Failed to send named-room-unavailable message"
         );
@@ -715,7 +757,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
         contact,
         toShortCircuitInteractive(
           `Of course — the ${named.name}, from ₹${named.price}/night, sleeps up to ${named.capacity}. Shall I lock it in?`,
-          roomResponsePrompt()
+          roomResponsePrompt(lang)
         ),
         "Failed to send named-room switch"
       );

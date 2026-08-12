@@ -2,6 +2,7 @@ import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/in
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
 import { captureGuestCount } from "@/lib/booking/guest-count";
+import { resolveLanguage } from "@/lib/i18n/guest-language";
 import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
@@ -95,6 +96,9 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // dates before the reply is written, so an already-booked room is never
     // recommended (see availability.ts).
     stayDates: effectiveCheckIn && effectiveCheckOut ? { checkIn: effectiveCheckIn, checkOut: effectiveCheckOut } : null,
+    // Governs the AI prose. The deterministic replies are localised via the
+    // catalog; this is what keeps the model in the same language.
+    language: resolveLanguage(contact.language),
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
@@ -128,6 +132,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     guestMessage: latestInbound.content,
     hotelName: profile?.name ?? undefined,
     bookingSummary,
+    language: resolveLanguage(contact.language),
     knownGuestCount,
     datesKnown: Boolean(effectiveCheckIn && effectiveCheckOut),
   });

@@ -1,3 +1,4 @@
+import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { todayMidnightIST } from "@/lib/india-time";
 
 const MAX_ROWS = 10; // WhatsApp Cloud API: max 10 rows total across all sections
@@ -81,23 +82,24 @@ function addDays(d: Date, n: number): Date {
  * wrong date in exactly the context where that's least forgivable (the same
  * rule DATE_QUICK_PICK follows).
  */
-export function buildCheckInPickerMessage(now: Date = new Date()): DatePickerMessage {
+export function buildCheckInPickerMessage(now: Date = new Date(), lang?: GuestLanguage | null): DatePickerMessage {
+  const s = t(resolveLanguage(lang));
   const today = todayMidnightIST(now);
   const rows = Array.from({ length: MAX_ROWS - 1 }, (_, i) => {
     const d = addDays(today, i);
-    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : "";
+    const label = i === 0 ? s.labelToday : i === 1 ? s.labelTomorrow : "";
     return {
       id: `${CHECK_IN_PREFIX}${isoDay(d)}`,
       title: human(d).slice(0, ROW_TITLE_MAX),
       description: label,
     };
   });
-  rows.push({ id: CHECK_IN_OTHER_ID, title: "Another date", description: "Type the date you want" });
+  rows.push({ id: CHECK_IN_OTHER_ID, title: s.anotherDate, description: s.anotherDateDesc });
 
   return {
     type: "list",
-    body: "Which day would you like to check in?",
-    buttonText: "Pick a date",
+    body: s.checkInPickerBody,
+    buttonText: s.checkInPickerButton,
     sections: [{ rows }],
   };
 }
@@ -109,22 +111,23 @@ export function buildCheckInPickerMessage(now: Date = new Date()): DatePickerMes
  * before check-in) structurally impossible rather than something to
  * validate after the fact.
  */
-export function buildNightsPickerMessage(checkIn: Date): DatePickerMessage {
+export function buildNightsPickerMessage(checkIn: Date, lang?: GuestLanguage | null): DatePickerMessage {
+  const s = t(resolveLanguage(lang));
   const rows = Array.from({ length: 7 }, (_, i) => {
     const nights = i + 1;
     const out = addDays(checkIn, nights);
     return {
       id: `${NIGHTS_PREFIX}${nights}`,
-      title: `${nights} night${nights === 1 ? "" : "s"}`.slice(0, ROW_TITLE_MAX),
-      description: `Check out ${human(out)}`.slice(0, ROW_DESCRIPTION_MAX),
+      title: s.night(nights).slice(0, ROW_TITLE_MAX),
+      description: s.checkOutOn(human(out)).slice(0, ROW_DESCRIPTION_MAX),
     };
   });
-  rows.push({ id: NIGHTS_MORE_ID, title: "Longer stay", description: "Tell me how long you'd like to stay" });
+  rows.push({ id: NIGHTS_MORE_ID, title: s.longerStay, description: s.longerStayDesc });
 
   return {
     type: "list",
-    body: `Checking in ${human(checkIn)} — how many nights?`,
-    buttonText: "Pick nights",
+    body: s.nightsBody(human(checkIn)),
+    buttonText: s.nightsButton,
     sections: [{ rows }],
   };
 }
