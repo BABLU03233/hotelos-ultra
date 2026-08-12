@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildCheckInPickerMessage,
   buildNightsPickerMessage,
+  CHECK_IN_OTHER_ID,
   CHECK_IN_PREFIX,
   describeStay,
+  NIGHTS_MORE_ID,
   NIGHTS_PREFIX,
   parseCheckInId,
+  parseNightsFromText,
   parseNightsId,
-  TYPE_DATES_ID,
 } from "./date-picker-message";
 
 // 06:00 UTC = 11:30 IST — mid-day, no timezone boundary ambiguity.
@@ -41,7 +43,15 @@ describe("buildCheckInPickerMessage", () => {
   });
 
   it("keeps an escape hatch for dates further out", () => {
-    expect(rows.at(-1)!.id).toBe(TYPE_DATES_ID);
+    expect(rows.at(-1)!.id).toBe(CHECK_IN_OTHER_ID);
+  });
+
+  it("gives the escape hatch an id outside the date-parsing namespace", () => {
+    // "checkin_other" would share CHECK_IN_PREFIX and could be swept into
+    // the date parser if routing order ever changed — which is how the
+    // original loop worked. Distinct namespaces make that impossible.
+    expect(CHECK_IN_OTHER_ID.startsWith(CHECK_IN_PREFIX)).toBe(false);
+    expect(NIGHTS_MORE_ID.startsWith(NIGHTS_PREFIX)).toBe(false);
   });
 
   it("respects WhatsApp's title and description limits", () => {
@@ -78,7 +88,7 @@ describe("buildNightsPickerMessage", () => {
 
   it("stays within the row cap and keeps an escape hatch", () => {
     expect(rows.length).toBeLessThanOrEqual(10);
-    expect(rows.at(-1)!.id).toBe(TYPE_DATES_ID);
+    expect(rows.at(-1)!.id).toBe(NIGHTS_MORE_ID);
   });
 });
 
@@ -129,6 +139,36 @@ describe("parseNightsId", () => {
       const out = parseNightsId(`${NIGHTS_PREFIX}${n}`, CHECK_IN)!;
       expect(out.getTime()).toBeGreaterThan(CHECK_IN.getTime());
     }
+  });
+});
+
+describe("parseNightsFromText", () => {
+  // The escape hatch is worthless if what it leads to can't be understood —
+  // the guest lands back in the prose loop the picker exists to avoid.
+  it("reads a stay length in the ways guests actually write it", () => {
+    expect(parseNightsFromText("10 nights")).toBe(10);
+    expect(parseNightsFromText("2 raat")).toBe(2);
+    expect(parseNightsFromText("3 din")).toBe(3);
+    expect(parseNightsFromText("ten nights")).toBe(10);
+    expect(parseNightsFromText("do raat")).toBe(2);
+  });
+
+  it("understands weeks", () => {
+    expect(parseNightsFromText("a week")).toBe(7);
+    expect(parseNightsFromText("2 weeks")).toBe(14);
+  });
+
+  it("takes a bare number only when we just asked", () => {
+    expect(parseNightsFromText("10")).toBeNull();
+    expect(parseNightsFromText("10", { answeringNightsQuestion: true })).toBe(10);
+    expect(parseNightsFromText("three", { answeringNightsQuestion: true })).toBe(3);
+  });
+
+  it("refuses nonsense rather than booking it", () => {
+    expect(parseNightsFromText("0 nights")).toBeNull();
+    expect(parseNightsFromText("400 nights")).toBeNull();
+    expect(parseNightsFromText("what time is check-in?")).toBeNull();
+    expect(parseNightsFromText("")).toBeNull();
   });
 });
 

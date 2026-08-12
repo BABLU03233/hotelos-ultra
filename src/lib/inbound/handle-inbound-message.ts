@@ -22,13 +22,11 @@ import { resolveQuickPickDates } from "@/lib/booking/quick-pick-dates";
 import {
   buildCheckInPickerMessage,
   buildNightsPickerMessage,
-  CHECK_IN_PREFIX,
+  checkOutAfterNights,
   describeStay,
-  NIGHTS_PREFIX,
-  parseCheckInId,
-  parseNightsId,
-  TYPE_DATES_ID,
+  parseNightsFromText,
 } from "@/lib/whatsapp/date-picker-message";
+import { routeDatePickerTap } from "@/lib/whatsapp/date-picker-router";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
 import { messageQueue } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
@@ -631,52 +629,70 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // live: create and upload succeed, publish returns 139000/4233020 while
   // the display name sits DECLINED), which every hotel would hit before its
   // guests could pick a date. See date-picker-message.ts.
-  if (msg.interactiveId === TYPE_DATES_ID) {
+  // Every date-picker tap routes through one pure decision function, which
+  // is what makes the "no row may re-open its own list" invariant testable
+  // exhaustively — see date-picker-router.ts for the loop this prevents.
+  const pickerAction = routeDatePickerTap(msg.interactiveId, { pendingCheckIn: contact.pendingCheckIn });
+  if (pickerAction.kind !== "notMine") {
     if (contact.aiPaused) return;
-    // Once a check-in is already settled, "longer stay" means they want more
-    // nights, not a different arrival day.
-    const picker = contact.pendingCheckIn ? buildNightsPickerMessage(contact.pendingCheckIn) : buildCheckInPickerMessage();
-    await sendAndPersist(tenant, contact, picker, "Failed to send date picker");
-    return;
-  }
 
-  if (msg.interactiveId?.startsWith(CHECK_IN_PREFIX)) {
-    if (contact.aiPaused) return;
-    const checkIn = parseCheckInId(msg.interactiveId);
-    if (checkIn) {
-      // Check-out is deliberately cleared: a half-set range left over from an
-      // earlier attempt would otherwise pair a new arrival with a stale
-      // departure, which is how a check-out lands before its check-in.
-      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: null } });
-      await sendAndPersist(tenant, contact, buildNightsPickerMessage(checkIn), "Failed to send nights picker");
-      return;
-    }
-    // Stale row (a picker sent days ago, now naming a past date) — reopen it
-    // on today's dates rather than silently booking the wrong day.
-    await sendAndPersist(tenant, contact, buildCheckInPickerMessage(), "Failed to re-send date picker");
-    return;
-  }
-
-  if (msg.interactiveId?.startsWith(NIGHTS_PREFIX)) {
-    if (contact.aiPaused) return;
-    if (contact.pendingCheckIn) {
-      const checkOut = parseNightsId(msg.interactiveId, contact.pendingCheckIn);
-      if (checkOut) {
-        await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckOut: checkOut } });
-        // Rewritten to the resolved range for the same reason the quick-pick
-        // rows are: Anushka's next reply is then grounded in real dates
-        // rather than the phrase "3 nights".
-        await prisma.message.update({
-          where: { id: messageRow.id },
-          data: { content: describeStay(contact.pendingCheckIn, checkOut) },
-        });
-        // Falls through to the AI queue, which now has real dates and so can
-        // check availability and recommend a room it can actually deliver.
-      }
-    } else {
-      // Nights tapped with no arrival day settled — ask for that first.
+    if (pickerAction.kind === "openCheckInPicker") {
       await sendAndPersist(tenant, contact, buildCheckInPickerMessage(), "Failed to send date picker");
       return;
+    }
+
+    if (pickerAction.kind === "prompt") {
+      // Prose, no list attached — structurally cannot loop.
+      await sendAndPersist(tenant, contact, { type: "text", text: pickerAction.text }, "Failed to send date prompt");
+      return;
+    }
+
+    if (pickerAction.kind === "setCheckIn") {
+      // Check-out is deliberately cleared: a half-set range left over from
+      // an earlier attempt would otherwise pair a new arrival with a stale
+      // departure, which is how a check-out lands before its check-in.
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { pendingCheckIn: pickerAction.checkIn, pendingCheckOut: null },
+      });
+      await sendAndPersist(tenant, contact, buildNightsPickerMessage(pickerAction.checkIn), "Failed to send nights picker");
+      return;
+    }
+
+    if (pickerAction.kind === "setCheckOut" && contact.pendingCheckIn) {
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckOut: pickerAction.checkOut } });
+      // Rewritten to the resolved range for the same reason the quick-pick
+      // rows are: Anushka's next reply is then grounded in real dates rather
+      // than the phrase "3 nights". Falls through to the AI queue, which now
+      // has real dates and can recommend a room it can actually deliver.
+      await prisma.message.update({
+        where: { id: messageRow.id },
+        data: { content: describeStay(contact.pendingCheckIn, pickerAction.checkOut) },
+      });
+    }
+  }
+
+  // A stay length typed in free text, once "Longer stay" has sent the guest
+  // there ("10 nights", "2 raat", "a week", or a bare "10" right after being
+  // asked). Without this the escape hatch leads nowhere understandable and
+  // the guest is back in the prose loop the picker exists to avoid. Only
+  // fills the gap — never overrides a check-out already chosen.
+  if (!msg.interactiveId && content && contact.pendingCheckIn && !contact.pendingCheckOut) {
+    const lastOut = await prisma.message.findFirst({
+      where: { tenantId: tenant.id, contactId: contact.id, direction: "OUT" },
+      orderBy: { createdAt: "desc" },
+      select: { content: true },
+    });
+    const nights = parseNightsFromText(content, {
+      answeringNightsQuestion: /how many nights/i.test(lastOut?.content ?? ""),
+    });
+    if (nights) {
+      const checkOut = checkOutAfterNights(contact.pendingCheckIn, nights);
+      await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckOut: checkOut } });
+      await prisma.message.update({
+        where: { id: messageRow.id },
+        data: { content: describeStay(contact.pendingCheckIn, checkOut) },
+      });
     }
   }
 

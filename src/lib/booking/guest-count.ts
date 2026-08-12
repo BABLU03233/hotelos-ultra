@@ -150,7 +150,12 @@ export function extractGuestCount(text: string, opts: ExtractGuestCountOptions =
   // --- "N people" and its many nouns, in every script/register ---
   // "log"/"logon" is the Hinglish person-noun ("3 log"); the negative
   // lookahead on "in" keeps "do log in" (a WiFi question) from matching.
-  const digitNoun = raw.match(/\b(\d+)\+?\s*(?:guests?|people|persons?|pax|adults?|members?|log(?:on)?\b(?!\s*in))/i);
+  // "peopl\w*" and "ppl" rather than a strict "people": a soak with realistic
+  // typing noise showed ordinary misspellings ("3+ peopple") dropping out of
+  // detection entirely, which then reads to the guest as being asked their
+  // party size a second time. The leading digit and a person-noun stem
+  // together are specific enough that loosening the tail is safe.
+  const digitNoun = raw.match(/\b(\d+)\+?\s*(?:guests?|peopl\w*|ppl|persons?|pax|adults?|members?|log(?:on)?\b(?!\s*in))/i);
   if (digitNoun) return inRange(Number(digitNoun[1]));
 
   const wordNoun = raw.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:guests?|people|persons?|pax|adults?|members?)\b/i);

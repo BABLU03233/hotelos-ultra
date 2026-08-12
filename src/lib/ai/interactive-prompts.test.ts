@@ -244,6 +244,51 @@ describe("ROOM_BOOK_BUTTON_ID", () => {
   });
 });
 
+describe("photo requests survive real typing", () => {
+  // languageObvious false so resolveDeterministicReply actually engages the
+  // waterfall rather than short-circuiting to the AI on language grounds.
+  const base = {
+    isFirstReply: false,
+    languageObvious: false,
+    history: [] as { role: string; content: string }[],
+    guestMessage: "",
+  };
+
+  // Found by a soak with realistic typing noise: a mistyped photo request
+  // fell through detection and got swallowed by a funnel prompt, so the
+  // guest was asked their party size instead of shown the room.
+  const asks = [
+    "send photos",
+    "can I see pictures?",
+    "View photos",
+    "Viewphotos", // tapped row title with the space dropped
+    "send phots", // dropped letter
+    "View hpotos", // transposition
+    "phto bhejo", // dropped letter, Hinglish
+    "SEND PHOTOS",
+    "pictuers please",
+  ];
+  for (const a of asks) {
+    it(`recognises "${a}"`, () => {
+      expect(resolveDeterministicReply({ ...base, guestMessage: a, history: [{ role: "assistant", content: "Are you looking to book a room today?" }] })).toBeNull();
+    });
+  }
+
+  it("does not mistake picking a date for asking for photos", () => {
+    // "pic"/"pick" are one edit apart, and "Pick a date"/"Pick exact dates"
+    // are rows in this very flow — fuzzy matching must not collide with them.
+    // Probed with booking intent already shown and no count known: a real
+    // photo request returns null (handed to the AI so it can send photos),
+    // so anything NOT a photo request must instead reach the guest-count
+    // gate. Comparing the two outcomes is what isolates the collision.
+    const withIntent = [{ role: "assistant", content: "Are you looking to book a room today?" }];
+    for (const notAPhotoRequest of ["pick nights", "picked"]) {
+      const r = resolveDeterministicReply({ ...base, history: withIntent, guestMessage: notAPhotoRequest, knownGuestCount: null });
+      expect(r?.text, `"${notAPhotoRequest}" was treated as a photo request`).toBe("How many people will be staying? 😊");
+    }
+  });
+});
+
 describe("hasStatedGuestCount with a stored count", () => {
   // The regression this whole mechanism exists to prevent. Every text scan
   // in this file can only see the last 12 messages the pipeline loads, so a

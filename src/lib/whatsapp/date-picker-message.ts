@@ -34,7 +34,28 @@ export interface DatePickerMessage {
 
 export const CHECK_IN_PREFIX = "checkin_";
 export const NIGHTS_PREFIX = "nights_";
+/** DATE_QUICK_PICK's "Pick exact dates" row — the way IN to this picker. */
 export const TYPE_DATES_ID = "dates_custom";
+
+/**
+ * The escape hatches, each with its OWN id.
+ *
+ * These originally reused TYPE_DATES_ID, which produced an infinite loop in
+ * production on the first real conversation: TYPE_DATES_ID's handler opens a
+ * picker, so tapping "Longer stay" inside the nights picker re-sent the
+ * nights picker, and tapping it again re-sent it again. The guest could not
+ * get out. Same defect on the check-in picker's "Another date".
+ *
+ * The rule this encodes: a row whose entire purpose is "none of these
+ * options suit me" must never route back into the list it appears in.
+ */
+// Deliberately NOT "checkin_other"/"nights_more": those share the parsing
+// prefixes above, so they'd fall into the date/nights parsing branches if
+// the routing order were ever rearranged — parse to null, route to "open the
+// picker", and reinstate the exact loop this is fixing. Distinct namespaces
+// make that impossible rather than merely unlikely. Asserted in the tests.
+export const CHECK_IN_OTHER_ID = "date_other";
+export const NIGHTS_MORE_ID = "stay_longer";
 
 /** yyyy-mm-dd for a Date, read in India time — the id that travels in the row. */
 function isoDay(d: Date): string {
@@ -71,7 +92,7 @@ export function buildCheckInPickerMessage(now: Date = new Date()): DatePickerMes
       description: label,
     };
   });
-  rows.push({ id: TYPE_DATES_ID, title: "Another date", description: "Type the dates you want" });
+  rows.push({ id: CHECK_IN_OTHER_ID, title: "Another date", description: "Type the date you want" });
 
   return {
     type: "list",
@@ -98,7 +119,7 @@ export function buildNightsPickerMessage(checkIn: Date): DatePickerMessage {
       description: `Check out ${human(out)}`.slice(0, ROW_DESCRIPTION_MAX),
     };
   });
-  rows.push({ id: TYPE_DATES_ID, title: "Longer stay", description: "Tell me how long you'd like to stay" });
+  rows.push({ id: NIGHTS_MORE_ID, title: "Longer stay", description: "Tell me how long you'd like to stay" });
 
   return {
     type: "list",
@@ -145,4 +166,56 @@ export function parseNightsId(id: string, checkIn: Date): Date | null {
 /** Human label for a settled stay, for the confirmation line. */
 export function describeStay(checkIn: Date, checkOut: Date): string {
   return `${human(checkIn)} → ${human(checkOut)}`;
+}
+
+const NIGHT_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  ek: 1, do: 2, teen: 3, char: 4, chaar: 4, paanch: 5, panch: 5, che: 6, chhe: 6, saat: 7, aath: 8, nau: 9, das: 10, dus: 10,
+};
+
+/**
+ * A stay length typed in the guest's own words, once "Longer stay" has sent
+ * them to free text: "10 nights", "2 raat", "a week", "10".
+ *
+ * The escape hatch is worthless if what it leads to can't be understood —
+ * the guest would land right back in the prose loop the picker exists to
+ * avoid. A bare number is accepted only when we've just asked how many
+ * nights, the same restriction extractGuestCount applies to a bare count.
+ *
+ * Capped at 30: beyond that it's a typo or a long-stay enquiry that wants a
+ * human, not a silent month-long booking.
+ */
+export function parseNightsFromText(text: string, opts: { answeringNightsQuestion?: boolean } = {}): number | null {
+  const t = text.trim().toLowerCase();
+  if (!t) return null;
+
+  const inRange = (n: number) => (Number.isInteger(n) && n >= 1 && n <= 30 ? n : null);
+
+  // "a week" / "one week" / "2 weeks"
+  const weeks = t.match(/\b(\d{1,2})\s*(weeks?|hafte|hafta)\b/);
+  if (weeks) return inRange(Number(weeks[1]) * 7);
+  if (/\b(a|one)\s*(week|hafta)\b/.test(t)) return 7;
+
+  // "10 nights" / "2 raat" / "3 din"
+  const digit = t.match(/\b(\d{1,2})\s*(nights?|raat(?:ein|en)?|din|రాత్రు?ల?ు?|रात(?:ें|ों)?)\b/);
+  if (digit) return inRange(Number(digit[1]));
+
+  // "ten nights" / "do raat"
+  const word = t.match(/\b([a-z]+)\s*(nights?|raat(?:ein|en)?|din)\b/);
+  if (word && NIGHT_WORDS[word[1]] !== undefined) return inRange(NIGHT_WORDS[word[1]]);
+
+  // Bare number, only right after being asked.
+  if (opts.answeringNightsQuestion) {
+    const bare = t.match(/^(\d{1,2})[.!]?$/);
+    if (bare) return inRange(Number(bare[1]));
+    const bareWord = t.match(/^([a-z]+)[.!]?$/);
+    if (bareWord && NIGHT_WORDS[bareWord[1]] !== undefined) return inRange(NIGHT_WORDS[bareWord[1]]);
+  }
+
+  return null;
+}
+
+/** Check-out for a stay of `nights` from `checkIn`. */
+export function checkOutAfterNights(checkIn: Date, nights: number): Date {
+  return addDays(checkIn, nights);
 }

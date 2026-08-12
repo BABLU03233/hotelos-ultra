@@ -23,6 +23,52 @@ function pick<T>(rng: () => number, a: T[]): T {
   return a[Math.floor(rng() * a.length) % a.length];
 }
 
+/**
+ * Messes a message up the way a real stranger on a phone keyboard does.
+ *
+ * Every pool above is spelled correctly, which quietly makes the whole soak
+ * an easier test than reality: guests type "roomm", drop spaces, SHOUT, skip
+ * punctuation and send bare emoji. Detection here is regex-driven, so a
+ * typo can flip a slot from recognised to unrecognised — and the invariants
+ * that matter (never loop, never go silent, never re-ask a settled slot)
+ * must hold even when nothing is recognised at all.
+ */
+function mangle(rng: () => number, s: string): string {
+  const r = rng();
+  if (r < 0.45) return s; // most messages are typed fine
+  if (r < 0.55) return s.toUpperCase();
+  if (r < 0.62) return s.replace(/[?.!,]/g, ""); // no punctuation
+  if (r < 0.70) return s.replace(/\s+/g, ""); // spaces dropped
+  if (r < 0.78) {
+    // Doubled letter — "room" -> "roomm"
+    const i = Math.floor(rng() * s.length);
+    return s.slice(0, i) + s.charAt(i) + s.slice(i);
+  }
+  if (r < 0.86) {
+    // Dropped letter
+    const i = Math.floor(rng() * s.length);
+    return s.slice(0, i) + s.slice(i + 1);
+  }
+  if (r < 0.92) {
+    // Adjacent-key transposition
+    const i = Math.max(1, Math.floor(rng() * (s.length - 1)));
+    return s.slice(0, i - 1) + s.charAt(i) + s.charAt(i - 1) + s.slice(i + 1);
+  }
+  if (r < 0.96) return s + "  "; // trailing whitespace
+  return pick(rng, CONTENTLESS); // near-contentless
+}
+
+/**
+ * Replacements that destroy the message's meaning entirely.
+ *
+ * Intent-based invariants are skipped for these: if the guest actually sent
+ * "🏨🏨", no system can know they meant "send photos", and asserting
+ * otherwise measures the mangler rather than the product. They're still fed
+ * through, because the invariants that DON'T depend on intent — never loop,
+ * never go silent — must hold for a bare emoji too.
+ */
+const CONTENTLESS = ["👍", "🙏", "??", "...", "k", "hmm", "🏨🏨"];
+
 const GREETINGS = ["hi", "hello", "hey", "namaste", "hii", "Hi there", "నమస్కారం", "हैलो"];
 const INTENT = [
   "I'd like to book a room",
@@ -172,12 +218,19 @@ function runOne(seed: number): Violation[] {
   // Legitimate re-asks (no structured range resolved) — counted, not failed,
   // but they must never exceed the cap.
   let softDateReasks = 0;
+  let softCountReasks = 0;
 
-  msgs.forEach((msg, turn) => {
+  msgs.forEach((clean, turn) => {
+    // Typed the way a real stranger types it. Intent flags are read from the
+    // ORIGINAL string: a mangled "send photos" is still a photo request as
+    // far as the guest is concerned, and holding the invariant against the
+    // clean intent is what makes this a real test rather than a tautology.
+    const msg = mangle(rng, clean);
     const countKnownBefore = st.count != null || hasStatedGuestCount(st.history, msg, st.count);
     const datesKnownBefore = st.datesKnown || hasStatedDates(st.history, msg, st.storedDates);
-    const isPhotoReq = PHOTOS.includes(msg);
-    const isCancel = CANCELS.includes(msg);
+    const meaningSurvived = !CONTENTLESS.includes(msg.trim());
+    const isPhotoReq = PHOTOS.includes(clean) && meaningSurvived;
+    const isCancel = CANCELS.includes(clean) && meaningSurvived;
 
     const { text, interactive } = step(st, msg, rng);
     tr.push(`  guest> ${msg}`);
@@ -188,9 +241,18 @@ function runOne(seed: number): Violation[] {
 
     const add = (rule: string, detail: string) => v.push({ seed, rule, detail, transcript: [...tr] });
 
-    // 1. never re-ask a settled slot
-    if (text === GUEST_COUNT_ASK && countSettledTurn !== null && turn > countSettledTurn) {
-      add("re-asked guest count after it was known", `turn ${turn} stored=${st.count}`);
+    // 1. never re-ask a settled slot.
+    // Strict form, matching the dates rule below: once a count is actually
+    // STORED, asking again is always a bug. When nothing was ever captured
+    // (a typo defeated detection, say) the count genuinely is unknown, so
+    // asking is correct — bounded by the stuck-loop rule, not this one.
+    // Keying this off the text scan instead made the harness measure its own
+    // flicker rather than the product's behaviour.
+    if (text === GUEST_COUNT_ASK && st.count != null) {
+      add("re-asked guest count after it was stored", `turn ${turn} stored=${st.count}`);
+    }
+    if (text === GUEST_COUNT_ASK && countSettledTurn !== null && turn > countSettledTurn && st.count == null) {
+      softCountReasks++;
     }
     // Strict form: once a real structured range is STORED, asking again is
     // always a bug. When no range could be resolved (the AI marker didn't
@@ -237,6 +299,9 @@ function runOne(seed: number): Violation[] {
   // turn into the interrogation the loop bug used to produce.
   if (softDateReasks > 2) {
     v.push({ seed, rule: "asked for dates more than twice without a stored range", detail: `${softDateReasks} asks`, transcript: tr });
+  }
+  if (softCountReasks > 2) {
+    v.push({ seed, rule: "asked for guest count more than twice without a stored value", detail: `${softCountReasks} asks`, transcript: tr });
   }
 
   return v;

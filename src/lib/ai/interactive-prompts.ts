@@ -287,10 +287,85 @@ export function looksLikePriceOrOfferSignal(text: string): boolean {
 // Matches both the literal "View photos" button tap and a guest typing the
 // same request as free text -- see PHOTOS in pipeline.ts, which already
 // expects both forms to arrive as the guest's plain message.
-const PHOTO_REQUEST_PATTERN = /\b(photos?|pictures?|pics?)\b|what (does|do) (it|the room) look like/i;
+// Stems rather than \b-bounded whole words. A soak run with realistic typing
+// noise caught the gap: \b requires a non-word character before the keyword,
+// so a tapped row title arriving with its space dropped ("Viewphotos") — and
+// any of the ordinary misspellings guests produce on a phone keyboard —
+// matched nothing, and the request got swallowed by a funnel prompt instead
+// of sending photos. Matching the stem is deliberately loose here: over-
+// detecting a photo request costs a guest an extra photo, while under-
+// detecting it means ignoring what they actually asked for.
+const PHOTO_REQUEST_PATTERN = /photo|pictur|\bpi?cs?\b|what (does|do) (it|the room) look like/i;
 
+/**
+ * True when `a` becomes `b` by swapping one adjacent pair of characters
+ * ("hpotos" → "photos").
+ *
+ * Counted separately because a transposition is TWO substitutions under
+ * plain Levenshtein and so slips past a distance-1 check — while being one
+ * of the most common things a thumb actually does on a phone keyboard. This
+ * is the Damerau part of Damerau-Levenshtein, added on its own rather than
+ * raising the edit budget to 2, which would start matching unrelated words.
+ */
+function isTransposition(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const diffs: number[] = [];
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) diffs.push(i);
+    if (diffs.length > 2) return false;
+  }
+  if (diffs.length !== 2) return false;
+  const [x, y] = diffs;
+  return y === x + 1 && a[x] === b[y] && a[y] === b[x];
+}
+
+/** True when `a` and `b` differ by at most one insertion, deletion or substitution. */
+function withinOneEdit(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < short.length && j < long.length) {
+    if (short[i] === long[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (short.length === long.length) i++; // substitution
+    j++; // insertion/deletion
+  }
+  return edits + (long.length - j) + (short.length - i) <= 1;
+}
+
+// The TARGET words must be this long; a shorter threshold is actively
+// harmful, since "pic" and "pick" differ by one edit and "pick" appears all
+// over this very flow ("Pick exact dates", "Pick a date") — a request to
+// pick a date would be read as a request for photos.
+//
+// The guest's own word only needs 4, so a dropped letter ("phto") still
+// matches. That stays safe precisely because the targets are all 5+: "pick"
+// is more than one edit from every one of them.
+const FUZZY_TARGET_MIN_LENGTH = 5;
+const FUZZY_WORD_MIN_LENGTH = 4;
+const PHOTO_WORDS = ["photo", "photos", "picture", "pictures"];
+
+/**
+ * Catches the ordinary single-character slips a phone keyboard produces
+ * ("phtos", "pictuers") that stem matching alone can't. Found by a soak with
+ * realistic typing noise: a typo'd photo request fell through detection and
+ * got swallowed by a funnel prompt, so the guest was asked their party size
+ * instead of being shown the room they asked to see.
+ */
 function looksLikePhotoRequest(text: string): boolean {
-  return PHOTO_REQUEST_PATTERN.test(text);
+  if (PHOTO_REQUEST_PATTERN.test(text)) return true;
+  return text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= FUZZY_WORD_MIN_LENGTH)
+    .some((w) => PHOTO_WORDS.some((p) => p.length >= FUZZY_TARGET_MIN_LENGTH && (withinOneEdit(w, p) || isTransposition(w, p))));
 }
 
 export function roomResponsePrompt(): InteractivePrompt {
