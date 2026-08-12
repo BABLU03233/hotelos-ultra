@@ -1,4 +1,5 @@
 import { todayMidnightIST } from "@/lib/india-time";
+import { parseBookableExplicitDate } from "./explicit-date";
 
 export type QuickPickKey = "dates_today" | "dates_tomorrow" | "dates_weekend" | "dates_nextweek";
 
@@ -136,6 +137,21 @@ export function resolveTypedRelativeDates(text: string, now: Date = new Date()):
       const checkOut = addDays(checkIn, 1);
       return { checkIn, checkOut, label: `${formatShort(checkIn)} – ${formatShort(checkOut)}` };
     }
+  }
+
+  // A typed, named-month date resolves here rather than waiting on the AI's
+  // DATES: marker. The app explicitly invites this ("just type the date, e.g.
+  // 25 Aug"), so failing to understand the reply breaks its own promise —
+  // which is exactly what happened live with "26jul".
+  //
+  // Safe to do deterministically because a NAMED month carries no
+  // day-first/month-first ambiguity; bare digits still don't resolve here.
+  // parseBookableExplicitDate returns null for a past date, so this can
+  // never quietly roll one forward into next year.
+  const explicit = parseBookableExplicitDate(t, now);
+  if (explicit) {
+    const checkOut = addDays(explicit, 1);
+    return { checkIn: explicit, checkOut, label: `${formatShort(explicit)} – ${formatShort(checkOut)}` };
   }
 
   // Anything more specific ("15th to 17th August", "20/09") is deliberately

@@ -1,3 +1,4 @@
+import { explicitDateIsPast } from "@/lib/booking/explicit-date";
 import { dateFieldsIST, todayMidnightIST } from "@/lib/india-time";
 
 /**
@@ -23,7 +24,11 @@ import { dateFieldsIST, todayMidnightIST } from "@/lib/india-time";
  * class through the server's own clock instead of the guest's phrasing.
  */
 export function guestDateLooksPast(text: string, now: Date = new Date()): boolean {
-  return numericDateLooksPast(text, now) || monthNameDateLooksPast(text, now);
+  // explicitDateIsPast covers the compact spellings ("26jul", "27jul2026")
+  // that monthNameDateLooksPast below misses because it requires whitespace
+  // between the day and the month — a real gap: the app asked a guest to
+  // type a date, they typed "26jul", and nothing understood it.
+  return numericDateLooksPast(text, now) || explicitDateIsPast(text, now) || monthNameDateLooksPast(text, now);
 }
 
 function numericDateLooksPast(text: string, now: Date): boolean {
