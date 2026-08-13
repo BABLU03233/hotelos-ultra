@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRoomListMessage } from "./room-list-message";
 import { hasWrongRoomPrice } from "@/lib/ai/reply-safety";
-import { GREET_QUESTION_BUTTON_ID } from "@/lib/ai/interactive-prompts";
+import { GREET_QUESTION_BUTTON_ID, mentionsRoomPrice, readyToOfferRooms } from "@/lib/ai/interactive-prompts";
 
 // The hotel's real inventory, and the figures the model invented for it.
 const ROOMS = [
@@ -69,6 +69,46 @@ describe("the guest chooses the room, not Anushka", () => {
     const ids = (l: "en" | "hi" | "te") => buildRoomListMessage(ROOMS, l).sections[0].rows.map((r) => r.id);
     expect(ids("hi")).toEqual(ids("en"));
     expect(ids("te")).toEqual(ids("en"));
+  });
+});
+
+describe("the room list must not re-send itself forever", () => {
+  // A loop found by auditing the new flow. "Already shown a room" is
+  // detected by scanning assistant messages for a room price. The list's
+  // body line — "We have 3 rooms free for your dates" — carries no price, so
+  // persisting only the body left that check false and readyToOfferRooms
+  // true, re-sending the identical list every turn with no way out.
+  const history = [
+    { role: "user", content: "I want to book a room" },
+    { role: "assistant", content: "How many people will be staying? 😊" },
+    { role: "user", content: "2 people" },
+    { role: "assistant", content: "When are you looking to stay?" },
+    { role: "user", content: "this weekend" },
+  ];
+  const ready = (h: { role: string; content: string }[]) =>
+    readyToOfferRooms({ history: h, guestMessage: "ok", knownGuestCount: 2, datesKnown: true });
+
+  it("offers the list once", () => {
+    expect(ready(history)).toBe(true);
+  });
+
+  it("does not offer it again once the rooms and prices have been sent", () => {
+    const list = buildRoomListMessage(ROOMS);
+    const persisted = [list.body, ...list.sections[0].rows.map((r) => `${r.title} — ${r.description}`)].join("\n");
+    expect(ready([...history, { role: "assistant", content: persisted }])).toBe(false);
+  });
+
+  it("persisting the body alone would reopen the loop", () => {
+    // Guards the actual mechanism rather than the symptom: if someone
+    // "simplifies" the stored content back to just the body, this fails.
+    const list = buildRoomListMessage(ROOMS);
+    expect(ready([...history, { role: "assistant", content: list.body }])).toBe(true);
+  });
+
+  it("the sent content carries a real per-night price", () => {
+    const list = buildRoomListMessage(ROOMS);
+    const persisted = [list.body, ...list.sections[0].rows.map((r) => `${r.title} — ${r.description}`)].join("\n");
+    expect(mentionsRoomPrice(persisted)).toBe(true);
   });
 });
 

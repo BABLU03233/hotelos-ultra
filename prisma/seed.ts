@@ -155,7 +155,7 @@ async function main() {
           {
             question: "Do you offer discounts for direct bookings?",
             answer:
-              "Yes — ask about our current offers: FLAT100 (flat ₹100 off any room), WELCOME10 (10% off your first stay), STAY3PLUS (flat ₹500 off for 3+ nights), or PREMIUM300 (flat ₹300 off the Premium Room). Direct bookings only, and offers aren't combinable.",
+              "Yes — new guests get a flat 10% off their first stay with code WELCOME10 when booking directly with us. Direct bookings only.",
           },
           {
             question: "Where exactly is the hotel located?",
@@ -172,34 +172,17 @@ async function main() {
           },
         ],
       },
+      // One offer, deliberately. Four competing discounts gave the model four
+      // things to get wrong in a single sentence and gave guests a puzzle
+      // rather than a reason to book; a single first-stay discount is easier
+      // to state correctly and easier to act on.
       offers: {
         create: [
           {
-            title: "Flat ₹100 Off (FLAT100)",
-            description: "Flat ₹100 off any room type when you book directly with us — no OTA required. Not combinable with other offers.",
-            discount: "₹100 off",
-            code: "FLAT100",
-            active: true,
-          },
-          {
             title: "10% Off First Stay (WELCOME10)",
-            description: "First time booking with Hotel Ivory Towers? Get 10% off your room price. First-time guests only.",
+            description: "First time booking with Hotel Ivory Towers? Get a flat 10% off your room price. New guests only.",
             discount: "10% off",
             code: "WELCOME10",
-            active: true,
-          },
-          {
-            title: "Flat ₹500 Off, 3+ Nights (STAY3PLUS)",
-            description: "Staying 3 nights or longer? Get a flat ₹500 off your total bill.",
-            discount: "₹500 off",
-            code: "STAY3PLUS",
-            active: true,
-          },
-          {
-            title: "Flat ₹300 Off Premium Room (PREMIUM300)",
-            description: "Treat yourself to the Premium Room and save ₹300 on the room price. Valid on Premium Room bookings only.",
-            discount: "₹300 off",
-            code: "PREMIUM300",
             active: true,
           },
         ],

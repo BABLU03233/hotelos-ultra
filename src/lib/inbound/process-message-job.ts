@@ -160,8 +160,20 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
           buttonText: list.buttonText,
           sections: list.sections,
         });
+        // The persisted content carries the rooms and their prices, not just
+        // the body line. Two reasons, and the first is a loop:
+        //
+        // "already shown a room" is detected by scanning assistant messages
+        // for a room price (mentionsRoomPrice). The body alone — "We have 3
+        // rooms free for your dates" — contains no price, so that check
+        // stayed false and readyToOfferRooms kept returning true, re-sending
+        // the identical list on every subsequent turn with no way out.
+        //
+        // Second, it's simply the truer record: the guest saw these rooms and
+        // these rates, so that is what the CRM transcript should show.
+        const persisted = [list.body, ...list.sections[0].rows.map((r) => `${r.title} — ${r.description}`)].join("\n");
         await prisma.message.create({
-          data: { tenantId, contactId, direction: "OUT", type: "INTERACTIVE", content: list.body, whatsappMessageId, status: "SENT" },
+          data: { tenantId, contactId, direction: "OUT", type: "INTERACTIVE", content: persisted, whatsappMessageId, status: "SENT" },
         });
         if (contact.leadStatus === "NEW") {
           await prisma.contact.update({ where: { id: contactId }, data: { leadStatus: "INTERESTED", lastMessage: list.body } });
