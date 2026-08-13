@@ -12,10 +12,13 @@ describe("buildRoomListMessage", () => {
     const msg = buildRoomListMessage(ROOMS);
     expect(msg.type).toBe("list");
     expect(msg.sections).toHaveLength(1);
-    expect(msg.sections[0].rows).toEqual([
-      { id: "room_pick_r1", title: "Classic Room", description: "From ₹999/night · up to 2 guests" },
-      { id: "room_pick_r2", title: "Deluxe Room", description: "From ₹1299/night · up to 3 guests" },
-      { id: "room_pick_r3", title: "Premium Room", description: "From ₹1599/night · up to 3 guests" },
+    // Titles read as an action now — this list IS the recommendation step,
+    // so a row is something the guest does, not a label. A trailing
+    // "Know more" row is appended; see room-choice.test.ts.
+    expect(msg.sections[0].rows.slice(0, 3)).toEqual([
+      { id: "room_pick_r1", title: "Book Classic Room", description: "From ₹999/night · up to 2 guests" },
+      { id: "room_pick_r2", title: "Book Deluxe Room", description: "From ₹1299/night · up to 3 guests" },
+      { id: "room_pick_r3", title: "Book Premium Room", description: "From ₹1599/night · up to 3 guests" },
     ]);
   });
 
@@ -37,7 +40,10 @@ describe("buildRoomListMessage", () => {
   });
 
   it("handles an empty room list without throwing", () => {
+    // Still carries the "Know more" escape hatch, so a guest is never shown
+    // a list with nothing tappable in it.
     const msg = buildRoomListMessage([]);
-    expect(msg.sections[0].rows).toEqual([]);
+    expect(msg.sections[0].rows).toHaveLength(1);
+    expect(msg.sections[0].rows[0].title).toBe("Know more");
   });
 });

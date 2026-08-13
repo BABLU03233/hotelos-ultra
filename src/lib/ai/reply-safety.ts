@@ -42,6 +42,41 @@ export function hasHallucinationRisk(text: string, legitimatePhoneNumbers: Set<s
 
 export const SAFE_REPLY_FALLBACK = "Great, glad that works for you! 🎉 Just tap Confirm booking below when you're ready and I'll take care of the rest.";
 
+// "₹1,899/night", "₹1899 per night" — a per-night rate, which is the only
+// figure that can be checked against a room's real price. Totals ("₹2,598
+// for 2 nights") and discounts ("₹100 off") are deliberately out of scope:
+// both are legitimate arithmetic over real numbers, and flagging them would
+// suppress correct replies.
+const PER_NIGHT_PRICE = /(?:₹|rs\.?|inr)\s*([\d,]+)\s*(?:\/|\bper\b)\s*night/gi;
+
+/**
+ * True when the reply names a room and quotes a per-night price for it that
+ * isn't that room's real rate.
+ *
+ * From a live incident: asked to recommend, the model quoted ₹1,899 and
+ * ₹2,199 for rooms costing ₹1,299 and ₹1,599 — 46% and 37% above the real
+ * figures, which were sitting in its own prompt. A guest could have arrived
+ * expecting one price and been charged another. The existing guards covered
+ * invented phone numbers and false booking confirmations; an invented PRICE
+ * went straight through.
+ *
+ * The room shortlist is now built from Room rows so the main path never
+ * routes pricing through the model at all. This is the backstop for
+ * everywhere else it might mention one.
+ *
+ * Only fires when a named room and a per-night figure appear together and
+ * none of the quoted figures matches — a reply that mentions a room and a
+ * total, or quotes the right price alongside a wrong one, is left alone.
+ */
+export function hasWrongRoomPrice(text: string, rooms: { name: string; price: number }[]): boolean {
+  const quoted = [...text.matchAll(PER_NIGHT_PRICE)].map((m) => Number(m[1].replace(/,/g, "")));
+  if (!quoted.length) return false;
+  const lower = text.toLowerCase();
+  const named = rooms.filter((r) => lower.includes(r.name.toLowerCase()));
+  if (named.length !== 1) return false; // ambiguous or no room named — nothing to check against
+  return !quoted.some((q) => q === named[0].price);
+}
+
 const URL_PATTERN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]+\.(com|in|co\.in|net|org|me|app|link|gl|online|shop)\b\S*/gi;
 
 /**

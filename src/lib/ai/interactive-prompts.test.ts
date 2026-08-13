@@ -881,19 +881,18 @@ describe("predictedStageInstruction", () => {
     expect(result).toContain("I want to book a room");
   });
 
-  it("gives the room-recommend heads-up (not GREET_MENU) on a rich first reply where guest count and dates are already known", () => {
-    // The exact mismatch this function exists to prevent: without the fix,
-    // this would predict GREET_MENU (since replyText is empty pre-call),
-    // but the real post-call decision would end up as ROOM_RESPONSE the
-    // moment the AI names a room -- telling the AI the wrong thing was
-    // about to happen.
+  it("tells the AI NOT to name a room on a rich first reply where count and dates are known", () => {
+    // Was: a heads-up that the AI was about to recommend a room. Now the
+    // opposite instruction — the room shortlist is built from Room rows and
+    // sent separately, after the model quoted prices 46% and 37% above the
+    // real ones while recommending. It must not name a room or a price.
     const result = predictedStageInstruction({
       ...base,
       isFirstReply: true,
       languageObvious: true,
       guestMessage: "Hi, 2 guests, want a room this weekend",
     });
-    expect(result).toContain("recommend");
+    expect(result).toMatch(/do NOT name a room/i);
     expect(result).not.toContain("I want to book a room\" / \"Availability");
   });
 
@@ -931,9 +930,12 @@ describe("predictedStageInstruction", () => {
     expect(result).toContain("cheaper room");
   });
 
-  it("gives a heads-up about recommending a room once guest count and dates are both known", () => {
+  it("forbids naming a room or price once count and dates are both known", () => {
+    // The guest picks from a real list instead; the model's job is one warm
+    // line, not a recommendation carrying invented numbers.
     const result = predictedStageInstruction({ ...base, guestMessage: "2 guests, this weekend" });
-    expect(result).toContain("recommend");
+    expect(result).toMatch(/do NOT name a room/i);
+    expect(result).toMatch(/quote any price/i);
   });
 
   it("returns an empty string for plain small talk with no booking interest yet", () => {

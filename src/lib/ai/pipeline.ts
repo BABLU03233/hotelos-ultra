@@ -19,7 +19,7 @@ import {
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, hasWrongRoomPrice, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
 
 // Curated OpenRouter free-tier models for the fallback tier below. Ordering
 // is re-verified periodically against real production traffic, not assumed
@@ -181,7 +181,7 @@ async function buildSystemPrompt(
   retrievedContext: string[],
   context?: ReplyContext,
   interactiveState?: { history: ChatMessage[]; guestMessage: string }
-): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string>; legitimateUrls: Set<string> }> {
+): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string>; legitimateUrls: Set<string>; rooms: { name: string; price: number }[] }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
     prisma.room.findMany({ where: { tenantId } }),
@@ -432,6 +432,9 @@ PHOTOS
     agentName,
     legitimatePhoneNumbers: extractLegitimatePhoneNumbers(profile?.aiSystemPrompt ?? ""),
     legitimateUrls: new Set(profile?.googleMapsUrl ? [profile.googleMapsUrl] : []),
+    // Returned so the reply can be checked against real rates — see
+    // hasWrongRoomPrice. Already loaded above to build the prompt.
+    rooms: rooms.map((r) => ({ name: r.name, price: r.price })),
   };
 }
 
@@ -462,7 +465,7 @@ export async function generateReply(
   context?: ReplyContext
 ): Promise<GenerateReplyResult> {
   const retrieved = await retrieveRelevantChunks(tenantId, guestMessage).catch(() => []);
-  const { prompt: systemPrompt, agentName, legitimatePhoneNumbers, legitimateUrls } = await buildSystemPrompt(tenantId, retrieved, context, {
+  const { prompt: systemPrompt, agentName, legitimatePhoneNumbers, legitimateUrls, rooms } = await buildSystemPrompt(tenantId, retrieved, context, {
     history,
     guestMessage,
   });
@@ -501,7 +504,15 @@ export async function generateReply(
   // fabricated phone number or a false "booking confirmed" claim in prose,
   // most often when a guest types confirmation instead of tapping the
   // button. Swapped for a safe generic line rather than a partial rewrite.
-  const text = hasHallucinationRisk(urlSafeText, legitimatePhoneNumbers) ? SAFE_REPLY_FALLBACK : urlSafeText;
+  // A wrong PRICE is caught alongside the phone-number and false-confirmation
+  // cases, and for the same reason: it is a claim the guest will act on. Seen
+  // live — the model quoted rates 46% and 37% above the real ones with the
+  // correct figures in its own prompt. `rooms` here is the hotel's real
+  // inventory, already loaded to build the prompt.
+  const text =
+    hasHallucinationRisk(urlSafeText, legitimatePhoneNumbers) || hasWrongRoomPrice(urlSafeText, rooms)
+      ? SAFE_REPLY_FALLBACK
+      : urlSafeText;
   // The deterministic waterfall (see selectDeterministicInteractive) is now
   // the primary decision-maker for which buttons accompany a reply, not the
   // AI's own "BUTTONS: X" marker — prompt-only button decisions proved

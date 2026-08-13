@@ -1126,6 +1126,29 @@ function promptForStageKey(key: StageKey, lang?: GuestLanguage | null): Interact
  * already known that the AI might recommend a room this turn -> its own
  * judgment call, same as before).
  */
+/**
+ * Guest count and dates are settled and no room has been named yet — the
+ * moment the conversation is ready to put rooms in front of the guest.
+ *
+ * Exported so the worker can act on it: the room shortlist is built from
+ * real Room rows and sent deterministically, rather than the model being
+ * asked to recommend one. That change came from a live incident where the
+ * model chose a room on the guest's behalf AND quoted prices 46% and 37%
+ * above the real ones, with the correct figures sitting in its own prompt.
+ */
+export function readyToOfferRooms(params: {
+  history: { role: string; content: string }[];
+  guestMessage: string;
+  knownGuestCount?: number | null;
+  datesKnown?: boolean;
+}): boolean {
+  return (
+    hasStatedGuestCount(params.history, params.guestMessage, params.knownGuestCount) &&
+    hasStatedDates(params.history, params.guestMessage, params.datesKnown) &&
+    !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content))
+  );
+}
+
 export function predictedStageInstruction(params: {
   isFirstReply: boolean;
   languageObvious: boolean;
@@ -1150,7 +1173,7 @@ export function predictedStageInstruction(params: {
     hasStatedDates(params.history, params.guestMessage, params.datesKnown) &&
     !params.history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content));
   if (readyToRecommend) {
-    return "If you recommend a specific room with its price in this reply, a Book this room / See other options / View photos picker will automatically appear underneath — end the reply right after naming the room, don't also ask a follow-up question in the same message.";
+    return "The guest is ready to see rooms, and a list of the hotel's real rooms with real prices is being sent separately — do NOT name a room or quote any price yourself. Keep this reply to one short warm line.";
   }
 
   const key = resolveStageKey({ ...params, replyText: "" });

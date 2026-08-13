@@ -1,6 +1,7 @@
-import { looksLikeObviousLanguage, resolveDeterministicReply } from "@/lib/ai/interactive-prompts";
+import { looksLikeObviousLanguage, readyToOfferRooms, resolveDeterministicReply } from "@/lib/ai/interactive-prompts";
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
+import { findUnavailableRoomIds } from "@/lib/booking/availability";
 import { captureGuestCount } from "@/lib/booking/guest-count";
 import { resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
@@ -8,6 +9,7 @@ import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
+import { buildRoomListMessage } from "@/lib/whatsapp/room-list-message";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/tenant-credentials";
 
 const HISTORY_LIMIT = 12;
@@ -125,6 +127,53 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
   const agentNameFallback = profile?.aiAgentName?.trim() || "Anushka";
+
+  // ---- Rooms are offered, never chosen on the guest's behalf ----
+  // Live incident: asked to recommend, the model picked one room for the
+  // guest and quoted ₹1,899 and ₹2,199 for rooms costing ₹1,299 and ₹1,599 —
+  // inventing prices 46% and 37% above the real ones while the correct
+  // figures sat in its own prompt.
+  //
+  // Two problems with one fix. Choosing was never ours to do: with a handful
+  // of rooms, the shortlist IS the answer. And building that list from Room
+  // rows takes the model out of the pricing path entirely — a database row
+  // cannot hallucinate a rate. Sent here rather than through the AI for the
+  // same reason every other real-data list is.
+  if (
+    readyToOfferRooms({ history, guestMessage: latestInbound.content, knownGuestCount, datesKnown: Boolean(effectiveCheckIn && effectiveCheckOut) })
+  ) {
+    const rooms = await prisma.room.findMany({ where: { tenantId }, orderBy: { price: "asc" } });
+    const taken =
+      effectiveCheckIn && effectiveCheckOut
+        ? await findUnavailableRoomIds(prisma, tenantId, effectiveCheckIn, effectiveCheckOut).catch(() => new Set<string>())
+        : new Set<string>();
+    const offerable = rooms.filter((r) => !taken.has(r.id));
+
+    if (offerable.length) {
+      const creds = await getWhatsAppCredentials(tenantId);
+      if (!creds) return;
+      const list = buildRoomListMessage(offerable, resolveLanguage(contact.language));
+      try {
+        const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+          type: "list",
+          body: list.body,
+          buttonText: list.buttonText,
+          sections: list.sections,
+        });
+        await prisma.message.create({
+          data: { tenantId, contactId, direction: "OUT", type: "INTERACTIVE", content: list.body, whatsappMessageId, status: "SENT" },
+        });
+        if (contact.leadStatus === "NEW") {
+          await prisma.contact.update({ where: { id: contactId }, data: { leadStatus: "INTERESTED", lastMessage: list.body } });
+        }
+      } catch (err) {
+        console.error(`Room shortlist send failed for tenant ${tenantId}, contact ${contactId}:`, err);
+      }
+      return;
+    }
+    // Nothing free for those dates — fall through so the AI can say so and
+    // the waterfall re-offers dates, rather than sending an empty list.
+  }
 
   // Real room name + exact dates for the CONFIRM_BOOKING summary below --
   // only fetched when both are actually known, so a guest sees exactly what

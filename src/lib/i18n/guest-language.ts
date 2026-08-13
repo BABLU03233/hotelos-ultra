@@ -167,6 +167,10 @@ interface Strings {
   noBookingFound: string;
   continueAnyway: string;
   farewell: string;
+  roomChoiceBody: (n: number) => string;
+  bookRoom: (name: string) => string;
+  knowMore: string;
+  knowMoreDesc: string;
 }
 
 const EN: Strings = {
@@ -247,6 +251,10 @@ const EN: Strings = {
   noBookingFound: "I can't find an active booking for this number. If you booked under a different number, our team can help — shall I pass this on?",
   continueAnyway: "Perfect — shall I lock this room in for you?",
   farewell: "Lovely — see you soon! 😊 Message me anytime if anything comes up.",
+  roomChoiceBody: (n) => `We have ${n} room${n === 1 ? "" : "s"} free for your dates 😊 Which one would you like?`,
+  bookRoom: (name) => `Book ${name}`,
+  knowMore: "Know more",
+  knowMoreDesc: "Check-in, parking, policies & more",
 };
 
 const HI: Strings = {
@@ -327,6 +335,10 @@ const HI: Strings = {
   noBookingFound: "इस नंबर पर कोई चालू बुकिंग नहीं मिली। अगर किसी और नंबर से बुक की थी, तो हमारी टीम मदद कर देगी — भेज दूँ?",
   continueAnyway: "बढ़िया — यही कमरा बुक कर दूँ?",
   farewell: "बहुत बढ़िया — जल्दी मिलते हैं! 😊 कुछ भी हो तो मैसेज कीजिए।",
+  roomChoiceBody: (n) => `आपकी तारीख़ों पर ${n} कमरे खाली हैं 😊 कौन सा पसंद करेंगे?`,
+  bookRoom: (name) => `${name} बुक करें`,
+  knowMore: "और जानकारी",
+  knowMoreDesc: "चेक-इन, पार्किंग, नियम वग़ैरह",
 };
 
 const TE: Strings = {
@@ -407,6 +419,10 @@ const TE: Strings = {
   noBookingFound: "ఈ నంబర్‌కి యాక్టివ్ బుకింగ్ కనిపించలేదు. వేరే నంబర్‌తో బుక్ చేసి ఉంటే మా టీమ్ సహాయం చేస్తుంది — పంపమంటారా?",
   continueAnyway: "చాలా బాగుంది — ఈ రూమ్ ఖరారు చేయనా?",
   farewell: "చాలా బాగుంది — త్వరలో కలుద్దాం! 😊 ఏదైనా ఉంటే మెసేజ్ చేయండి.",
+  roomChoiceBody: (n) => `మీ తేదీలకు ${n} రూమ్‌లు ఖాళీగా ఉన్నాయి 😊 ఏది కావాలి?`,
+  bookRoom: (name) => `${name} బుక్ చేయండి`,
+  knowMore: "మరిన్ని వివరాలు",
+  knowMoreDesc: "చెక్-ఇన్, పార్కింగ్, నిబంధనలు",
 };
 
 const TABLE: Record<GuestLanguage, Strings> = { en: EN, hi: HI, te: TE };
