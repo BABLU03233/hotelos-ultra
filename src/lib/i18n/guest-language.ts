@@ -171,6 +171,9 @@ interface Strings {
   bookRoom: (name: string) => string;
   knowMore: string;
   knowMoreDesc: string;
+  offersBody: string;
+  offersButton: string;
+  offerDetail: (title: string, discount: string, code: string) => string;
 }
 
 const EN: Strings = {
@@ -255,6 +258,10 @@ const EN: Strings = {
   bookRoom: (name) => `Book ${name}`,
   knowMore: "Know more",
   knowMoreDesc: "Check-in, parking, policies & more",
+  offersBody: "Here's what's running right now — tap one to learn more:",
+  offersButton: "See offers",
+  offerDetail: (title, discount, code) =>
+    `${title} — ${discount}. Quote code ${code} when you book and we'll apply it. Shall we get your room sorted? 😊`,
 };
 
 const HI: Strings = {
@@ -339,6 +346,10 @@ const HI: Strings = {
   bookRoom: (name) => `${name} बुक करें`,
   knowMore: "और जानकारी",
   knowMoreDesc: "चेक-इन, पार्किंग, नियम वग़ैरह",
+  offersBody: "अभी ये ऑफ़र चल रहे हैं — जानने के लिए टैप कीजिए:",
+  offersButton: "ऑफ़र देखें",
+  offerDetail: (title, discount, code) =>
+    `${title} — ${discount}। बुकिंग के समय कोड ${code} बता दीजिए, हम लगा देंगे। कमरा तय कर लें? 😊`,
 };
 
 const TE: Strings = {
@@ -423,6 +434,10 @@ const TE: Strings = {
   bookRoom: (name) => `${name} బుక్ చేయండి`,
   knowMore: "మరిన్ని వివరాలు",
   knowMoreDesc: "చెక్-ఇన్, పార్కింగ్, నిబంధనలు",
+  offersBody: "ప్రస్తుతం ఉన్న ఆఫర్లు — వివరాలకు నొక్కండి:",
+  offersButton: "ఆఫర్లు చూడండి",
+  offerDetail: (title, discount, code) =>
+    `${title} — ${discount}. బుక్ చేసేటప్పుడు ${code} కోడ్ చెప్పండి, వర్తింపజేస్తాం. రూమ్ చూద్దామా? 😊`,
 };
 
 const TABLE: Record<GuestLanguage, Strings> = { en: EN, hi: HI, te: TE };

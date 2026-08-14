@@ -7,14 +7,39 @@ const OFFERS = [
 ];
 
 describe("buildOfferListMessage", () => {
-  it("builds one row per offer with id/title/description combining discount and description", () => {
+  it("moves the bracketed code out of the title so it can't be truncated mid-code", () => {
+    // This test previously asserted the broken output — "10% Off First Stay
+    // (WELC" — as though it were correct. A 30-char title cut at WhatsApp's
+    // 24-char limit handed the guest half a coupon code. The code now lives
+    // in the description, which has three times the room.
     const msg = buildOfferListMessage(OFFERS);
     expect(msg.type).toBe("list");
     expect(msg.sections).toHaveLength(1);
     expect(msg.sections[0].rows).toEqual([
-      { id: "offer_pick_o1", title: "Flat ₹100 Off (FLAT100)", description: "₹100 off — Flat ₹100 off any room type when you book directly." },
-      { id: "offer_pick_o2", title: "10% Off First Stay (WELC", description: "10% off — First-time guests only." },
+      { id: "offer_pick_o1", title: "Flat ₹100 Off", description: "₹100 off — code FLAT100 — Flat ₹100 off any room type when you book dire" },
+      { id: "offer_pick_o2", title: "10% Off First Stay", description: "10% off — code WELCOME10 — First-time guests only." },
     ]);
+  });
+
+  it("never shows a half-truncated code", () => {
+    for (const row of buildOfferListMessage(OFFERS).sections[0].rows) {
+      expect(row.title).not.toMatch(/\([A-Z0-9_-]*$/);
+    }
+  });
+
+  it("keeps the full code visible somewhere", () => {
+    const rows = buildOfferListMessage(OFFERS).sections[0].rows;
+    expect(rows[1].description).toContain("WELCOME10");
+  });
+
+  it("renders in the guest's language", () => {
+    expect(/[ऀ-ॿ]/.test(buildOfferListMessage(OFFERS, "hi").body)).toBe(true);
+    expect(/[ఀ-౿]/.test(buildOfferListMessage(OFFERS, "te").buttonText)).toBe(true);
+  });
+
+  it("leaves a title with no bracketed code alone", () => {
+    const msg = buildOfferListMessage([{ id: "o1", title: "Monsoon Special", description: null, discount: "15% off" }]);
+    expect(msg.sections[0].rows[0].title).toBe("Monsoon Special");
   });
 
   it("caps at 10 rows even if a tenant has more offers (WhatsApp's hard limit)", () => {

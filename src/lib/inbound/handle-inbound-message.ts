@@ -483,11 +483,35 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     const offers = await prisma.offer.findMany({ where: { tenantId: tenant.id, active: true } });
     if (offers.length) {
-      await sendAndPersist(tenant, contact, buildOfferListMessage(offers), "Failed to send offers list");
+      await sendAndPersist(tenant, contact, buildOfferListMessage(offers, lang), "Failed to send offers list");
       return;
     }
     // No active offers configured — fall through to the AI queue so the
     // guest still gets *some* reply, matching the "no rooms configured" fallback above.
+  }
+
+  // Tapping an offer row. The list has always generated these ids and
+  // nothing has ever handled them, so the tap fell through to the model
+  // carrying only the offer's title as text — a dead end at the exact moment
+  // a guest is most interested in booking. Answered from the Offer row so
+  // the discount and code are the hotel's real ones, then pointed back at
+  // the booking flow rather than left hanging.
+  if (msg.interactiveId?.startsWith("offer_pick_")) {
+    if (contact.aiPaused) return;
+    const offer = await prisma.offer.findFirst({
+      where: { id: msg.interactiveId.slice("offer_pick_".length), tenantId: tenant.id, active: true },
+    });
+    if (offer) {
+      const label = offer.title.replace(/\s*\([A-Z0-9_-]{3,}\)\s*$/, "").trim();
+      const body = t(lang).offerDetail(label, offer.discount ?? "", offer.code ?? "—");
+      // Straight to dates when they're still unknown, so an interested guest
+      // moves forward instead of having to restate what they want.
+      const prompt = contact.pendingCheckIn && contact.pendingCheckOut ? confirmBookingPrompt(lang) : dateQuickPickPrompt(lang);
+      await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, prompt), "Failed to send offer detail");
+      return;
+    }
+    // Stale or deactivated offer — fall through to the AI rather than
+    // pretending a discount still exists.
   }
 
   // A language-select tap (English/हिंदी/తెలుగు) — made fully deterministic
