@@ -123,9 +123,15 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // A guest-facing reply is a writing task, so the chat pools are the right
 // ones. Env-overridable so a strategy can be swapped without a code change,
 // exactly like OPENROUTER_FREE_MODELS above.
+// "auto/best-free" leads on evidence, not intuition. Both were re-tested
+// against the live gateway an hour after the first check: best-chat had gone
+// from a clean 2.3s answer to a hard 400 ("Felo thread creation failed" —
+// one of its upstreams down), while best-free answered correctly both times.
+// The more reliable pool goes first; the flakier one is still worth keeping
+// as a second attempt, since its failure costs one fast 400 and nothing else.
 const OMNIROUTE_MODELS = process.env.OMNIROUTE_MODELS?.split(",")
   .map((m) => m.trim())
-  .filter(Boolean) ?? ["auto/best-chat", "auto/best-free"];
+  .filter(Boolean) ?? ["auto/best-free", "auto/best-chat"];
 
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,

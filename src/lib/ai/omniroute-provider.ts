@@ -58,9 +58,16 @@ export function createOmniRouteProvider(model: string): AIProvider {
         // Longer than the 5s given to a single OpenRouter model, because a
         // request here may legitimately try several upstreams internally
         // before answering — that internal retry is the whole point of this
-        // link. Still bounded: this is the last resort, and a guest waiting
-        // 20s has already waited too long.
-        signal: AbortSignal.timeout(20_000),
+        // link.
+        //
+        // 30s, not the 20s first chosen: the same pool measured 2.3s on one
+        // check and 14.4s an hour later, so latency here swings by ~6x with
+        // whichever upstream it lands on. A 20s ceiling sat close enough to
+        // the observed worst case that a slightly slower day would time out
+        // the ONE link standing between a guest and the holding message.
+        // Nothing downstream is waiting on this — by the time execution
+        // reaches here every faster provider has already failed.
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!res.ok) throw new Error(`OmniRoute chat failed (${res.status}, ${label}): ${await res.text()}`);
