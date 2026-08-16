@@ -26,6 +26,40 @@ import { AIProvider } from "./provider";
  * also holds its own provider credentials, which keeps this app's env free
  * of yet another set of keys.
  */
+/**
+ * A reply that narrates the model's own thinking instead of answering the
+ * guest: "The user is asking about room availability for tomorrow."
+ *
+ * Measured across three rounds against the live gateway, three of the four
+ * free pools produced one of these each. Free tiers lean on reasoning models,
+ * and when the chain-of-thought isn't wrapped in <think> tags (which
+ * stripThinkingArtifacts already removes) it arrives as ordinary prose and
+ * would be sent to the guest verbatim.
+ *
+ * Treated as a provider failure rather than something to clean up, because
+ * that is what it is — the pool did not answer. Throwing hands the turn to
+ * the next free pool, which usually does answer properly; salvaging the text
+ * would just forward a worse reply.
+ *
+ * Anchored to the START of the reply and to openers a reply addressed TO the
+ * guest would never use — third-person references to them, or the model
+ * talking to itself. A legitimate line that mentions "the user" further in
+ * is untouched.
+ *
+ * "we need to" and "we should" were in the first version and are gone: a
+ * caught false positive ("We should have availability that week 😊") showed
+ * they are ordinary hotel phrasing, not narration. The asymmetry matters —
+ * a false positive throws away a perfectly good reply and pushes the guest
+ * one step closer to the holding message, so this only matches openers that
+ * cannot plausibly be addressed to the guest.
+ */
+const LEAKED_REASONING =
+  /^\s*(the (user|guest|customer)\b|okay,? (so|let)\b|let me (think|check what|see what)\b|i should\b|first,? i\b|the system prompt\b|based on the (system )?prompt\b)/i;
+
+export function looksLikeLeakedReasoning(text: string): boolean {
+  return LEAKED_REASONING.test(text);
+}
+
 export function createOmniRouteProvider(model: string): AIProvider {
   const label = `omniroute:${model}`;
   return {
@@ -78,6 +112,7 @@ export function createOmniRouteProvider(model: string): AIProvider {
       // failure, not a success. Treating it as success would hand a guest a
       // blank WhatsApp message instead of falling through.
       if (!content.trim()) throw new Error(`OmniRoute returned empty content (${label})`);
+      if (looksLikeLeakedReasoning(content)) throw new Error(`OmniRoute returned leaked reasoning (${label})`);
       return content;
     },
   };

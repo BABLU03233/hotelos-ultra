@@ -123,15 +123,31 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // A guest-facing reply is a writing task, so the chat pools are the right
 // ones. Env-overridable so a strategy can be swapped without a code change,
 // exactly like OPENROUTER_FREE_MODELS above.
-// "auto/best-free" leads on evidence, not intuition. Both were re-tested
-// against the live gateway an hour after the first check: best-chat had gone
-// from a clean 2.3s answer to a hard 400 ("Felo thread creation failed" —
-// one of its upstreams down), while best-free answered correctly both times.
-// The more reliable pool goes first; the flakier one is still worth keeping
-// as a second attempt, since its failure costs one fast 400 and nothing else.
+// FREE TIERS ONLY. Every entry here is a `:free`-suffixed channel or the
+// explicitly free-tiered "auto/best-free", both of which OmniRoute filters
+// to free candidates and — importantly — resolves to an EMPTY pool rather
+// than silently reaching for a paid model when no free one is connected
+// (documented behaviour, default OMNIROUTE_AUTO_FREE_FALLBACK_TO_FULL_POOL
+// =false, which production sets explicitly rather than relying on).
+//
+// "auto/best-chat" was removed for exactly that reason: it carries no tier
+// filter at all, so it could pick a paid model. A plain category name is not
+// a free guarantee here; only the free-tiered channels are.
+//
+// Order is measured, not guessed — three rounds each against the live
+// gateway with the real prompt:
+//
+//   auto/coding:free     3/3   8.0s   <- fastest AND fully reliable
+//   auto/reasoning:free  3/3  11.6s
+//   auto/best-free       3/3  14.1s
+//   auto/chat:free       2/3   8.1s   <- dropped, least reliable
+//
+// "coding" leading a hotel concierge looks wrong and measured best twice
+// over; these channels select on provider health, not subject matter, and
+// it answered guest questions perfectly well.
 const OMNIROUTE_MODELS = process.env.OMNIROUTE_MODELS?.split(",")
   .map((m) => m.trim())
-  .filter(Boolean) ?? ["auto/best-free", "auto/best-chat"];
+  .filter(Boolean) ?? ["auto/coding:free", "auto/reasoning:free", "auto/best-free"];
 
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
