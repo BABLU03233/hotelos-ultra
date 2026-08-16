@@ -466,8 +466,16 @@ describe("hasStatedDates", () => {
   });
 
   it("detects numeric date formats", () => {
-    expect(hasStatedDates([], "15/8 to 17/8")).toBe(true);
-    expect(hasStatedDates([], "the 21st")).toBe(true);
+    // Computed relative to today, never hardcoded. This test used to assert
+    // "15/8 to 17/8" and "the 21st": both were future when written and
+    // silently became past, at which point hasStatedDates correctly refused
+    // them (a past date is not a usable answer) and the test failed for a
+    // reason unrelated to whatever change was being made that day.
+    const future = new Date(Date.now() + 10 * 86_400_000);
+    const d = future.getDate();
+    const m = future.getMonth() + 1;
+    expect(hasStatedDates([], `${d}/${m} to ${d}/${m}`)).toBe(true);
+    expect(hasStatedDates([], `the ${d}th`)).toBe(true);
   });
 
   it("returns false when no date is mentioned anywhere", () => {

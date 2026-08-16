@@ -16,6 +16,7 @@ import {
   predictedStageInstruction,
   selectDeterministicInteractive,
 } from "./interactive-prompts";
+import { createOmniRouteProvider } from "./omniroute-provider";
 import { createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
@@ -102,6 +103,30 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // guest's actual question, and others) — better to fail over to a
 // weaker-quota but higher-quality provider, or ultimately the paid
 // Anthropic safety net, than to ever answer a guest with Cloudflare.
+// 14-15. OmniRoute — a self-hosted gateway (see omniroute-provider.ts)
+//    aggregating a far deeper pool of free tiers with its own internal
+//    failover. It sits BELOW every direct provider deliberately: Groq
+//    answers in under a second, and routing the common case through an
+//    extra hop on a 1-vCPU box would tax every reply to help the rare one.
+//    Verified answering with no provider configuration at all, so it is
+//    real redundancy the day the tiers above run dry — which matters more
+//    than usual here, because the paid Anthropic safety net below is not
+//    configured in production.
+//
+// Two routing strategies, so one bad pool still leaves a second to try.
+// Both live-verified against the running gateway (~2.3s each) rather than
+// assumed: the first name tried here, "auto/best-quality", does not exist at
+// all, and "auto/best-coding" returns a 400 on conversational input because
+// it routes to code-specific models. Either would have been a dead link
+// silently burning a fallback step.
+//
+// A guest-facing reply is a writing task, so the chat pools are the right
+// ones. Env-overridable so a strategy can be swapped without a code change,
+// exactly like OPENROUTER_FREE_MODELS above.
+const OMNIROUTE_MODELS = process.env.OMNIROUTE_MODELS?.split(",")
+  .map((m) => m.trim())
+  .filter(Boolean) ?? ["auto/best-chat", "auto/best-free"];
+
 const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
   createGroqProvider("GROQ_API_KEY_2", "groq-2"),
@@ -109,6 +134,7 @@ const aiProvider: AIProvider = createFallbackProvider([
   createGeminiProvider("GEMINI_API_KEY_2", "gemini-2"),
   ...OPENROUTER_FREE_MODELS.map((model) => createOpenRouterProvider(model)),
   ...OPENROUTER_FREE_MODELS.map((model) => createOpenRouterProvider(model, "OPENROUTER_API_KEY_2")),
+  ...OMNIROUTE_MODELS.map((model) => createOmniRouteProvider(model)),
   anthropicProvider,
 ]);
 
