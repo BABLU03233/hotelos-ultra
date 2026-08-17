@@ -62,6 +62,27 @@ interface RetrievedChunk {
 
 /** Returns the topK knowledge chunks (this tenant only) most relevant to `query`, ordered by cosine distance. */
 export async function retrieveRelevantChunks(tenantId: string, query: string, topK = 5): Promise<string[]> {
+  // Nothing indexed means there is nothing to retrieve, and embedding the
+  // query first would be a network round-trip to find that out.
+  //
+  // This sat on the critical path of every AI reply: generateReply awaits
+  // retrieval before it can build the prompt, so a tenant with an empty
+  // knowledge base — the live one included, at zero chunks — paid an
+  // embeddings API call on every single message purely to search an empty
+  // table. Measured at roughly 500ms against a Groq reply of 477-770ms, so
+  // it was very nearly doubling the guest's wait for no possible benefit.
+  //
+  // A local indexed EXISTS is sub-millisecond, and deliberately not cached:
+  // the moment a hotel uploads its first document, retrieval must start
+  // working on the next message rather than whenever a TTL happened to
+  // expire. The check is cheap enough that correctness costs nothing here.
+  const [{ exists }] = await prisma.$queryRaw<{ exists: boolean }[]>`
+    SELECT EXISTS(
+      SELECT 1 FROM "KnowledgeChunk" WHERE "tenantId" = ${tenantId} AND embedding IS NOT NULL
+    ) AS exists
+  `;
+  if (!exists) return [];
+
   const [queryVector] = await embeddingProvider.embed([query], "query");
   const rows = await prisma.$queryRaw<RetrievedChunk[]>`
     SELECT content, embedding <=> ${toVectorLiteral(queryVector)}::vector AS distance

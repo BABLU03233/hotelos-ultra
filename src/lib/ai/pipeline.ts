@@ -144,6 +144,27 @@ const aiProvider: AIProvider = createFallbackProvider([
 
 const ESCALATE_MARKER = "ESCALATE:";
 
+/**
+ * Finds the model's hand-off marker anywhere in a reply, not just at the
+ * start, and returns the reason it gave.
+ *
+ * The prompt asks for the marker and nothing else, and a startsWith check was
+ * enough while the top of the chain was a strong model. It stopped being
+ * enough the moment weaker free tiers began carrying real traffic: caught
+ * live as "Wi-Fi availablng undhi kaani details ikkada ledu. ESCALATE: Wi-Fi
+ * gurinchi..." — an answer with the internal marker appended, which the
+ * startsWith check passed straight through into the guest's WhatsApp.
+ *
+ * Exported so the rule is testable on its own. Everything else in this path
+ * needs a database and a live provider to exercise, which is how a
+ * one-character-class bug like this stays untested.
+ */
+export function findEscalation(text: string): { reason: string } | null {
+  const at = text.indexOf(ESCALATE_MARKER);
+  if (at === -1) return null;
+  return { reason: text.slice(at + ESCALATE_MARKER.length).trim() };
+}
+
 export interface ReplyContext {
   /** No prior OUT message exists for this contact — Anushka has never spoken to them before. */
   isFirstReply: boolean;
@@ -510,12 +531,25 @@ export async function generateReply(
   // with the ESCALATE_MARKER check right below it, not just the guest-
   // facing text further down.
   const trimmed = stripThinkingArtifacts(reply).trim();
-  if (trimmed.startsWith(ESCALATE_MARKER)) {
+  // Anywhere in the reply, not just at the start. The prompt asks for the
+  // marker and nothing else, but a weaker model answers first and appends it:
+  // caught live as "Wi-Fi availablng undhi kaani details ikkada ledu.
+  // ESCALATE: Wi-Fi gurinchi..." — a startsWith check let that through, so
+  // the internal marker went to the guest as part of their WhatsApp message.
+  //
+  // A marker mid-text means the model was not confident enough to answer
+  // cleanly, which is the same thing it means at the start, so it is handled
+  // the same way: staff are notified and the guest gets the holding line.
+  // Sending the prefix instead was tempting and rejected — text the model
+  // itself flagged as insufficient is not text to hand a guest, and the
+  // useful half cannot be told from the unfinished half.
+  const escalation = findEscalation(trimmed);
+  if (escalation) {
     return {
       reply: "Thanks for your message — let me get one of our team to help with that, they'll be with you shortly!",
       imageUrls: [],
       shouldEscalate: true,
-      escalationReason: trimmed.slice(ESCALATE_MARKER.length).trim(),
+      escalationReason: escalation.reason,
       agentName,
     };
   }
