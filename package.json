@@ -15,7 +15,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "test": "vitest run",
-    "soak": "tsx scripts/soak-conversations.ts"
+    "soak": "tsx scripts/soak-conversations.ts",
+    "quality": "tsx scripts/quality-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
