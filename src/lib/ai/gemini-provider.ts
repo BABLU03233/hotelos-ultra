@@ -52,7 +52,15 @@ export function createGeminiProvider(apiKeyEnvVar: string, label: string): AIPro
         // the next provider on failure. The SDK's default (5 attempts,
         // exponential backoff up to 60s between tries) was silently adding
         // up to a minute of latency per guest reply on free-tier rate limits.
-        httpOptions: { timeout: 15_000, retryOptions: { attempts: 1 } },
+        //
+        // 8s, down from 15s, against measured production behaviour: real
+        // successes land in 1.2-4.4s and real failures (503 "high demand")
+        // come back in 3.2-6.5s, so 15s only ever governed a hung socket.
+        // With two Gemini keys chained, the old ceiling could spend 30
+        // seconds of a guest's patience before the chain had even reached
+        // OpenRouter. The chain's own budget (fallback-provider.ts) bounds
+        // this too, but a link that knows its own limits should say so.
+        httpOptions: { timeout: 8_000, retryOptions: { attempts: 1 } },
       },
     });
   }

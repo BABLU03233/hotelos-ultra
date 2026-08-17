@@ -17,46 +17,17 @@ import {
   selectDeterministicInteractive,
 } from "./interactive-prompts";
 import { createOmniRouteProvider } from "./omniroute-provider";
-import { createOpenRouterProvider } from "./openrouter-provider";
+import { configuredOpenRouterModels, createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
 import { extractLegitimatePhoneNumbers, hasHallucinationRisk, hasWrongRoomPrice, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
 
-// Curated OpenRouter free-tier models for the fallback tier below. Ordering
-// is re-verified periodically against real production traffic, not assumed
-// stable — free-tier model availability on OpenRouter is genuinely volatile
-// day to day, not just noisy: a 2026-08-10 re-test (isolating each model
-// directly, real system prompt, 4 realistic scenarios including the exact
-// hallucination-risk and script-matching cases this session caught real
-// providers failing) found the OPPOSITE ranking from the 2026-08-09 test
-// this comment previously documented. "poolside/laguna-xs-2.1" went 4/4
-// with zero hallucinations (correctly said "I don't have that information"
-// on an unlisted amenity rather than inventing one, correctly stayed in
-// Roman-script Hinglish) -- moved to first. "nvidia/nemotron-nano-9b-v2"
-// and "nvidia/nemotron-nano-12b-v2-vl" each timed out 3 of 4 times (the one
-// success from each was good quality, so kept, just not relied on first).
-// "google/gemma-4-26b-a4b-it" failed all 4 (timeout once, rate-limited the
-// rest) -- moved last rather than dropped, since a currently-bad model can
-// recover next time this is re-checked. "nvidia/nemotron-nano-30b-a3b:free"
-// turned out to be an invalid model ID (400 from OpenRouter, despite being
-// listed) and "openai/gpt-oss-20b:free" came back slow *and* empty (a
-// reasoning model that burned its whole token budget on hidden reasoning) —
-// both dropped entirely, not just reordered. (openrouter-provider.ts throws
-// on a 200-with-blank-content response instead of treating it as success,
-// so a flaky model fails over fast rather than risking a blank WhatsApp
-// message reaching a guest.) Excludes narrow specialists (a content-safety
-// classifier, a code-only model) unsuited to a general conversational
-// reply. The whole list is env-overridable (comma-separated
-// `OPENROUTER_FREE_MODELS`) so a deprecated/rate-limited entry can be
-// swapped without a code change.
-const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
-  .map((m) => m.trim())
-  .filter(Boolean) ?? [
-  "poolside/laguna-xs-2.1:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-4-26b-a4b-it:free",
-];
+// The curated free-tier list, and the reasoning behind its ordering, now live
+// in openrouter-provider.ts — see configuredOpenRouterModels(). It moved so
+// model-health.ts can verify those pinned IDs still exist without importing
+// this whole module, after a retired model went unnoticed in production for a
+// full day.
+const OPENROUTER_FREE_MODELS = configuredOpenRouterModels();
 
 // Tries each configured provider in order and falls through on failure
 // (rate limit, outage, missing key) so a guest is never left unanswered
@@ -64,11 +35,22 @@ const OPENROUTER_FREE_MODELS = process.env.OPENROUTER_FREE_MODELS?.split(",")
 // have no API key configured fail immediately (no network call) and the
 // chain just moves on — no need to explicitly list which are "active".
 //
+// The whole chain runs under one overall time budget (see
+// fallback-provider.ts). Before that existed, these timeouts summed to ~190
+// seconds of possible guest-facing silence — a number nobody chose, just what
+// the parts added up to.
+//
 // Order, and why (live-verified 2026-08-10, not assumed):
 // 1-2. Groq (two accounts) — fastest, live-tested under 500ms each,
 //    ~100k tokens/day free *per key*, independently verified live. A second
 //    key sits right behind the first: same speed/quality, genuinely separate
 //    quota, so this is the highest-value redundancy in the whole chain.
+//    Its model was retired out from under production on 2026-08-18 and both
+//    keys 404'd for a day, costing every reply the ~500ms slot and pushing it
+//    onto Gemini or worse — the position that makes this link most valuable
+//    is exactly what made its death invisible. See groq-provider.ts for the
+//    replacement benchmark, and model-health.ts for the startup check that
+//    now catches it.
 // 3-4. Gemini (two accounts) — live-verified real constraint is only 20
 //    requests/day *per key* (much lower than early research suggested —
 //    corrected after live-hitting "GenerateRequestsPerDayPerProjectPerModel

@@ -9,6 +9,7 @@ import { sweepDueCampaigns } from "@/lib/campaigns/send";
 import { sendCampaignToRecipient } from "@/lib/campaigns/send-recipient";
 import { sweepDueFollowUpReminders } from "@/lib/contacts/reminder-sweep";
 import { sweepDueFollowUps } from "@/lib/follow-ups/sweep";
+import { logModelHealth } from "@/lib/ai/model-health";
 import { processMessageJob } from "@/lib/inbound/process-message-job";
 import { redisConnection } from "@/lib/queue/redis";
 import { CampaignSendJob, ProcessMessageJob } from "@/lib/queue/queues";
@@ -93,6 +94,11 @@ runSweeps();
 const sweepInterval = setInterval(runSweeps, SWEEP_INTERVAL_MS);
 
 console.log("HotelOS Ultra worker started — message-processing, campaign-send, follow-up + campaign-schedule + reminder sweep (every 60s).");
+
+// Deliberately not awaited: this reads model catalogues over the network, and
+// a slow or unreachable one must never delay the worker picking up a guest's
+// message. It only reports — nothing downstream waits on the result.
+void logModelHealth();
 
 async function shutdown() {
   clearInterval(sweepInterval);

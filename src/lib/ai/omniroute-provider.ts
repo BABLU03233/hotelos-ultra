@@ -1,4 +1,4 @@
-import { AIProvider } from "./provider";
+import { AIProvider, timeoutSignal } from "./provider";
 
 /**
  * OmniRoute (https://github.com/diegosouzapw/OmniRoute) — a self-hosted,
@@ -64,7 +64,7 @@ export function createOmniRouteProvider(model: string): AIProvider {
   const label = `omniroute:${model}`;
   return {
     name: label,
-    async chat({ systemPrompt, messages }) {
+    async chat({ systemPrompt, messages, signal }) {
       // Unset in any environment without the gateway running (local dev,
       // CI), so this link fails instantly with no network call and the chain
       // moves on — same contract every other provider here follows.
@@ -101,7 +101,10 @@ export function createOmniRouteProvider(model: string): AIProvider {
         // the ONE link standing between a guest and the holding message.
         // Nothing downstream is waiting on this — by the time execution
         // reaches here every faster provider has already failed.
-        signal: AbortSignal.timeout(30_000),
+        // Narrowed by the chain's remaining budget when one is set, so the
+        // slowest link can no longer be the reason a guest waits past the
+        // deadline — see fallback-provider.ts.
+        signal: timeoutSignal(30_000, signal),
       });
 
       if (!res.ok) throw new Error(`OmniRoute chat failed (${res.status}, ${label}): ${await res.text()}`);
