@@ -53,14 +53,17 @@ export function createGeminiProvider(apiKeyEnvVar: string, label: string): AIPro
         // exponential backoff up to 60s between tries) was silently adding
         // up to a minute of latency per guest reply on free-tier rate limits.
         //
-        // 8s, down from 15s, against measured production behaviour: real
+        // 10s, down from 15s, against measured production behaviour: real
         // successes land in 1.2-4.4s and real failures (503 "high demand")
         // come back in 3.2-6.5s, so 15s only ever governed a hung socket.
-        // With two Gemini keys chained, the old ceiling could spend 30
-        // seconds of a guest's patience before the chain had even reached
-        // OpenRouter. The chain's own budget (fallback-provider.ts) bounds
-        // this too, but a link that knows its own limits should say so.
-        httpOptions: { timeout: 8_000, retryOptions: { attempts: 1 } },
+        //
+        // 10s exactly, and not the 8s this was first set to: Google enforces
+        // a MINIMUM deadline and rejects anything shorter outright — "Manually
+        // set deadline 8s is too short. Minimum allowed deadline is 10s",
+        // HTTP 400, on every single request. That briefly took both Gemini
+        // links out of the chain entirely. A timeout below a provider's own
+        // floor doesn't make it fast, it makes it absent.
+        httpOptions: { timeout: 10_000, retryOptions: { attempts: 1 } },
       },
     });
   }
