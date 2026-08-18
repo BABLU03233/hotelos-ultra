@@ -17,6 +17,29 @@ export function formatDate(input: string | Date | null): string {
   return new Date(input).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** "6:59 pm" — the only timestamp WhatsApp puts on a bubble. */
+export function formatClockTime(input: string | Date | null): string {
+  if (!input) return "";
+  return new Date(input).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+/** "Today" / "Yesterday" / "18 August 2026" — the day separator pill. */
+export function formatDaySeparator(input: string | Date): string {
+  const d = new Date(input);
+  const today = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(today) - startOf(d)) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/** Calendar-day key, so consecutive messages can be grouped under one separator. */
+export function dayKey(input: string | Date): string {
+  const d = new Date(input);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 export function formatDateTime(input: string | Date | null): string {
   if (!input) return "—";
   return new Date(input).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });

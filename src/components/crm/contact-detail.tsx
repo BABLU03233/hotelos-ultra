@@ -29,13 +29,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { GlossaryTerm } from "@/components/shared/glossary-term";
+
 import { EmptyState } from "@/components/ui/empty-state";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "sonner";
-import { formatCountdown, formatRelativeTime, initials } from "@/lib/format";
-import { describeRemaining, serviceWindow } from "@/lib/whatsapp/service-window";
+import { dayKey, formatCountdown, formatDaySeparator, initials } from "@/lib/format";
+
 import { useAuthStore } from "@/store/use-auth-store";
 import { cn } from "@/lib/utils";
 import { BookingStatus, Contact, FollowUpAction, LeadStatus, Message, ScheduledFollowUp, StaffMember, StaffNotification } from "@/types";
@@ -190,13 +190,10 @@ function ContactDetailPane({
   const { data: followUpsData } = useFetch<{ followUps: ScheduledFollowUp[] }>(`/api/contacts/${contact.id}/follow-ups`);
   const escalation = notificationsData?.notifications.find((n) => n.contact.id === contact.id);
   const upcomingFollowUps = followUpsData?.followUps.filter((f) => f.status === "PENDING") ?? [];
-  // The same function the API enforces with, so the composer can never offer
-  // something the server will refuse. The old local rule also treated a guest
-  // who had NEVER messaged as an open window (`hoursSinceInbound === null ||
-  // ...`), which is exactly backwards: with no inbound message there is no
-  // window at all, and Meta rejects those sends too.
-  const window = serviceWindow(contact.lastInboundAt);
-  const windowOpen = window.open;
+  // The 24-hour window is deliberately not consulted here any more. Staff can
+  // message any contact at any time; WhatsApp decides, and a refusal explains
+  // itself on the message. serviceWindow still backs campaigns and follow-up
+  // sweeps, which genuinely must not send into a closed window unattended.
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -308,35 +305,47 @@ function ContactDetailPane({
         )}
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-2.5 p-4">
+      {/* WhatsApp's chat surface: a warm sand ground in light mode, deep slate
+          in dark, with its faint doodle tile. The tile is an inline SVG data
+          URI rather than an asset — the artifact CSP and our own build both
+          stay simpler with nothing external to fetch. */}
+      <ScrollArea
+        className="min-h-0 flex-1 bg-[#efeae2] dark:bg-[#0b141a]"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='0.035' stroke-width='1.2'%3E%3Cpath d='M12 8c2-3 6-3 8 0M40 14c3 1 4 5 1 7M20 44c-3 1-6-2-4-5M46 40c2 2 1 6-2 6'/%3E%3Ccircle cx='31' cy='27' r='3'/%3E%3Cpath d='M8 30h5M50 22h5M28 52v4M33 4v4'/%3E%3C/g%3E%3C/svg%3E\")",
+        }}
+      >
+        <div className="flex flex-col gap-[3px] px-3 py-4">
           {!messages
             ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-2/3" />)
-            : messages.map((m) => <MessageBubble key={m.id} message={m} />)}
+            : messages.map((m, i) => {
+                // A day separator whenever the calendar day changes, exactly
+                // like WhatsApp — without it a long conversation reads as one
+                // undifferentiated wall.
+                const prev = i > 0 ? messages[i - 1] : null;
+                const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
+                return (
+                  <React.Fragment key={m.id}>
+                    {newDay && (
+                      <div className="my-2 flex justify-center">
+                        <span className="rounded-md bg-white/90 px-3 py-1 text-[12.5px] font-medium text-[#54656f] uppercase shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">
+                          {formatDaySeparator(m.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    <MessageBubble message={m} />
+                  </React.Fragment>
+                );
+              })}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
-      {windowOpen && contact.lastInboundAt && (
-        <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-          Free-form replies open ({describeRemaining(window.msRemaining)}) — guest messaged{" "}
-          {formatRelativeTime(contact.lastInboundAt)}.
-        </p>
-      )}
-      <MessageComposer
-        onSend={sendReply}
-        onSendFile={sendFile}
-        sending={sending}
-        warning={
-          windowOpen ? undefined : (
-            <>
-              <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm> looks closed
-              {contact.lastInboundAt ? ` (last message ${formatRelativeTime(contact.lastInboundAt)})` : ""} — WhatsApp
-              may not deliver this. You can still try; if it fails you&apos;ll see why on the message.
-            </>
-          )
-        }
-      />
+      {/* No 24-hour-window notice, in either direction. Staff can message any
+          contact at any time; if WhatsApp refuses one, the message itself says
+          why (see explainFailure in message-bubble.tsx). */}
+      <MessageComposer onSend={sendReply} onSendFile={sendFile} sending={sending} />
 
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">

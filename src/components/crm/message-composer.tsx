@@ -28,24 +28,23 @@ export function MessageComposer({
   onSend,
   onSendFile,
   sending,
-  warning,
 }: {
   onSend: (text: string) => void;
   onSendFile?: (file: File, caption: string) => void;
   sending?: boolean;
-  /**
-   * Shown above a fully working composer when WhatsApp is unlikely to deliver
-   * a free-form message (the 24-hour window looks closed).
-   *
-   * A previous version replaced the composer entirely. That was overreach:
-   * Meta owns the window clock and ours can disagree at the boundary, so
-   * refusing locally can block a send that would have worked — and staff would
-   * rather try and be told it failed. The original bug was never that the send
-   * was allowed, it was that failure was invisible; that is now fixed on the
-   * message itself, which shows the real reason from Meta.
-   */
-  warning?: React.ReactNode;
 }) {
+  // No 24-hour-window warning here by design.
+  //
+  // It went through three versions: a banner beside a live composer, then a
+  // hard block, then a soft warning — and all three put a caveat in front of
+  // staff every time they opened an older conversation. Meta owns that clock
+  // anyway, ours can disagree with it at the boundary, and a guest may have
+  // reopened the window from another device we never saw. So the composer
+  // simply always works.
+  //
+  // Honesty is preserved where it costs nothing: if WhatsApp does refuse a
+  // message, the bubble itself says why (see explainFailure in
+  // message-bubble.tsx). Report the real outcome, don't predict it.
   const [text, setText] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
   const [fileError, setFileError] = React.useState<string | null>(null);
@@ -87,10 +86,7 @@ export function MessageComposer({
   const canSend = Boolean(file) || Boolean(text.trim());
 
   return (
-    <div className="flex flex-col gap-1.5 border-t border-border p-3">
-      {warning && (
-        <p className="text-[11px] leading-snug text-amber-600 dark:text-amber-500">{warning}</p>
-      )}
+    <div className="flex flex-col gap-1.5 bg-[#f0f2f5] p-2.5 dark:bg-[#202c33]">
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {SHORT_REPLIES.map((reply) => (
           <button
@@ -134,12 +130,19 @@ export function MessageComposer({
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      {/* WhatsApp's composer row: icons sit flat next to a single rounded
+          input, with only the send button carrying colour. */}
+      <div className="flex items-end gap-1.5">
         <Popover open={quickReplyOpen} onOpenChange={setQuickReplyOpen}>
           <PopoverTrigger
             render={
-              <Button variant="outline" size="icon" title="FAQ quick replies">
-                <MessageSquareQuote />
+              <Button
+                variant="ghost"
+                size="icon"
+                title="FAQ quick replies"
+                className="size-10 shrink-0 rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
+              >
+                <MessageSquareQuote className="size-5" />
               </Button>
             }
           />
@@ -181,14 +184,15 @@ export function MessageComposer({
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
         />
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           title="Attach a photo or file"
           aria-label="Attach a photo or file"
           onClick={() => fileInput.current?.click()}
           disabled={sending}
+          className="size-10 shrink-0 rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
         >
-          <Paperclip />
+          <Paperclip className="size-5" />
         </Button>
 
         <Textarea
@@ -200,10 +204,16 @@ export function MessageComposer({
               submit();
             }
           }}
-          placeholder={file ? "Add a caption…" : "Type a message…"}
-          className="max-h-32 min-h-9 flex-1 resize-none"
+          placeholder={file ? "Add a caption…" : "Type a message"}
+          className="max-h-32 min-h-[42px] flex-1 resize-none rounded-[21px] border-0 bg-white px-4 py-[11px] text-[15px] shadow-none focus-visible:ring-0 dark:bg-[#2a3942]"
         />
-        <Button size="icon" disabled={sending || !canSend} onClick={submit}>
+        <Button
+          size="icon"
+          disabled={sending || !canSend}
+          onClick={submit}
+          aria-label="Send"
+          className="size-10 shrink-0 rounded-full bg-[#00a884] text-white hover:bg-[#06cf9c] disabled:opacity-40 dark:bg-[#00a884]"
+        >
           <Send />
         </Button>
       </div>
