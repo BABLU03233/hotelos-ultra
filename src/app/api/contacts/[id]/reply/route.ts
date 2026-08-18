@@ -96,9 +96,36 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
       mediaFilename: filename,
     };
   } else {
-    const { text } = contactReplySchema.parse(await req.json());
-    const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text });
-    sendResult = { whatsappMessageId, type: "TEXT", content: text, mediaId: null, mediaMimeType: null, mediaFilename: null };
+    const raw = (await req.json()) as { text?: string; templateName?: string; templateLanguage?: string };
+
+    if (raw.templateName) {
+      // The only thing WhatsApp will deliver outside the 24-hour window, and
+      // until now there was no way to send one to a single contact — templates
+      // existed solely for campaigns and imports. So a hotel with an approved
+      // template still could not reach a guest who had gone quiet, which is
+      // the entire complaint this endpoint kept receiving.
+      const templateName = raw.templateName;
+      const languageCode = raw.templateLanguage || "en_US";
+      const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
+        type: "template",
+        templateName,
+        languageCode,
+      });
+      sendResult = {
+        whatsappMessageId,
+        type: "TEXT",
+        // Recorded by name: the rendered text lives with Meta, and the
+        // transcript should still show that something was sent and what.
+        content: `[template: ${templateName}]`,
+        mediaId: null,
+        mediaMimeType: null,
+        mediaFilename: null,
+      };
+    } else {
+      const { text } = contactReplySchema.parse(raw);
+      const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text });
+      sendResult = { whatsappMessageId, type: "TEXT", content: text, mediaId: null, mediaMimeType: null, mediaFilename: null };
+    }
   }
 
   const [message] = await db.$transaction([

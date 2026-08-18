@@ -109,6 +109,24 @@ export function ContactDetail({
     }
   }
 
+  async function sendTemplate(name: string, language: string) {
+    if (!contactId) return;
+    setSending(true);
+    try {
+      await apiFetch(`/api/contacts/${contactId}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ templateName: name, templateLanguage: language }),
+      });
+      reloadMessages();
+      reloadContact();
+      toast.success("Template sent — this reaches the guest even outside the 24-hour window.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send that template");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function sendFile(file: File, caption: string) {
     if (!contactId) return;
     setSending(true);
@@ -152,6 +170,7 @@ export function ContactDetail({
       updateContact={updateContact}
       sendReply={sendReply}
       sendFile={sendFile}
+      sendTemplate={sendTemplate}
       onBack={onBack}
     />
   );
@@ -164,6 +183,7 @@ function ContactDetailPane({
   updateContact,
   sendReply,
   sendFile,
+  sendTemplate,
   onBack,
 }: {
   contact: Contact;
@@ -172,6 +192,7 @@ function ContactDetailPane({
   updateContact: (patch: ContactPatch) => Promise<void>;
   sendReply: (text: string) => Promise<void>;
   sendFile: (file: File, caption: string) => Promise<void>;
+  sendTemplate: (name: string, language: string) => Promise<void>;
   onBack?: () => void;
 }) {
   const [notes, setNotes] = React.useState(contact.notes ?? "");
@@ -345,7 +366,7 @@ function ContactDetailPane({
       {/* No 24-hour-window notice, in either direction. Staff can message any
           contact at any time; if WhatsApp refuses one, the message itself says
           why (see explainFailure in message-bubble.tsx). */}
-      <MessageComposer onSend={sendReply} onSendFile={sendFile} sending={sending} />
+      <MessageComposer onSend={sendReply} onSendFile={sendFile} onSendTemplate={sendTemplate} sending={sending} />
 
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">

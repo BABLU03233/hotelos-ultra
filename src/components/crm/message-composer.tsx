@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquareQuote, Paperclip, Send, X } from "lucide-react";
+import { FileBadge, MessageSquareQuote, Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,13 +24,23 @@ const SHORT_REPLIES = [
   "You're welcome! 😊",
 ];
 
+interface ApprovedTemplate {
+  name: string;
+  language: string;
+  category: string;
+  body: string;
+  variables: number;
+}
+
 export function MessageComposer({
   onSend,
   onSendFile,
+  onSendTemplate,
   sending,
 }: {
   onSend: (text: string) => void;
   onSendFile?: (file: File, caption: string) => void;
+  onSendTemplate?: (name: string, language: string) => void;
   sending?: boolean;
 }) {
   // No 24-hour-window warning here by design.
@@ -49,8 +59,15 @@ export function MessageComposer({
   const [file, setFile] = React.useState<File | null>(null);
   const [fileError, setFileError] = React.useState<string | null>(null);
   const [quickReplyOpen, setQuickReplyOpen] = React.useState(false);
+  const [templateOpen, setTemplateOpen] = React.useState(false);
   const fileInput = React.useRef<HTMLInputElement>(null);
   const { data } = useFetch<{ faqs: Faq[] }>(quickReplyOpen ? "/api/settings/faqs" : null);
+  // Read live from Meta, not from our own table — templates approved directly
+  // in Meta Business Manager never reach our database, and in production that
+  // meant the one sendable template was invisible everywhere.
+  const { data: templateData } = useFetch<{ templates: ApprovedTemplate[] }>(
+    templateOpen ? "/api/wa-templates/approved" : null
+  );
 
   const previewUrl = React.useMemo(() => (file && file.type.startsWith("image/") ? URL.createObjectURL(file) : null), [file]);
   React.useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
@@ -176,6 +193,72 @@ export function MessageComposer({
             </ScrollArea>
           </PopoverContent>
         </Popover>
+
+        {onSendTemplate && (
+          <Popover open={templateOpen} onOpenChange={setTemplateOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Send an approved template (reaches guests outside the 24-hour window)"
+                  aria-label="Send an approved template"
+                  className="size-10 shrink-0 rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
+                >
+                  <FileBadge className="size-5" />
+                </Button>
+              }
+            />
+            <PopoverContent align="start" side="top" className="w-96 p-0">
+              <div className="border-b border-border px-3 py-2">
+                <p className="text-xs font-medium">Approved templates</p>
+                <p className="text-[11px] text-muted-foreground">
+                  The only messages WhatsApp delivers to a guest who hasn&apos;t written in 24 hours.
+                </p>
+              </div>
+              <ScrollArea className="max-h-72">
+                {!templateData ? (
+                  <p className="p-4 text-center text-xs text-muted-foreground">Loading…</p>
+                ) : templateData.templates.length === 0 ? (
+                  <p className="p-4 text-center text-xs text-muted-foreground">
+                    No approved templates yet — create one under Templates and submit it to Meta.
+                  </p>
+                ) : (
+                  <div className="flex flex-col p-1">
+                    {templateData.templates.map((t) => (
+                      <button
+                        key={`${t.name}:${t.language}`}
+                        // Templates with {{1}} placeholders need values this
+                        // screen does not collect yet; sending one unfilled
+                        // would be rejected by Meta, so they are shown but
+                        // not selectable rather than silently failing.
+                        disabled={t.variables > 0 || sending}
+                        onClick={() => {
+                          onSendTemplate(t.name, t.language);
+                          setTemplateOpen(false);
+                        }}
+                        className="rounded-md p-2 text-left text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <p className="font-medium">
+                          {t.name}{" "}
+                          <span className="font-normal text-muted-foreground">
+                            · {t.language} · {t.category.toLowerCase()}
+                          </span>
+                        </p>
+                        {t.body && <p className="mt-0.5 line-clamp-3 text-muted-foreground">{t.body}</p>}
+                        {t.variables > 0 && (
+                          <p className="mt-1 text-[11px] font-medium text-amber-600">
+                            Needs {t.variables} value{t.variables > 1 ? "s" : ""} — send from Campaigns instead.
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        )}
 
         <input
           ref={fileInput}
