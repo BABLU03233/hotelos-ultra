@@ -485,6 +485,28 @@ export function deservesRealAnswer(text: string): boolean {
   return t.split(/\s+/).filter(Boolean).length >= 4;
 }
 
+/**
+ * Did the guest actually ASK something, as opposed to saying something
+ * substantive?
+ *
+ * Strictly narrower than deservesRealAnswer, and deliberately so. That
+ * function decides whether a message is meaty enough to deserve the model
+ * rather than a canned slot prompt, and its ">= 4 words" fallback is right for
+ * that job — "I'd like to book a room" is substantive and should reach the
+ * model. But it is not a question, and the funnel instruction for it ("your
+ * job is to learn the party size") is exactly correct.
+ *
+ * This predicate answers the different question of whether ignoring the
+ * message would read as not listening. Only an explicit question mark or a
+ * real interrogative marker counts, so a statement of intent still gets the
+ * funnel while "wifi hai kya aapke yaha" gets answered.
+ */
+export function looksLikeDirectQuestion(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return t.endsWith("?") || QUESTION_MARKER.test(t);
+}
+
 export function looksLikeAgreement(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
@@ -1176,6 +1198,22 @@ export function predictedStageInstruction(params: {
     return "The guest is ready to see rooms, and a list of the hotel's real rooms with real prices is being sent separately — do NOT name a room or quote any price yourself. Keep this reply to one short warm line.";
   }
 
+  // Did the guest actually ask something this turn?
+  //
+  // The slot-filling instructions below used to be unconditional, and ended
+  // with "don't ask about dates or anything else in this same reply". Read by
+  // a model that has just been handed a real question, that is an instruction
+  // to ignore the guest. Caught in an end-to-end run: a guest asked "wifi hai
+  // kya aapke yaha" before stating party size and Anushka escalated with the
+  // reason "Need clarification on guest count" — the guest got a hand-off
+  // message instead of the answer sitting in her own prompt.
+  //
+  // The waterfall already routes questions here rather than answering them
+  // with a canned slot prompt (see deservesRealAnswer). This closes the other
+  // half of that decision: having decided the question deserves a real
+  // answer, stop simultaneously telling the model not to give one.
+  const asked = looksLikeDirectQuestion(params.guestMessage);
+
   const key = resolveStageKey({ ...params, replyText: "" });
   switch (key) {
     case "LANGUAGE_SELECT":
@@ -1183,9 +1221,13 @@ export function predictedStageInstruction(params: {
     case "GREET_MENU":
       return "This is the guest's very first message and their language is already clear from how they wrote. An \"I want to book a room\" / \"Availability & price\" / \"I need more details\" picker will automatically appear under your reply — keep your opener short and don't ask an open question yourself, the picker already is the question.";
     case "GUEST_COUNT":
-      return "This reply's job: move toward learning how many people will be staying. A \"Just me\" / \"2 people\" / \"3+ people\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask about dates or anything else in this same reply.";
+      return asked
+        ? "The guest just asked you something — ANSWER IT, using the hotel information above. That answer is this reply's job. A \"Just me\" / \"2 people\" / \"3+ people\" picker appears automatically underneath, so the party-size question is already handled for you and must not crowd out their actual question. Never reply with only a request for their guest count when they asked you something else, and never hand off to a colleague for something the information above already answers."
+        : "This reply's job: move toward learning how many people will be staying. A \"Just me\" / \"2 people\" / \"3+ people\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask about dates or anything else in this same reply.";
     case "DATE_QUICK_PICK":
-      return "This reply's job: move toward learning their dates. A \"This weekend\" / \"Next week\" / \"I'll type dates\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask anything else in this same reply.";
+      return asked
+        ? "The guest just asked you something — ANSWER IT, using the hotel information above. That answer is this reply's job. A \"This weekend\" / \"Next week\" / \"I'll type dates\" picker appears automatically underneath, so the dates question is already handled for you and must not crowd out their actual question. Never reply with only a request for their dates when they asked you something else, and never hand off to a colleague for something the information above already answers."
+        : "This reply's job: move toward learning their dates. A \"This weekend\" / \"Next week\" / \"I'll type dates\" picker will automatically appear under your reply — a brief version of that question in your own words is fine (or skip it, the picker covers it), but don't ask anything else in this same reply.";
     case "PRICE_OBJECTION":
       return "A See cheaper room / Show me offers / Continue anyway picker will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
     case "CONFIRM_BOOKING":
