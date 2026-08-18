@@ -51,6 +51,19 @@ export interface StatusUpdate {
   whatsappMessageId: string;
   status: "sent" | "delivered" | "read" | "failed";
   timestamp: string;
+  /**
+   * Meta's reason for a `failed` status. The send endpoint returns 200 and a
+   * message id even for a message that cannot be delivered, and reports the
+   * real outcome here instead — so this is the ONLY place the cause ever
+   * appears. It was previously parsed away, which is why staff saw a failure
+   * marker with no explanation.
+   *
+   * The one that matters most in practice is 131047 ("Re-engagement
+   * message"): the 24-hour customer service window has closed and only a
+   * template can reach this guest.
+   */
+  errorCode: number | null;
+  errorTitle: string | null;
 }
 
 interface WebhookValue {
@@ -149,11 +162,18 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
       }
 
       for (const raw of value.statuses ?? []) {
+        // Meta nests the human-readable half under error_data.details and
+        // puts a short label in title; details is the more specific of the
+        // two ("Message failed to send because more than 24 hours have
+        // passed since the customer last replied"), so it wins when present.
+        const err = (raw.errors as { code?: number; title?: string; error_data?: { details?: string } }[] | undefined)?.[0];
         statuses.push({
           phoneNumberId,
           whatsappMessageId: String(raw.id ?? ""),
           status: String(raw.status ?? "sent") as StatusUpdate["status"],
           timestamp: String(raw.timestamp ?? ""),
+          errorCode: typeof err?.code === "number" ? err.code : null,
+          errorTitle: err?.error_data?.details ?? err?.title ?? null,
         });
       }
     }

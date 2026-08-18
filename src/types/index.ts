@@ -45,8 +45,14 @@ export interface Message {
   type: MessageType;
   content: string | null;
   mediaUrl: string | null;
+  mediaId: string | null;
+  mediaMimeType: string | null;
+  mediaFilename: string | null;
   interactiveId: string | null;
   status: MessageStatus;
+  /** Meta's reason for a failed send — see StatusUpdate in whatsapp/webhook.ts. */
+  errorCode: number | null;
+  errorTitle: string | null;
   senderUserId: string | null;
   createdAt: string;
 }

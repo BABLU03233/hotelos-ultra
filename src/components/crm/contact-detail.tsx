@@ -33,7 +33,9 @@ import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
-import { formatCountdown, formatRelativeTime, hoursSince, initials } from "@/lib/format";
+import { toast } from "sonner";
+import { formatCountdown, formatRelativeTime, initials } from "@/lib/format";
+import { describeRemaining, serviceWindow } from "@/lib/whatsapp/service-window";
 import { useAuthStore } from "@/store/use-auth-store";
 import { cn } from "@/lib/utils";
 import { BookingStatus, Contact, FollowUpAction, LeadStatus, Message, ScheduledFollowUp, StaffMember, StaffNotification } from "@/types";
@@ -96,6 +98,29 @@ export function ContactDetail({
       await apiFetch(`/api/contacts/${contactId}/reply`, { method: "POST", body: JSON.stringify({ text }) });
       reloadMessages();
       reloadContact();
+    } catch (err) {
+      // Surfaced rather than swallowed. A send that WhatsApp refuses (most
+      // often the closed 24-hour window) used to leave the composer looking
+      // like it had worked, which is how staff ended up believing messages
+      // were delivered when they never left the building.
+      toast.error(err instanceof Error ? err.message : "Couldn't send that message");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendFile(file: File, caption: string) {
+    if (!contactId) return;
+    setSending(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      if (caption) body.append("caption", caption);
+      await apiFetch(`/api/contacts/${contactId}/reply`, { method: "POST", body });
+      reloadMessages();
+      reloadContact();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send that attachment");
     } finally {
       setSending(false);
     }
@@ -126,6 +151,7 @@ export function ContactDetail({
       sending={sending}
       updateContact={updateContact}
       sendReply={sendReply}
+      sendFile={sendFile}
       onBack={onBack}
     />
   );
@@ -137,6 +163,7 @@ function ContactDetailPane({
   sending,
   updateContact,
   sendReply,
+  sendFile,
   onBack,
 }: {
   contact: Contact;
@@ -144,6 +171,7 @@ function ContactDetailPane({
   sending: boolean;
   updateContact: (patch: ContactPatch) => Promise<void>;
   sendReply: (text: string) => Promise<void>;
+  sendFile: (file: File, caption: string) => Promise<void>;
   onBack?: () => void;
 }) {
   const [notes, setNotes] = React.useState(contact.notes ?? "");
@@ -162,8 +190,13 @@ function ContactDetailPane({
   const { data: followUpsData } = useFetch<{ followUps: ScheduledFollowUp[] }>(`/api/contacts/${contact.id}/follow-ups`);
   const escalation = notificationsData?.notifications.find((n) => n.contact.id === contact.id);
   const upcomingFollowUps = followUpsData?.followUps.filter((f) => f.status === "PENDING") ?? [];
-  const hoursSinceInbound = contact.lastInboundAt ? hoursSince(contact.lastInboundAt) : null;
-  const windowOpen = hoursSinceInbound === null || hoursSinceInbound < 24;
+  // The same function the API enforces with, so the composer can never offer
+  // something the server will refuse. The old local rule also treated a guest
+  // who had NEVER messaged as an open window (`hoursSinceInbound === null ||
+  // ...`), which is exactly backwards: with no inbound message there is no
+  // window at all, and Meta rejects those sends too.
+  const window = serviceWindow(contact.lastInboundAt);
+  const windowOpen = window.open;
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -284,27 +317,38 @@ function ContactDetailPane({
         </div>
       </ScrollArea>
 
-      {contact.lastInboundAt && (
-        <p
-          className={cn(
-            "border-t px-4 py-2 text-[11px]",
-            windowOpen
-              ? "border-border text-muted-foreground"
-              : "border-amber-500/30 bg-amber-500/10 font-medium text-amber-600"
-          )}
-        >
-          {windowOpen ? (
-            <>Free-form replies open — guest messaged {formatRelativeTime(contact.lastInboundAt)}.</>
-          ) : (
-            <>
-              <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm>
-              {" "}closed — only a{" "}
-              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm> can reach this guest now.
-            </>
-          )}
+      {windowOpen && contact.lastInboundAt && (
+        <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+          Free-form replies open ({describeRemaining(window.msRemaining)}) — guest messaged{" "}
+          {formatRelativeTime(contact.lastInboundAt)}.
         </p>
       )}
-      <MessageComposer onSend={sendReply} sending={sending} />
+      <MessageComposer
+        onSend={sendReply}
+        onSendFile={sendFile}
+        sending={sending}
+        disabled={!windowOpen}
+        disabledReason={
+          contact.lastInboundAt ? (
+            <>
+              <span className="font-medium">
+                <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm> closed
+              </span>{" "}
+              — this guest last messaged {formatRelativeTime(contact.lastInboundAt)}. WhatsApp will not deliver a normal
+              reply now, so sending one would fail silently. Only a{" "}
+              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm> can reach them — or ask them
+              to message you first, which reopens the window for 24 hours.
+            </>
+          ) : (
+            <>
+              <span className="font-medium">This guest has never messaged you.</span> WhatsApp only allows a business to
+              open a conversation with a{" "}
+              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm>, so a normal reply cannot be
+              delivered.
+            </>
+          )
+        }
+      />
 
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">

@@ -124,8 +124,80 @@ describe("parseWebhookPayload", () => {
     const { statuses, messages } = parseWebhookPayload(payload);
     expect(messages).toHaveLength(0);
     expect(statuses).toEqual([
-      { phoneNumberId: "PHONE_123", whatsappMessageId: "wamid.OUT1", status: "delivered", timestamp: "1700000001" },
+      {
+        phoneNumberId: "PHONE_123",
+        whatsappMessageId: "wamid.OUT1",
+        status: "delivered",
+        timestamp: "1700000001",
+        errorCode: null,
+        errorTitle: null,
+      },
     ]);
+  });
+
+  it("captures why a send failed, which is the only place Meta ever says so", () => {
+    // The real shape of a 24-hour-window rejection. The send endpoint returns
+    // 200 and a message id for these, so this callback is the ONLY signal that
+    // the guest never received the message — and it was previously parsed away,
+    // leaving staff with a failure marker and no cause.
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                statuses: [
+                  {
+                    id: "wamid.OUT2",
+                    status: "failed",
+                    timestamp: "1700000002",
+                    errors: [
+                      {
+                        code: 131047,
+                        title: "Re-engagement message",
+                        error_data: {
+                          details:
+                            "Message failed to send because more than 24 hours have passed since the customer last replied to this number.",
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { statuses } = parseWebhookPayload(payload);
+    expect(statuses[0].status).toBe("failed");
+    expect(statuses[0].errorCode).toBe(131047);
+    // details beats title: it is the sentence that actually explains the cause.
+    expect(statuses[0].errorTitle).toMatch(/more than 24 hours/);
+  });
+
+  it("falls back to the error title when Meta sends no details", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                statuses: [
+                  { id: "wamid.OUT3", status: "failed", timestamp: "1700000003", errors: [{ code: 131026, title: "Message undeliverable" }] },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { statuses } = parseWebhookPayload(payload);
+    expect(statuses[0]).toMatchObject({ errorCode: 131026, errorTitle: "Message undeliverable" });
   });
 
   it("ignores entries with no metadata.phone_number_id", () => {

@@ -8,10 +8,18 @@ export interface WhatsAppCredentials {
   wabaId?: string;
 }
 
+// Media can be addressed two ways. `link` is a publicly reachable URL, which
+// is how Anushka sends the hotel's own room photos. `id` is a media object
+// already uploaded to Meta (see uploadWhatsAppMedia), which is how a staff
+// attachment from the CRM is sent — this deployment has no object storage
+// configured, so there is no public URL to hand Meta, and uploading the bytes
+// directly avoids inventing one.
 type OutboundMessage =
   | { type: "text"; text: string }
-  | { type: "image"; link: string; caption?: string }
-  | { type: "document"; link: string; filename: string; caption?: string }
+  | { type: "image"; link?: string; id?: string; caption?: string }
+  | { type: "document"; link?: string; id?: string; filename: string; caption?: string }
+  | { type: "audio"; link?: string; id?: string }
+  | { type: "video"; link?: string; id?: string; caption?: string }
   | { type: "location"; latitude: number; longitude: number; name?: string; address?: string }
   | { type: "template"; templateName: string; languageCode?: string; components?: unknown[] }
   // Reply-button interactive message — max 3 buttons, title <=20 chars, id
@@ -35,19 +43,34 @@ type OutboundMessage =
   // per send purely because Meta's API requires some value.
   | { type: "flow"; body: string; flowId: string; flowCta: string; screen: string };
 
+/**
+ * Meta accepts exactly one of `id` or `link` on a media object and rejects a
+ * payload carrying both, so this picks rather than spreads. `id` wins because
+ * bytes we uploaded ourselves are always reachable, whereas a link depends on
+ * object storage being configured.
+ */
+function mediaRef(m: { id?: string; link?: string }): { id: string } | { link: string } {
+  if (m.id) return { id: m.id };
+  return { link: m.link ?? "" };
+}
+
 export function buildPayload(to: string, message: OutboundMessage): Record<string, unknown> {
   const base = { messaging_product: "whatsapp", to };
   switch (message.type) {
     case "text":
       return { ...base, type: "text", text: { body: message.text } };
     case "image":
-      return { ...base, type: "image", image: { link: message.link, caption: message.caption } };
+      return { ...base, type: "image", image: { ...mediaRef(message), caption: message.caption } };
     case "document":
       return {
         ...base,
         type: "document",
-        document: { link: message.link, filename: message.filename, caption: message.caption },
+        document: { ...mediaRef(message), filename: message.filename, caption: message.caption },
       };
+    case "audio":
+      return { ...base, type: "audio", audio: mediaRef(message) };
+    case "video":
+      return { ...base, type: "video", video: { ...mediaRef(message), caption: message.caption } };
     case "location":
       return {
         ...base,
@@ -141,6 +164,42 @@ export async function sendWhatsAppMessage(
 
   const json = (await res.json()) as { messages: { id: string }[] };
   return json.messages[0].id;
+}
+
+/**
+ * Uploads bytes to Meta and returns a media id usable as `id` on an outbound
+ * image/document/audio/video.
+ *
+ * This is how a staff attachment leaves the CRM. The alternative — putting the
+ * file somewhere public and sending Meta a `link` — needs object storage, and
+ * none is configured here; it would also expose a guest's document on a public
+ * URL, which is a worse default for a hotel handling ID scans and invoices.
+ *
+ * Media ids expire after a few days on Meta's side, which is fine for sending
+ * (immediate) but means the CRM cannot rely on them for display forever. See
+ * the /api/media route for how playback is handled.
+ */
+export async function uploadWhatsAppMedia(
+  creds: WhatsAppCredentials,
+  file: Blob,
+  filename: string
+): Promise<string> {
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", file, filename);
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${creds.phoneNumberId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${creds.accessToken}` },
+    // No Content-Type header: fetch sets the multipart boundary itself, and
+    // overriding it produces a silently unparseable body.
+    body: form,
+  });
+
+  if (!res.ok) throw new Error(`WhatsApp media upload failed (${res.status}): ${await res.text()}`);
+  const json = (await res.json()) as { id?: string };
+  if (!json.id) throw new Error("WhatsApp media upload returned no id");
+  return json.id;
 }
 
 /** Pings the Graph API with a phone_number_id + access token pair and returns the resolved number — lets Settings confirm credentials are correct before saving them. */

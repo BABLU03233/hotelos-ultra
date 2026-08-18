@@ -337,6 +337,13 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       content: content ?? msg.buttonText,
       interactiveId: msg.interactiveId,
       mediaUrl,
+      // Kept even when mediaUrl is set, and essential when it isn't: with no
+      // object storage configured, uploadObject returns null and mediaUrl
+      // stays empty, which is why a guest's photo previously showed in the CRM
+      // as an empty bubble. /api/media/[id] streams it back from Meta using
+      // this id instead.
+      mediaId: msg.mediaId,
+      mediaMimeType: msg.mediaMimeType,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",
     },
@@ -965,6 +972,13 @@ export async function handleStatusUpdate(status: StatusUpdate): Promise<void> {
   if (!status.whatsappMessageId) return;
   await prisma.message.updateMany({
     where: { whatsappMessageId: status.whatsappMessageId },
-    data: { status: mapStatus(status.status) },
+    data: {
+      status: mapStatus(status.status),
+      // Only written on failure, and only when Meta actually said why — a
+      // later delivered/read update for the same message must not wipe a
+      // reason, and a failure with no errors[] must not blank an existing one.
+      ...(status.status === "failed" && status.errorCode !== null ? { errorCode: status.errorCode } : {}),
+      ...(status.status === "failed" && status.errorTitle ? { errorTitle: status.errorTitle } : {}),
+    },
   });
 }
