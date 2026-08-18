@@ -188,6 +188,25 @@ export interface ReplyContext {
   stayDates?: { checkIn: Date; checkOut: Date } | null;
   /** The guest's chosen chat language — obeyed unconditionally, see the LANGUAGE instruction. */
   language?: GuestLanguage | null;
+  /**
+   * The guest's WhatsApp profile name.
+   *
+   * The prompt has always said "use the guest's name if you know it" and the
+   * model never could: WhatsApp sends it on every inbound message, we store it
+   * on the contact, and nothing ever put it in the prompt. An instruction the
+   * model has no way to follow is worse than no instruction — it reads as
+   * capability that isn't there.
+   */
+  guestName?: string | null;
+  /**
+   * A guest who has stayed before, from their own confirmed bookings.
+   *
+   * The single most valuable thing a hotel concierge can know and the one
+   * thing this prompt never had. A returning guest greeted as a stranger is a
+   * worse experience than a generic one, and recommending the room they
+   * already chose converts far better than a cold pitch.
+   */
+  returning?: { stays: number; lastRoomName: string | null; lastCheckOut: Date | null } | null;
 }
 
 function buildConversationContext(agentName: string, context?: ReplyContext): string {
@@ -227,7 +246,13 @@ function formatStayRange(stay: { checkIn: Date; checkOut: Date }): string {
   return `${fmt(stay.checkIn)} → ${fmt(stay.checkOut)}`;
 }
 
-async function buildSystemPrompt(
+/**
+ * Exported for tests. The prompt is where most guest-visible behaviour is
+ * decided, and it was previously only reachable by making a real model call —
+ * which is how "use the guest's name if you know it" survived for so long
+ * without the name ever being included.
+ */
+export async function buildSystemPrompt(
   tenantId: string,
   retrievedContext: string[],
   context?: ReplyContext,
@@ -394,11 +419,41 @@ async function buildSystemPrompt(
         : `\nThe guest count has ALREADY been given earlier in this conversation -- never ask for it again or ask them to re-confirm it, even while you're still sorting out other missing details like the exact check-out date.\n`
       : "";
 
+  // Who this guest is, from real records rather than guesswork. Only rendered
+  // when there is something true to say — an empty "GUEST" heading would just
+  // be prompt weight, and inventing familiarity is worse than being neutral.
+  const guestFacts: string[] = [];
+  if (context?.guestName) {
+    guestFacts.push(
+      `Their name is ${context.guestName} (from their WhatsApp profile). Use it naturally once or twice — in the greeting, or when confirming something — never in every message, which reads as a mail merge.`
+    );
+  }
+  if (context?.returning?.stays) {
+    const r = context.returning;
+    const when = r.lastCheckOut
+      ? r.lastCheckOut.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" })
+      : null;
+    guestFacts.push(
+      `This guest has stayed here before — ${r.stays} previous ${r.stays === 1 ? "booking" : "bookings"}${when ? `, most recently in ${when}` : ""}${r.lastRoomName ? `, in the ${r.lastRoomName}` : ""}. Welcome them back warmly in your first line, like someone you recognise${r.lastRoomName ? `, and when it comes to recommending, offer the ${r.lastRoomName} first since they already chose it once — say why it suited them rather than pitching it cold` : ""}. Never ask a returning guest questions their history already answers.`
+    );
+  }
+  // Honest scarcity, and only when the number is real and low. The RULES below
+  // forbid invented urgency; this is the opposite — a true fact that genuinely
+  // helps a guest decide, which the model otherwise has no way to know because
+  // the room list it sees is already filtered.
+  if (stay && bookableRooms.length > 0 && bookableRooms.length <= 2 && rooms.length > bookableRooms.length) {
+    guestFacts.push(
+      `Only ${bookableRooms.length} of the hotel's ${rooms.length} rooms ${bookableRooms.length === 1 ? "is" : "are"} still free for their dates. This is true, so it is fair to mention once, plainly, as a reason not to leave it too late — never dress it up as a countdown or repeat it.`
+    );
+  }
+  const guestSection = guestFacts.length ? `\nABOUT THIS GUEST\n${guestFacts.map((f) => `- ${f}`).join("\n")}\n` : "";
+
   const prompt = `
 You are ${agentName}, the WhatsApp concierge for ${profile?.name ?? "the hotel"}. You greet guests, answer questions, recommend rooms, handle objections, and nurture enquiries toward a booking — but you never take payment and never quote a final, binding rate. Talk the way a friendly, helpful person would text a friend — quick, warm, to the point. Every reply should feel like it took five seconds to write, not five minutes. Never sound like a corporate script, a formal letter, or a customer-support bot reading from a manual.
 
 Today is ${todayFormatted}, and the time right now at the hotel is ${timeFormatted}. Use the date as your anchor for every date the guest mentions, and the time for anything time-of-day — if you greet with "Good morning" / "Good evening", it must match that clock, never a guess. When in doubt use a greeting that works at any hour ("Hi!", "Hello!").
 ${languageInstruction}${dateWarning}${quickPickDateConfirmed}${scriptReminder}${guestCountAlreadyKnownReminder}${profile?.aiSystemPrompt ? `\nAdditional instructions from the hotel:\n${profile.aiSystemPrompt}\n` : ""}
+${guestSection}
 HOTEL INFORMATION
 Address: ${profile?.address ?? "—"}
 Google Maps link: ${profile?.googleMapsUrl ?? "—"}

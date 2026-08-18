@@ -108,6 +108,25 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   // a guest who's gone quiet for a while gets a gentle re-spark instead of
   // Anushka just resuming mid-conversation as if no time passed.
   const previousInbound = inboundMessages.length > 1 ? inboundMessages[inboundMessages.length - 2] : null;
+
+  // A returning guest, from their own confirmed bookings — one small indexed
+  // query for the single most useful thing a concierge can know about who
+  // they're talking to. CANCELLED bookings are excluded deliberately: someone
+  // who cancelled has not stayed, and "welcome back" would be wrong.
+  const priorBookings = await prisma.booking.findMany({
+    where: { tenantId, contactId, status: "CONFIRMED" },
+    orderBy: { checkOut: "desc" },
+    select: { roomNameSnapshot: true, checkOut: true },
+    take: 10,
+  });
+  const returning = priorBookings.length
+    ? {
+        stays: priorBookings.length,
+        lastRoomName: priorBookings[0].roomNameSnapshot,
+        lastCheckOut: priorBookings[0].checkOut,
+      }
+    : null;
+
   const replyContext = {
     isFirstReply: !chronological.some((m) => m.direction === "OUT"),
     daysSinceLastInbound: previousInbound
@@ -123,6 +142,11 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // Governs the AI prose. The deterministic replies are localised via the
     // catalog; this is what keeps the model in the same language.
     language: resolveLanguage(contact.language),
+    // WhatsApp sends this on every inbound message and we have always stored
+    // it; until now it never reached the prompt, so the model was told to use
+    // the guest's name without ever being given one.
+    guestName: contact.name,
+    returning,
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });
