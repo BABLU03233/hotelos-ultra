@@ -42,6 +42,10 @@ export interface InboundMessage {
   flowResponse: Record<string, unknown> | null;
   mediaId: string | null;
   mediaMimeType: string | null;
+  /** Original filename of a document the guest sent, e.g. "aadhaar-front.pdf". */
+  mediaFilename: string | null;
+  /** Text the guest typed alongside an image or document. */
+  mediaCaption: string | null;
   location: { latitude: number; longitude: number } | null;
   referral: InboundReferral | null;
 }
@@ -95,7 +99,12 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
         const type = String(raw.type ?? "unknown") as InboundMessage["type"];
         const textBody =
           type === "text" ? ((raw.text as { body?: string } | undefined)?.body ?? null) : null;
-        const media = raw[type] as { id?: string; mime_type?: string } | undefined;
+        // filename and caption are only sent for documents/images, and both
+        // were previously dropped. Without the filename a guest's attachment
+        // rendered in the CRM as a bare "[document]" with no way to tell an
+        // Aadhaar scan from an invoice; without the caption, whatever they
+        // typed alongside the file vanished entirely.
+        const media = raw[type] as { id?: string; mime_type?: string; filename?: string; caption?: string } | undefined;
         const location = raw.location as { latitude?: number; longitude?: number } | undefined;
         const referral = raw.referral as
           | { source_url?: string; headline?: string; ctwa_clid?: string }
@@ -147,6 +156,8 @@ export function parseWebhookPayload(payload: WebhookPayload): { messages: Inboun
           flowResponse,
           mediaId: media?.id ?? null,
           mediaMimeType: media?.mime_type ?? null,
+          mediaFilename: media?.filename ?? null,
+          mediaCaption: media?.caption ?? null,
           location:
             location?.latitude != null && location?.longitude != null
               ? { latitude: location.latitude, longitude: location.longitude }

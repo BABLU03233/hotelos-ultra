@@ -4,7 +4,6 @@ import { requireTenantDb } from "@/lib/auth/require-session";
 import { sendWhatsAppMessage, uploadWhatsAppMedia } from "@/lib/whatsapp/client";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/tenant-credentials";
 import { classifyAttachment, describeLimit, exceedsLimit } from "@/lib/whatsapp/attachment";
-import { serviceWindow } from "@/lib/whatsapp/service-window";
 import { contactReplySchema } from "@/lib/validation/contact";
 import { MessageType } from "@/generated/prisma/enums";
 
@@ -39,27 +38,22 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const creds = await getWhatsAppCredentials(session.tenantId);
   if (!creds) throw new ApiError(400, "Connect WhatsApp in Settings before replying");
 
-  // Enforced here, not just hinted at in the UI.
+  // Deliberately NOT blocked when the 24-hour window looks closed.
   //
-  // The CRM already showed a "24-hour window closed" banner, but the composer
-  // stayed live underneath it, so staff kept sending into a closed window.
-  // Meta accepts those requests with a 200 and a message id and drops the
-  // delivery, so the bubble showed a tick and the guest got nothing —
-  // confirmed in production, where every failed outbound went to a contact
-  // whose last inbound was over 24 hours old.
+  // The first version of this refused the send outright. That was wrong for
+  // two reasons. Meta owns this clock, not us: our `lastInboundAt` and Meta's
+  // own measurement can disagree by seconds around the boundary, and a guest
+  // who messaged from a second device may have reopened a window we cannot
+  // see — so a local refusal can block a send that would actually have gone
+  // through. And staff would rather try and be told it failed than be
+  // prevented from trying at all.
   //
-  // Refusing here converts a silent delivery failure into an immediate, honest
-  // error, and it holds regardless of which client is calling.
-  const windowState = serviceWindow(contact.lastInboundAt);
-  if (!windowState.open) {
-    throw new ApiError(
-      409,
-      contact.lastInboundAt
-        ? "WhatsApp's 24-hour window has closed for this guest — they last messaged over 24 hours ago, so only a Meta-approved template can reach them now. Ask them to message first, or send an approved template."
-        : "This guest has never messaged you, so WhatsApp won't deliver a free-form message. Only a Meta-approved template can start the conversation."
-    );
-  }
-
+  // What made the original bug harmful was never that the send was allowed,
+  // it was that failure was invisible: Meta returns 200 with a message id and
+  // drops the delivery asynchronously, so the bubble showed a tick. That is
+  // fixed at the other end now — the status webhook's errors[] is captured
+  // and rendered on the message with a plain explanation. Attempting and
+  // reporting honestly beats refusing on a guess.
   const contentType = req.headers.get("content-type") ?? "";
 
   let sendResult: { whatsappMessageId: string; type: MessageType; content: string | null; mediaId: string | null; mediaMimeType: string | null; mediaFilename: string | null };

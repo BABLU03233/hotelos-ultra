@@ -105,6 +105,72 @@ describe("parseWebhookPayload", () => {
     expect(messages[0]).toMatchObject({ type: "image", text: null, mediaId: "media-abc", mediaMimeType: "image/jpeg" });
   });
 
+  it("keeps a document's filename and caption", () => {
+    // Reported from live use: a guest sent a document and the CRM showed only
+    // "[document]". The id and mime type were parsed, but filename and caption
+    // were dropped, so there was no way to tell an Aadhaar scan from an
+    // invoice, and whatever the guest typed alongside it vanished.
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  {
+                    id: "wamid.DOC",
+                    from: "919999999999",
+                    type: "document",
+                    document: {
+                      id: "media-doc-1",
+                      mime_type: "application/pdf",
+                      filename: "aadhaar-front.pdf",
+                      caption: "here is my ID for check-in",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0]).toMatchObject({
+      type: "document",
+      mediaId: "media-doc-1",
+      mediaMimeType: "application/pdf",
+      mediaFilename: "aadhaar-front.pdf",
+      mediaCaption: "here is my ID for check-in",
+    });
+  });
+
+  it("keeps an image caption, which is often the actual message", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "PHONE_123" },
+                messages: [
+                  { id: "wamid.IMG", from: "919999999999", type: "image", image: { id: "m1", mime_type: "image/jpeg", caption: "is this the room?" } },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages[0].mediaCaption).toBe("is this the room?");
+    // Images carry no filename — that must stay null rather than becoming "".
+    expect(messages[0].mediaFilename).toBeNull();
+  });
+
   it("extracts status callbacks", () => {
     const payload = {
       entry: [

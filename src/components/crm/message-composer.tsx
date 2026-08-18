@@ -28,21 +28,23 @@ export function MessageComposer({
   onSend,
   onSendFile,
   sending,
-  disabled,
-  disabledReason,
+  warning,
 }: {
   onSend: (text: string) => void;
   onSendFile?: (file: File, caption: string) => void;
   sending?: boolean;
   /**
-   * Set when WhatsApp will not accept a free-form message (the 24-hour window
-   * has closed). Previously the CRM only showed a banner ABOVE a fully live
-   * composer, so staff kept sending into a closed window and the messages were
-   * silently dropped by Meta. A warning that leaves the button working is not
-   * a warning.
+   * Shown above a fully working composer when WhatsApp is unlikely to deliver
+   * a free-form message (the 24-hour window looks closed).
+   *
+   * A previous version replaced the composer entirely. That was overreach:
+   * Meta owns the window clock and ours can disagree at the boundary, so
+   * refusing locally can block a send that would have worked — and staff would
+   * rather try and be told it failed. The original bug was never that the send
+   * was allowed, it was that failure was invisible; that is now fixed on the
+   * message itself, which shows the real reason from Meta.
    */
-  disabled?: boolean;
-  disabledReason?: React.ReactNode;
+  warning?: React.ReactNode;
 }) {
   const [text, setText] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
@@ -68,7 +70,7 @@ export function MessageComposer({
   }
 
   function submit() {
-    if (sending || disabled) return;
+    if (sending) return;
     const trimmed = text.trim();
     if (file && onSendFile) {
       onSendFile(file, trimmed);
@@ -82,20 +84,13 @@ export function MessageComposer({
     setText("");
   }
 
-  if (disabled) {
-    return (
-      <div className="border-t border-border p-3">
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-500">
-          {disabledReason}
-        </div>
-      </div>
-    );
-  }
-
   const canSend = Boolean(file) || Boolean(text.trim());
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-border p-3">
+      {warning && (
+        <p className="text-[11px] leading-snug text-amber-600 dark:text-amber-500">{warning}</p>
+      )}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {SHORT_REPLIES.map((reply) => (
           <button

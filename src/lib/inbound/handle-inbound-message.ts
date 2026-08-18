@@ -265,6 +265,18 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     : null;
 
   let content = msg.text;
+  // What the guest typed alongside a photo or document is a real message —
+  // often the whole point ("here's my ID for check-in"). It was being dropped,
+  // so the attachment arrived as an empty bubble and Anushka never saw the
+  // words.
+  //
+  // Deliberately NOT falling back to the filename here. Filling `content`
+  // with "aadhaar-front.pdf" would have Anushka reply to the filename as if
+  // the guest had typed it, and would skip the caption-less media
+  // acknowledgement in process-message-job that asks them to say what they
+  // need in words. The filename is a label for the CRM, not something the
+  // guest said — it rides in mediaFilename and is rendered by the bubble.
+  if (!content) content = msg.mediaCaption;
   if (!content && msg.type === "audio" && downloaded) {
     content = await transcribeAudio(downloaded.buffer, downloaded.contentType)
       .then((text) => (text ? `🎤 ${text}` : null))
@@ -274,7 +286,9 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       });
   }
 
-  const preview = content ?? `[${msg.type}]`;
+  // The contact-list preview line. A filename is far more use here than
+  // "[document]" — it tells staff at a glance that an ID scan came in.
+  const preview = content ?? msg.mediaFilename ?? `[${msg.type}]`;
   const now = new Date();
   const optingOut = isOptOutSignal(msg);
 
@@ -344,6 +358,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       // this id instead.
       mediaId: msg.mediaId,
       mediaMimeType: msg.mediaMimeType,
+      mediaFilename: msg.mediaFilename,
       whatsappMessageId: msg.whatsappMessageId || null,
       status: "DELIVERED",
     },

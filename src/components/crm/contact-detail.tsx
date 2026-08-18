@@ -327,24 +327,12 @@ function ContactDetailPane({
         onSend={sendReply}
         onSendFile={sendFile}
         sending={sending}
-        disabled={!windowOpen}
-        disabledReason={
-          contact.lastInboundAt ? (
+        warning={
+          windowOpen ? undefined : (
             <>
-              <span className="font-medium">
-                <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm> closed
-              </span>{" "}
-              — this guest last messaged {formatRelativeTime(contact.lastInboundAt)}. WhatsApp will not deliver a normal
-              reply now, so sending one would fail silently. Only a{" "}
-              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm> can reach them — or ask them
-              to message you first, which reopens the window for 24 hours.
-            </>
-          ) : (
-            <>
-              <span className="font-medium">This guest has never messaged you.</span> WhatsApp only allows a business to
-              open a conversation with a{" "}
-              <GlossaryTerm term="approved-template">Meta-approved template</GlossaryTerm>, so a normal reply cannot be
-              delivered.
+              <GlossaryTerm term="24h-window">24-hour window</GlossaryTerm> looks closed
+              {contact.lastInboundAt ? ` (last message ${formatRelativeTime(contact.lastInboundAt)})` : ""} — WhatsApp
+              may not deliver this. You can still try; if it fails you&apos;ll see why on the message.
             </>
           )
         }
