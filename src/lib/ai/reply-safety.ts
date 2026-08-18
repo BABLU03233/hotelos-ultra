@@ -49,32 +49,56 @@ export const SAFE_REPLY_FALLBACK = "Great, glad that works for you! 🎉 Just ta
 // suppress correct replies.
 const PER_NIGHT_PRICE = /(?:₹|rs\.?|inr)\s*([\d,]+)\s*(?:\/|\bper\b)\s*night/gi;
 
+/** Every ₹ figure written anywhere in a room's own description. */
+const ANY_RUPEE_AMOUNT = /(?:₹|rs\.?|inr)\s*([\d,]+)/gi;
+
 /**
  * True when the reply names a room and quotes a per-night price for it that
- * isn't that room's real rate.
+ * the hotel never published anywhere.
  *
- * From a live incident: asked to recommend, the model quoted ₹1,899 and
- * ₹2,199 for rooms costing ₹1,299 and ₹1,599 — 46% and 37% above the real
- * figures, which were sitting in its own prompt. A guest could have arrived
- * expecting one price and been charged another. The existing guards covered
- * invented phone numbers and false booking confirmations; an invented PRICE
- * went straight through.
+ * The original version of this compared only against Room.price, and the
+ * incident it was written for turns out to have been a misdiagnosis. It
+ * recorded the model "inventing" ₹1,899 and ₹2,199 for rooms costing ₹1,299
+ * and ₹1,599 — but those are the hotel's own occupancy-tiered rates, written
+ * verbatim in those rooms' descriptions:
  *
- * The room shortlist is now built from Room rows so the main path never
- * routes pricing through the model at all. This is the backstop for
- * everywhere else it might mention one.
+ *   Deluxe:  "From ₹1,299/night for 1 guest, ₹1,599 for 2, ₹1,899 for 3."
+ *   Premium: "From ₹1,599/night for 1 guest, ₹1,899 for 2, ₹2,199 for 3."
+ *
+ * The model was reading the data it was given and pricing correctly for the
+ * party size. The guard then replaced those correct replies with
+ * SAFE_REPLY_FALLBACK — a confirm-booking line that reads as a non-sequitur.
+ * Caught again in an end-to-end run: a guest who said "we are 3 people" asked
+ * "which room do you suggest" and got "Great, glad that works for you! 🎉
+ * Just tap Confirm booking below", which answers nothing.
+ *
+ * So the allowed set is now the room's base rate plus every figure the hotel
+ * itself wrote into that room's description. A price the hotel published is
+ * not a hallucination, whatever column it lives in. Genuinely invented
+ * figures — anything appearing in neither place — are still caught, which is
+ * what this guard is actually for.
  *
  * Only fires when a named room and a per-night figure appear together and
  * none of the quoted figures matches — a reply that mentions a room and a
- * total, or quotes the right price alongside a wrong one, is left alone.
+ * total, or quotes a right price alongside a wrong one, is left alone.
  */
-export function hasWrongRoomPrice(text: string, rooms: { name: string; price: number }[]): boolean {
+export function hasWrongRoomPrice(
+  text: string,
+  rooms: { name: string; price: number; description?: string | null }[]
+): boolean {
   const quoted = [...text.matchAll(PER_NIGHT_PRICE)].map((m) => Number(m[1].replace(/,/g, "")));
   if (!quoted.length) return false;
   const lower = text.toLowerCase();
   const named = rooms.filter((r) => lower.includes(r.name.toLowerCase()));
   if (named.length !== 1) return false; // ambiguous or no room named — nothing to check against
-  return !quoted.some((q) => q === named[0].price);
+
+  const room = named[0];
+  const published = new Set<number>([room.price]);
+  for (const m of (room.description ?? "").matchAll(ANY_RUPEE_AMOUNT)) {
+    published.add(Number(m[1].replace(/,/g, "")));
+  }
+
+  return !quoted.some((q) => published.has(q));
 }
 
 const URL_PATTERN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]+\.(com|in|co\.in|net|org|me|app|link|gl|online|shop)\b\S*/gi;
@@ -140,4 +164,43 @@ export function stripThinkingArtifacts(text: string): string {
     cleaned = cleaned.replace(ORPHANED_THINK_CLOSE_PATTERN, "").trim();
   }
   return cleaned;
+}
+
+/**
+ * Rewrites Markdown into what WhatsApp actually renders.
+ *
+ * The system prompt says "No markdown formatting" and the model mostly obeys,
+ * but an end-to-end run caught a recommendation written as
+ * "**Classic Room** – starting from ₹999/night ... **Current offer:**".
+ * WhatsApp's bold is a SINGLE asterisk, so a guest sees the asterisks
+ * themselves — the reply reads as broken rather than emphasised.
+ *
+ * Fixed in code rather than by asking the prompt more firmly, for the same
+ * reason the price and URL guards are: an instruction the model follows most
+ * of the time is not a guarantee, and this one is cheap to make certain.
+ * Conversion, not deletion — the model reached for bold to mark the room name
+ * and the offer, which is a reasonable thing to want on WhatsApp; it just has
+ * to be spelled the WhatsApp way.
+ */
+export function toWhatsAppFormatting(text: string): string {
+  return (
+    text
+      // **bold** / __bold__ -> *bold* / _italic_ is wrong for __, which
+      // WhatsApp has no equivalent for, so both collapse to its single-marker
+      // bold and italic respectively.
+      .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, "*$1*")
+      .replace(/__(?=\S)([\s\S]*?\S)__/g, "_$1_")
+      // Headings ("### Rooms") have no WhatsApp equivalent at all; the text
+      // is worth keeping, the hashes are not.
+      .replace(/^#{1,6}[ \t]+/gm, "")
+      // "- item" / "* item" -> "• item", which is what a person actually
+      // types on WhatsApp. A leading "* " would otherwise be read as an
+      // unterminated bold marker.
+      .replace(/^[ \t]*[-*][ \t]+(?=\S)/gm, "• ")
+      // A label left dangling once its IMAGE: lines were stripped
+      // ("Photos:" with nothing after it) reads as a broken promise.
+      .replace(/\n+[ \t]*(photos?|images?|pictures?)\s*:\s*$/i, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }

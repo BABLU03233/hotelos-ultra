@@ -961,9 +961,23 @@ export function selectDeterministicInteractive(params: {
   knownGuestCount?: number | null;
   /** True when real dates are already stored for this contact — see hasStatedDates. */
   datesKnown?: boolean;
+  /**
+   * The guest's chosen chat language, so the buttons match the words above
+   * them.
+   *
+   * promptForStageKey has always accepted this; the AI path simply never
+   * passed it, so every button attached to a model-written reply was built
+   * from the English catalog. Caught in an end-to-end run: a Telugu guest was
+   * asked "ఎన్ని మంది కోసం బుక్ చేయాలి?" above rows reading "Just me / 2
+   * people / 3+ people", and a Hindi guest got the same. The deterministic
+   * short-circuits in handle-inbound-message.ts pass a language and were
+   * always correct, which is exactly why this stayed hidden — the flow looked
+   * right whenever it was driven by taps.
+   */
+  language?: GuestLanguage | null;
 }): InteractivePrompt | undefined {
   const key = resolveStageKey(params);
-  return key ? promptForStageKey(key) : params.aiInteractive;
+  return key ? promptForStageKey(key, params.language) : params.aiInteractive;
 }
 
 type StageKey =

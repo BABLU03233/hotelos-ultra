@@ -20,7 +20,7 @@ import { createOmniRouteProvider } from "./omniroute-provider";
 import { configuredOpenRouterModels, createOpenRouterProvider } from "./openrouter-provider";
 import { AIProvider, ChatMessage } from "./provider";
 import { retrieveRelevantChunks } from "./rag";
-import { extractLegitimatePhoneNumbers, hasHallucinationRisk, hasWrongRoomPrice, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls } from "./reply-safety";
+import { extractLegitimatePhoneNumbers, hasHallucinationRisk, hasWrongRoomPrice, SAFE_REPLY_FALLBACK, stripThinkingArtifacts, stripUnapprovedUrls, toWhatsAppFormatting } from "./reply-safety";
 
 // The curated free-tier list, and the reasoning behind its ordering, now live
 // in openrouter-provider.ts — see configuredOpenRouterModels(). It moved so
@@ -232,7 +232,7 @@ async function buildSystemPrompt(
   retrievedContext: string[],
   context?: ReplyContext,
   interactiveState?: { history: ChatMessage[]; guestMessage: string }
-): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string>; legitimateUrls: Set<string>; rooms: { name: string; price: number }[] }> {
+): Promise<{ prompt: string; agentName: string; legitimatePhoneNumbers: Set<string>; legitimateUrls: Set<string>; rooms: { name: string; price: number; description: string | null }[] }> {
   const [profile, rooms, faqs, offers] = await Promise.all([
     prisma.hotelProfile.findUnique({ where: { tenantId } }),
     prisma.room.findMany({ where: { tenantId } }),
@@ -365,7 +365,7 @@ async function buildSystemPrompt(
     interactiveState &&
     !looksLikeObviousLanguage(interactiveState.guestMessage) &&
     interactiveState.history.some((m) => looksLikeObviousLanguage(m.content))
-      ? `\nThe guest's last message was typed in plain Roman/Latin letters rather than Devanagari or Telugu script. Keep replying in their chosen LANGUAGE, but write it in Roman letters (Hinglish/Tenglish) to match how they're typing right now — don't force the native script back at them, and don't switch to English either.\n`
+      ? `\nThe guest's last message was typed in plain Roman/Latin letters rather than Devanagari or Telugu script. Keep replying in their chosen LANGUAGE, but write it in Roman letters (Hinglish/Tenglish) to match how they're typing right now — don't force the native script back at them, and don't switch to English either. Write the ENTIRE reply in Roman letters: every single word, including the question at the end. Never mix scripts inside one reply or one sentence — "Kitne guests ke liye?" is right, "Kitne guests ke liye बुक करना चाहेंगे?" is wrong, and half-converted words like "Kitने" are the worst of both.\n`
       : "";
   // Live-caught, real and visible to the guest: after tapping "3+ people"
   // once, the guest was asked to re-confirm "how many guests total" on
@@ -494,7 +494,11 @@ PHOTOS
     legitimateUrls: new Set(profile?.googleMapsUrl ? [profile.googleMapsUrl] : []),
     // Returned so the reply can be checked against real rates — see
     // hasWrongRoomPrice. Already loaded above to build the prompt.
-    rooms: rooms.map((r) => ({ name: r.name, price: r.price })),
+    //
+    // The description rides along because hotels write occupancy-tiered rates
+    // into it ("₹1,299/night for 1 guest, ₹1,599 for 2"), and quoting one of
+    // those is correct pricing, not a hallucination.
+    rooms: rooms.map((r) => ({ name: r.name, price: r.price, description: r.description })),
   };
 }
 
@@ -573,19 +577,22 @@ export async function generateReply(
   // stripping it after the fact can. See stripUnapprovedUrls's own comment
   // for why this is a surgical strip rather than swapping the whole reply.
   const urlSafeText = stripUnapprovedUrls(rawText, legitimateUrls);
+  // Applied after the IMAGE: lines are extracted, so a "Photos:" label left
+  // dangling by that extraction can be cleaned up too.
+  const formatted = toWhatsAppFormatting(urlSafeText);
   // Deterministic interception for a live-observed hallucination: a
   // fabricated phone number or a false "booking confirmed" claim in prose,
   // most often when a guest types confirmation instead of tapping the
   // button. Swapped for a safe generic line rather than a partial rewrite.
   // A wrong PRICE is caught alongside the phone-number and false-confirmation
-  // cases, and for the same reason: it is a claim the guest will act on. Seen
-  // live — the model quoted rates 46% and 37% above the real ones with the
-  // correct figures in its own prompt. `rooms` here is the hotel's real
-  // inventory, already loaded to build the prompt.
+  // cases, and for the same reason: it is a claim the guest will act on.
+  // `rooms` carries each room's description as well as its base rate, because
+  // a hotel's occupancy-tiered pricing lives in that text and quoting it is
+  // correct — see hasWrongRoomPrice for the misdiagnosis that cost.
   const text =
-    hasHallucinationRisk(urlSafeText, legitimatePhoneNumbers) || hasWrongRoomPrice(urlSafeText, rooms)
+    hasHallucinationRisk(formatted, legitimatePhoneNumbers) || hasWrongRoomPrice(formatted, rooms)
       ? SAFE_REPLY_FALLBACK
-      : urlSafeText;
+      : formatted;
   // The deterministic waterfall (see selectDeterministicInteractive) is now
   // the primary decision-maker for which buttons accompany a reply, not the
   // AI's own "BUTTONS: X" marker — prompt-only button decisions proved
@@ -601,6 +608,9 @@ export async function generateReply(
     aiInteractive: interactive,
     knownGuestCount: context?.knownGuestCount,
     datesKnown: Boolean(context?.stayDates),
+    // Without this the buttons under a Telugu or Hindi reply were rendered
+    // from the English catalog.
+    language: resolveLanguage(context?.language),
   });
   return { reply: text, imageUrls, interactive: finalInteractive, shouldEscalate: false, agentName, pendingDates };
 }
