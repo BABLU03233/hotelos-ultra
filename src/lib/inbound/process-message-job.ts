@@ -4,6 +4,7 @@ import { ChatMessage } from "@/lib/ai/provider";
 import { findUnavailableRoomIds } from "@/lib/booking/availability";
 import { captureGuestCount } from "@/lib/booking/guest-count";
 import { resolveLanguage, t } from "@/lib/i18n/guest-language";
+import { isPauseStale } from "./ai-pause";
 import { shouldRestartSession } from "./session-restart";
 import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
@@ -45,7 +46,17 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
 
   // Staff has taken this conversation over manually — the AI stays silent
   // until they hand it back (M3: "pauses AI for that contact").
-  if (contact.aiPaused) return;
+  //
+  // But a pause is a statement about right now, and nothing ever cleared this
+  // one: a single manual reply silenced Anushka for that guest permanently.
+  // Found in production with five of eight contacts dead, guests messaging
+  // "Hi" into nothing for over a day. A pause older than the expiry is lifted
+  // here rather than honoured — see ai-pause.ts for why twelve hours.
+  if (contact.aiPaused) {
+    if (!isPauseStale(contact)) return;
+    await prisma.contact.update({ where: { id: contactId }, data: { aiPaused: false, aiPausedAt: null } });
+    console.log(`[ai-pause] lifted a stale pause for contact ${contactId}`);
+  }
 
   const recentMessages = await prisma.message.findMany({
     where: { tenantId, contactId },
@@ -182,6 +193,8 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // the guest's name without ever being given one.
     guestName: contact.name,
     returning,
+    // The RAW stored value, not resolveLanguage() — see languageAlreadyChosen.
+    languageAlreadyChosen: Boolean(contact.language),
   };
 
   const profile = await prisma.hotelProfile.findUnique({ where: { tenantId }, select: { aiAgentName: true, name: true } });

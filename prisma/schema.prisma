@@ -338,6 +338,18 @@ model Contact {
   // Set true the moment staff sends a manual reply — pauses the AI for this
   // contact until a staff member flips it back off (see M3 in the spec).
   aiPaused        Boolean       @default(false)
+  // When the pause started, so a stale one can expire.
+  //
+  // Sending a manual reply sets aiPaused, which is right while a human is
+  // actually in the conversation — but nothing ever cleared it, so one
+  // friendly message from staff silenced Anushka for that guest forever.
+  // Found in production with 5 of 8 contacts dead: guests were messaging
+  // "Hi" and getting nothing at all, for a day.
+  //
+  // A pause older than AI_PAUSE_EXPIRY_HOURS is treated as stale and lifted
+  // on the guest's next message. Staff who genuinely want the bot off can
+  // pause again from the CRM, and that tap re-stamps this.
+  aiPausedAt      DateTime?
   // A manually scheduled reminder (calendar date/time picker in the CRM) —
   // separate from the automated FollowUpRule ladder. When followUpDate
   // comes due, the worker's reminder sweep creates a REMINDER-type

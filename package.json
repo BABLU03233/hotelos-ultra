@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "soak": "tsx scripts/soak-conversations.ts",
-    "quality": "tsx scripts/quality-report.ts"
+    "quality": "tsx scripts/quality-report.ts",
+    "e2e": "tsx scripts/e2e/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

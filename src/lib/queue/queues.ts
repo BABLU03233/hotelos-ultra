@@ -18,12 +18,36 @@ const defaultJobOptions = {
   removeOnFail: { count: 5000 },
 };
 
+/**
+ * Set by the functional E2E suite, which drives processMessageJob inline and
+ * therefore never needs a job to be picked up.
+ *
+ * Without it, running the suite would require a live Redis purely to throw the
+ * enqueue away — and a test suite meant to run after every change should not
+ * depend on a service it does not exercise. Scoped to this one env var and
+ * never set in any deployed environment; production always gets a real queue.
+ */
+const queueDisabled = process.env.E2E_DISABLE_QUEUE === "1";
+
+type MinimalQueue<T> = Pick<Queue<T>, "add">;
+
+function inertQueue<T>(name: string): MinimalQueue<T> {
+  return {
+    // The caller only ever awaits this; nothing reads the returned Job.
+    add: (async () => {
+      console.warn(`[queue] ${name}: enqueue skipped (E2E_DISABLE_QUEUE)`);
+    }) as unknown as MinimalQueue<T>["add"],
+  };
+}
+
 /** Inbound WhatsApp message -> AI reply pipeline. The webhook route persists the raw
  *  message synchronously (so it's never lost) and just enqueues the id here. */
-export const messageQueue = new Queue<ProcessMessageJob>("message-processing", {
-  connection: redisConnection,
-  defaultJobOptions,
-});
+export const messageQueue: MinimalQueue<ProcessMessageJob> = queueDisabled
+  ? inertQueue<ProcessMessageJob>("message-processing")
+  : new Queue<ProcessMessageJob>("message-processing", {
+      connection: redisConnection,
+      defaultJobOptions,
+    });
 
 /** One job per CampaignRecipient — keeps sends rate-limited and individually retryable. */
 export const campaignQueue = new Queue<CampaignSendJob>("campaign-send", {

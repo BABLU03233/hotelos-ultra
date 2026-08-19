@@ -189,6 +189,17 @@ export interface ReplyContext {
   /** The guest's chosen chat language — obeyed unconditionally, see the LANGUAGE instruction. */
   language?: GuestLanguage | null;
   /**
+   * Whether a language has actually been CHOSEN, as opposed to defaulted.
+   *
+   * `language` cannot answer this: resolveLanguage() turns null into "en", so
+   * a guest who never picked is indistinguishable from one who picked English.
+   * Without the distinction the AI path recomputed "do we know their
+   * language?" from script alone and re-offered the picker to someone who had
+   * already answered — caught by the E2E suite on the session-restart case,
+   * where clearing history made a settled choice look unset.
+   */
+  languageAlreadyChosen?: boolean;
+  /**
    * The guest's WhatsApp profile name.
    *
    * The prompt has always said "use the guest's name if you know it" and the
@@ -307,6 +318,7 @@ export async function buildSystemPrompt(
     ? predictedStageInstruction({
         isFirstReply: context?.isFirstReply ?? false,
         languageObvious:
+          Boolean(context?.languageAlreadyChosen) ||
           looksLikeObviousLanguage(interactiveState.guestMessage) ||
           interactiveState.history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
         history: interactiveState.history,
@@ -656,7 +668,11 @@ export async function generateReply(
   // cover, but in practice most replies are decided by conversation state.
   const finalInteractive = selectDeterministicInteractive({
     isFirstReply: context?.isFirstReply ?? false,
-    languageObvious: looksLikeObviousLanguage(guestMessage) || history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
+    // A stored choice counts: asking twice is what the picker exists to avoid.
+    languageObvious:
+      Boolean(context?.languageAlreadyChosen) ||
+      looksLikeObviousLanguage(guestMessage) ||
+      history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content)),
     history,
     guestMessage,
     replyText: text,

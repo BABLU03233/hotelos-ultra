@@ -282,7 +282,11 @@ function ContactDetailPane({
           </button>
           {contact.aiPaused ? (
             <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600 lg:flex">
+              {/* Visible at every width. This badge was hidden below lg, so on
+                  the phone staff actually use there was no sign the assistant
+                  had stopped — which is how five contacts sat silently paused
+                  for a day while guests messaged into nothing. */}
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600">
                 <Bot className="size-3" /> AI paused
               </span>
               <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>

@@ -144,7 +144,12 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
         status: "SENT",
       },
     }),
-    db.contact.update({ where: { id }, data: { lastMessage: sendResult.content ?? "", aiPaused: true } }),
+    // aiPausedAt is stamped so the pause can expire. Without it, one manual
+    // reply silenced the assistant for this guest permanently.
+    db.contact.update({
+      where: { id },
+      data: { lastMessage: sendResult.content ?? "", aiPaused: true, aiPausedAt: new Date() },
+    }),
     db.scheduledFollowUp.updateMany({ where: { contactId: id, status: "PENDING" }, data: { status: "CANCELLED" } }),
   ]);
 
