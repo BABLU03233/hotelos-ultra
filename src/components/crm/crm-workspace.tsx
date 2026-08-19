@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ContactDetail } from "./contact-detail";
 import { ContactList } from "./contact-list";
 import { CrmPipelineView } from "./crm-pipeline-view";
+import { ExportContactsMenu } from "./export-contacts-menu";
 import { ImportContactsDialog } from "./import-contacts-dialog";
 
 type View = "list" | "pipeline";
@@ -42,7 +43,10 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
             <List className="size-3.5" /> List
           </Button>
         </div>
-        <ImportContactsDialog onImported={onChanged} />
+        <div className="flex items-center gap-2">
+          <ExportContactsMenu />
+          <ImportContactsDialog onImported={onChanged} />
+        </div>
       </div>
 
       {view === "pipeline" ? (

@@ -36,7 +36,7 @@ vi.mock("@/lib/booking/availability", () => ({
 
 const { buildSystemPrompt } = await import("./pipeline");
 
-const baseContext = {
+const baseContext: Record<string, unknown> = {
   isFirstReply: true,
   daysSinceLastInbound: null,
   leadSource: "DIRECT" as const,
@@ -46,7 +46,7 @@ const baseContext = {
   language: "en" as const,
 };
 
-const build = (ctx: Partial<typeof baseContext> & Record<string, unknown> = {}) =>
+const build = (ctx: Record<string, unknown> = {}) =>
   buildSystemPrompt("t1", [], { ...baseContext, ...ctx } as never, {
     history: [],
     guestMessage: "hi",
