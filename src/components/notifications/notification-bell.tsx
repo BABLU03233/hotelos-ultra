@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { formatRelativeTime } from "@/lib/format";
 import { NOTIFICATION_STYLE } from "@/lib/notification-style";
 import { useAuthStore } from "@/store/use-auth-store";
@@ -21,7 +22,10 @@ export function NotificationBell() {
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function resolve(id: string) {
-    await apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) });
+    await saveWithFeedback(
+      () => apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) }),
+      "Couldn’t resolve that notification"
+    );
     reload();
   }
 

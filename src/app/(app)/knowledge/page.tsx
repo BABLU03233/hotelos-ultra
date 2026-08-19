@@ -11,6 +11,7 @@ import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { formatDate } from "@/lib/format";
 import { useAuthStore } from "@/store/use-auth-store";
 import { KnowledgeDoc, KnowledgeDocType } from "@/types";
@@ -28,8 +29,11 @@ export default function KnowledgePage() {
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function remove(id: string) {
-    await apiFetch(`/api/knowledge/${id}`, { method: "DELETE" });
-    reload();
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/knowledge/${id}`, { method: "DELETE" }),
+      "Couldn’t delete that document"
+    );
+    if (ok) reload();
   }
 
   return (

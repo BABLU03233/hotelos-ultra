@@ -10,6 +10,7 @@ import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { formatRelativeTime, initials } from "@/lib/format";
 import { ContactStatusBadges } from "./contact-status-badges";
 import {
@@ -160,7 +161,13 @@ export function CrmPipelineView({ onSelect, reloadToken }: { onSelect: (id: stri
     const newStatus = over.id as LeadStatus;
     const contact = data?.contacts.find((c) => c.id === contactId);
     if (!contact || contact.leadStatus === newStatus) return;
-    await apiFetch(`/api/contacts/${contactId}`, { method: "PATCH", body: JSON.stringify({ leadStatus: newStatus }) });
+    // Always reload, success or failure: on failure the card must snap back
+    // to where it really is rather than sitting in the column the owner
+    // dragged it to, which would show a pipeline that does not exist.
+    await saveWithFeedback(
+      () => apiFetch(`/api/contacts/${contactId}`, { method: "PATCH", body: JSON.stringify({ leadStatus: newStatus }) }),
+      "Couldn’t move that contact"
+    );
     reload();
   }
 

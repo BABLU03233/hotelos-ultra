@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CalendarClock, CircleCheck, PartyPopper, TriangleAlert } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { useFetch } from "@/hooks/use-fetch";
 import { formatRelativeTime } from "@/lib/format";
 import { NOTIFICATION_STYLE } from "@/lib/notification-style";
@@ -37,7 +38,10 @@ export function DashboardAttentionPanel({
 
   async function resolve(id: string) {
     setJustResolved((prev) => new Set(prev).add(id));
-    await apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) });
+    await saveWithFeedback(
+      () => apiFetch(`/api/notifications/${id}`, { method: "PATCH", body: JSON.stringify({}) }),
+      "Couldn’t resolve that notification"
+    );
     reload();
   }
 
