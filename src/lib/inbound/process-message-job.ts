@@ -4,6 +4,7 @@ import { ChatMessage } from "@/lib/ai/provider";
 import { findUnavailableRoomIds } from "@/lib/booking/availability";
 import { captureGuestCount } from "@/lib/booking/guest-count";
 import { resolveLanguage, t } from "@/lib/i18n/guest-language";
+import { shouldRestartSession } from "./session-restart";
 import { resolveTypedRelativeDates } from "@/lib/booking/quick-pick-dates";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
 import { ProcessMessageJob } from "@/lib/queue/queues";
@@ -79,9 +80,44 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     return;
   }
 
-  const history: ChatMessage[] = chronological
-    .filter((m) => m.id !== latestInbound.id && m.content)
-    .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
+  // Warm vs. cold framing for Anushka: a fresh ad lead gets an energetic open,
+  // a guest who's gone quiet for a while gets a gentle re-spark instead of
+  // Anushka just resuming mid-conversation as if no time passed.
+  const previousInbound = inboundMessages.length > 1 ? inboundMessages[inboundMessages.length - 2] : null;
+
+  // A returning guest typing a bare "hi" after a long silence is starting
+  // over, not resuming. Without this they landed mid-conversation: the model
+  // saw a transcript ending in a booking reference, and an abandoned funnel
+  // still held the dates and party size they gave days ago, so a shortlist
+  // could be re-sent for dates that had since passed.
+  //
+  // Decided BEFORE the history and slots below, because the restart is
+  // expressed by emptying those inputs rather than by adding a second
+  // greeting path. With no history and no stored slots the existing waterfall
+  // already recognises a bare greeting and opens with the menu — and
+  // crucially its `intentShown` goes back to false, which is what previously
+  // kept any guest who had once been shown a room permanently past the
+  // greeting stage. See session-restart.ts for why six hours, and why only a
+  // greeting carrying nothing else counts.
+  const hoursSinceLastInbound = previousInbound
+    ? (latestInbound.createdAt.getTime() - previousInbound.createdAt.getTime()) / 3_600_000
+    : null;
+  const restarting = shouldRestartSession({ guestMessage: latestInbound.content, hoursSinceLastInbound });
+
+  if (restarting) {
+    // Persisted, not just dropped for this turn — otherwise the stale dates
+    // would come straight back on their next message.
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { pendingRoomId: null, pendingCheckIn: null, pendingCheckOut: null, pendingGuestCount: null },
+    });
+  }
+
+  const history: ChatMessage[] = restarting
+    ? []
+    : chronological
+        .filter((m) => m.id !== latestInbound.id && m.content)
+        .map((m) => ({ role: m.direction === "IN" ? "user" : "assistant", content: m.content! }));
 
   // Party size the guest states on THIS turn, if any — read before either
   // reply path runs, since the deterministic path below never calls
@@ -89,8 +125,10 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   // the end of the turn so it survives the 12-message history window, which
   // is what actually caused guests to be re-asked something they'd already
   // answered (see src/lib/booking/guest-count.ts).
-  const capturedGuestCount = captureGuestCount(latestInbound.content, history, contact.pendingGuestCount);
-  const knownGuestCount = capturedGuestCount ?? contact.pendingGuestCount ?? null;
+  const capturedGuestCount = restarting
+    ? null
+    : captureGuestCount(latestInbound.content, history, contact.pendingGuestCount);
+  const knownGuestCount = restarting ? null : (capturedGuestCount ?? contact.pendingGuestCount ?? null);
 
   // Tier-1.5 date capture, between the tapped rows (fully deterministic) and
   // the AI's DATES: marker (best-effort): a guest who TYPES "this weekend"
@@ -100,14 +138,11 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   // question re-fired once the turn scrolled out of the history window.
   // Only fills a gap — never overwrites dates already agreed.
   const typedDates =
-    contact.pendingCheckIn && contact.pendingCheckOut ? null : resolveTypedRelativeDates(latestInbound.content);
-  const effectiveCheckIn = contact.pendingCheckIn ?? typedDates?.checkIn ?? null;
-  const effectiveCheckOut = contact.pendingCheckOut ?? typedDates?.checkOut ?? null;
-
-  // Warm vs. cold framing for Anushka: a fresh ad lead gets an energetic open,
-  // a guest who's gone quiet for a while gets a gentle re-spark instead of
-  // Anushka just resuming mid-conversation as if no time passed.
-  const previousInbound = inboundMessages.length > 1 ? inboundMessages[inboundMessages.length - 2] : null;
+    restarting || (contact.pendingCheckIn && contact.pendingCheckOut)
+      ? null
+      : resolveTypedRelativeDates(latestInbound.content);
+  const effectiveCheckIn = restarting ? null : (contact.pendingCheckIn ?? typedDates?.checkIn ?? null);
+  const effectiveCheckOut = restarting ? null : (contact.pendingCheckOut ?? typedDates?.checkOut ?? null);
 
   // A returning guest, from their own confirmed bookings — one small indexed
   // query for the single most useful thing a concierge can know about who
@@ -230,8 +265,16 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   // underneath. For stages where the next message is 100% predictable and
   // needs zero real judgment, skip AI text-generation entirely -- see
   // resolveDeterministicReply's own docs for exactly which stages and why.
+  // "We already know what language to write in" — which is true from a
+  // stored choice just as much as from the script in front of us. Without
+  // contact.language here, a returning guest whose history has been cleared
+  // for a session restart would be shown the language picker a second time,
+  // having already told us once. The picker is only for guests we genuinely
+  // cannot place.
   const languageObvious =
-    looksLikeObviousLanguage(latestInbound.content) || history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content));
+    Boolean(contact.language) ||
+    looksLikeObviousLanguage(latestInbound.content) ||
+    history.some((m) => m.role === "user" && looksLikeObviousLanguage(m.content));
   const deterministic = resolveDeterministicReply({
     isFirstReply: replyContext.isFirstReply,
     languageObvious,
