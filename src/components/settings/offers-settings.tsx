@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { useAuthStore } from "@/store/use-auth-store";
 import { Offer } from "@/types";
 
@@ -28,16 +29,23 @@ function OfferCard({ offer, onChanged }: { offer: Offer; onChanged: () => void }
   async function save(patch: Partial<Offer> = {}) {
     const next = { ...form, ...patch };
     setForm(next);
-    await apiFetch(`/api/settings/offers/${offer.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title: next.title, description: next.description, discount: next.discount, code: next.code, active: next.active }),
-    });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () =>
+        apiFetch(`/api/settings/offers/${offer.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: next.title, description: next.description, discount: next.discount, code: next.code, active: next.active }),
+        }),
+      "Couldn’t save that offer"
+    );
+    if (ok) onChanged();
   }
 
   async function remove() {
-    await apiFetch(`/api/settings/offers/${offer.id}`, { method: "DELETE" });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/settings/offers/${offer.id}`, { method: "DELETE" }),
+      "Couldn’t delete that offer"
+    );
+    if (ok) onChanged();
   }
 
   return (

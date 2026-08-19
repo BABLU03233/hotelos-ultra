@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { formatMoney } from "@/lib/format";
 import { useAuthStore } from "@/store/use-auth-store";
 import { Room } from "@/types";
@@ -27,22 +28,29 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
   const [form, setForm] = React.useState(room);
 
   async function save() {
-    await apiFetch(`/api/settings/rooms/${room.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        name: form.name,
-        type: form.type,
-        description: form.description,
-        price: Number(form.price),
-        capacity: Number(form.capacity),
-      }),
-    });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () =>
+        apiFetch(`/api/settings/rooms/${room.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: form.name,
+            type: form.type,
+            description: form.description,
+            price: Number(form.price),
+            capacity: Number(form.capacity),
+          }),
+        }),
+      "Couldn't save that room"
+    );
+    if (ok) onChanged();
   }
 
   async function remove() {
-    await apiFetch(`/api/settings/rooms/${room.id}`, { method: "DELETE" });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/settings/rooms/${room.id}`, { method: "DELETE" }),
+      "Couldn't delete that room"
+    );
+    if (ok) onChanged();
   }
 
   return (

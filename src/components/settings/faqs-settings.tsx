@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { useAuthStore } from "@/store/use-auth-store";
 import { Faq } from "@/types";
 
@@ -27,13 +28,19 @@ function FaqRow({ faq, onChanged }: { faq: Faq; onChanged: () => void }) {
 
   async function save() {
     if (question === faq.question && answer === faq.answer) return;
-    await apiFetch(`/api/settings/faqs/${faq.id}`, { method: "PATCH", body: JSON.stringify({ question, answer }) });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/settings/faqs/${faq.id}`, { method: "PATCH", body: JSON.stringify({ question, answer }) }),
+      "Couldn’t save that FAQ"
+    );
+    if (ok) onChanged();
   }
 
   async function remove() {
-    await apiFetch(`/api/settings/faqs/${faq.id}`, { method: "DELETE" });
-    onChanged();
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/settings/faqs/${faq.id}`, { method: "DELETE" }),
+      "Couldn’t delete that FAQ"
+    );
+    if (ok) onChanged();
   }
 
   return (
