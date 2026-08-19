@@ -6,6 +6,19 @@ git pull
 
 docker build -t hotelos-ultra:latest .
 
+# Migrate BEFORE the new code starts serving, not after.
+#
+# The old order restarted the containers and migrated afterwards, which left a
+# window where new code queried a column that did not exist yet. Observed live:
+# the follow-up sweep threw "The column Contact.aiPausedAt does not exist" for
+# ~30 seconds, from the container restart until the migration landed a moment
+# later. Additive migrations are backward-compatible, so applying them while
+# the OLD containers are still up is safe — the reverse is not.
+#
+# Run as a one-off against the freshly built image so it uses the same code
+# that is about to serve.
+docker run --rm --network hotelos-net --env-file /opt/hotelos/app.env hotelos-ultra:latest npx prisma migrate deploy
+
 docker stop hotelos-web hotelos-worker
 docker rm hotelos-web hotelos-worker
 
