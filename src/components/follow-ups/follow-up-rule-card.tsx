@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Trash2 } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { MetaTemplatePicker } from "@/components/templates/meta-template-picker"
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { apiFetch } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { FollowUpAction, FollowUpRule } from "@/types";
 
@@ -56,6 +57,16 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
   const [delayValue, setDelayValue] = React.useState(initialDelay.value);
   const [delayUnit, setDelayUnit] = React.useState<DelayUnit>(initialDelay.unit);
   const [messageBody, setMessageBody] = React.useState(rule.messageBody ?? "");
+  /**
+   * Collapsed by default.
+   *
+   * Each step is a form roughly 400px tall, and a real sequence runs to seven
+   * of them — so the page was several screens of scrolling to answer a
+   * question ("what does step 4 do?") that fits on one line. Expanded is for
+   * editing; collapsed is for reading the sequence, which is what someone
+   * opening this page is usually doing.
+   */
+  const [open, setOpen] = React.useState(false);
 
   async function patch(body: Partial<FollowUpRule>) {
     try {
@@ -91,8 +102,45 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
         {!isLast && <span className="mt-1 w-px flex-1 bg-border" />}
       </div>
 
-      <Card className="flex-1">
+      <Card className="min-w-0 flex-1">
         <CardContent className="flex flex-col gap-3">
+          {/* The always-visible summary. Reads as a sentence rather than a row
+              of controls, so the sequence can be understood by scanning. */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-0.5 text-left"
+              aria-expanded={open}
+            >
+              <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+              <span className="shrink-0 text-sm font-medium">{ACTION_LABELS[rule.action]}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                after {delayValue} {delayValue === 1 ? delayUnit.replace(/s$/, "") : delayUnit}
+              </span>
+              {rule.repeatDaily && (
+                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  repeats daily
+                </span>
+              )}
+              {!open && messageBody.trim() && (
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/80">“{messageBody.trim()}”</span>
+              )}
+            </button>
+
+            {/* Outside the toggle: pausing a step and opening it are different
+                intentions, and putting a switch inside a button that also
+                expands makes one of them an accident. */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Switch checked={rule.active} onCheckedChange={(checked) => patch({ active: checked })} />
+              <span className="hidden text-xs text-muted-foreground sm:inline">{rule.active ? "Active" : "Paused"}</span>
+              <Button variant="ghost" size="icon-sm" onClick={remove}>
+                <Trash2 className="text-destructive" />
+              </Button>
+            </div>
+          </div>
+
+          {open && (
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-0.5">
               <Select value={rule.action} onValueChange={(v) => v && patch({ action: v as FollowUpAction })}>
@@ -145,15 +193,10 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
               <span className="text-xs text-muted-foreground">after last message</span>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
-              <Switch checked={rule.active} onCheckedChange={(checked) => patch({ active: checked })} />
-              <span className="text-xs text-muted-foreground">{rule.active ? "Active" : "Paused"}</span>
-              <Button variant="ghost" size="icon-sm" onClick={remove}>
-                <Trash2 className="text-destructive" />
-              </Button>
-            </div>
           </div>
+          )}
 
+          {open && (
           <div className="flex items-center gap-2">
             <Switch checked={rule.repeatDaily} onCheckedChange={(checked) => patch({ repeatDaily: checked })} />
             <span className="text-xs text-muted-foreground">
@@ -162,7 +205,9 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
                 : "Repeat daily (off) — sends once, then this rule is done"}
             </span>
           </div>
+          )}
 
+          {open && (
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-end">
               <TemplatePicker
@@ -185,7 +230,9 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
               {" "}below is used instead.
             </p>
           </div>
+          )}
 
+          {open && (
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Meta-approved template</Label>
             <p className="-mt-1 text-[11px] text-muted-foreground">
@@ -197,6 +244,7 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
               onChange={(next) => patch({ metaTemplateId: next.metaTemplateId, templateVariableValues: next.templateVariableValues })}
             />
           </div>
+          )}
         </CardContent>
       </Card>
     </div>

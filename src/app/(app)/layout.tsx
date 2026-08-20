@@ -20,17 +20,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const agentName = hotelProfile?.aiAgentName || "Anushka";
 
   return (
-    <div className="flex min-h-dvh w-full">
+    // h-dvh, not min-h-dvh, and the difference is the whole bug: with a
+    // minimum the shell grows past the viewport, so the PAGE scrolls and takes
+    // the sidebar and header with it — main overflow-y-auto never engages
+    // because main has no height to overflow. Pinning the shell to exactly one
+    // viewport makes main the only scroll container, which is what keeps the
+    // navigation on screen.
+    <div className="flex h-dvh w-full overflow-hidden">
       <AuthHydrator
         user={{ id: user.id, name: user.name, email: user.email, role: user.role }}
         tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug, aiAgentName: agentName }}
       />
       <BookingAlert />
       <Sidebar hotelName={tenant.name} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 min-h-0 flex-1 flex-col">
         <AppHeader hotelName={tenant.name} userName={user.name} userEmail={user.email} />
         {!tenant.whatsappPhoneNumberId && <WhatsAppBanner agentName={agentName} />}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

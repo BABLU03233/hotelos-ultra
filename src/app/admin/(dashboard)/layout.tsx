@@ -16,11 +16,12 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
   const pendingReviews = await prisma.campaign.count({ where: { approval: "PENDING_REVIEW" } });
 
   return (
-    <div className="flex min-h-dvh w-full flex-col">
+    // See the owner shell for why h-dvh rather than min-h-dvh.
+    <div className="flex h-dvh w-full flex-col overflow-hidden">
       <AdminTopbar name={admin.name} />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <AdminSidebar pendingReviews={pendingReviews} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

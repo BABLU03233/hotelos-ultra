@@ -27,7 +27,9 @@ export function AdminSidebar({ pendingReviews = 0 }: { pendingReviews?: number }
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-r border-l-0 border-sidebar-border bg-sidebar md:flex">
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+      {/* Scrolls on its own if the nav ever outgrows a short window; the
+          sidebar itself stays pinned either way. */}
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {ADMIN_NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/tenants");
           return (

@@ -41,8 +41,10 @@ export function CrmWorkspace({
     // costing roughly 60px of vertical room and 48px of width on every screen —
     // which on a laptop is two or three chat rows and a visibly narrower
     // conversation, permanently, in exchange for a border nobody was reading.
-    // 3.5rem is the app header's h-14, the only fixed chrome above this.
-    <div className="-m-4 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-background md:-m-6">
+    // h-full works now that the shell pins main to a real height — the old
+    // viewport calc had to guess at the chrome above it, and guessed wrong
+    // whenever the WhatsApp-not-connected banner was showing.
+    <div className="-m-4 flex h-full flex-col overflow-hidden bg-background md:-m-6">
       {/* One slim strip instead of the old full-height toolbar row. The view
           toggle has to live here rather than inside the chat list, because it
           also switches the pipeline view on. */}

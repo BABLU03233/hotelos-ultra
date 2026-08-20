@@ -19,7 +19,9 @@ export function Sidebar({ hotelName }: { hotelName: string }) {
         <span className="truncate font-heading text-sm font-semibold">{hotelName}</span>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+      {/* Scrolls on its own if the nav ever outgrows a short window; the
+          sidebar itself stays pinned either way. */}
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
