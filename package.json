@@ -17,7 +17,8 @@
     "test": "vitest run",
     "soak": "tsx scripts/soak-conversations.ts",
     "quality": "tsx scripts/quality-report.ts",
-    "e2e": "tsx scripts/e2e/run.ts"
+    "e2e": "tsx scripts/e2e/run.ts",
+    "ai:code": "tsx scripts/ai-code.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
