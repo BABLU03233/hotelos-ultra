@@ -76,6 +76,10 @@ async function checkProvider(
   }));
 }
 
+/** One retry, long enough for container networking to settle, short enough
+ *  not to delay a worker that is otherwise ready to take jobs. */
+const RETRY_DELAY_MS = 5_000;
+
 export async function verifyConfiguredModels(): Promise<ModelHealthEntry[]> {
   const [groq, openrouter, openrouter2] = await Promise.all([
     checkProvider("groq", "https://api.groq.com/openai/v1/models", "GROQ_API_KEY", [configuredGroqModel()]),
@@ -99,8 +103,37 @@ export async function logModelHealth(): Promise<void> {
     return;
   }
 
+  // Everything unchecked means the check learned nothing — every catalogue
+  // fetch failed. Observed in production: the worker starts the instant its
+  // container does, races the network being ready, and reports "0 live, 0
+  // missing, 9 unchecked". That is indistinguishable from a healthy run to
+  // anyone skimming the logs, so the early warning this exists to give —
+  // catching a retired model before guests notice the latency — is silently
+  // lost. Verified afterwards that the same catalogues answer in ~300ms, so
+  // one retry is enough; this is a cold-start race, not an outage.
+  if (results.length && results.every((r) => r.status === "unchecked")) {
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    try {
+      results = await verifyConfiguredModels();
+    } catch {
+      // Keep the first pass's results and report them as-is below.
+    }
+  }
+
   const missing = results.filter((r) => r.status === "MISSING");
   const ok = results.filter((r) => r.status === "ok");
+  const unchecked = results.filter((r) => r.status === "unchecked");
+
+  // Still nothing after the retry. Say so at warn level with the reasons
+  // attached, rather than letting a row of zeroes pass for a clean bill.
+  if (results.length && unchecked.length === results.length) {
+    console.warn(
+      `[model-health] could not verify ANY of ${results.length} configured model(s) — the chain is unmonitored this run.`
+    );
+    for (const r of unchecked.slice(0, 3)) {
+      console.warn(`[model-health]   ${r.provider} -> ${r.model}: ${r.detail ?? "no detail"}`);
+    }
+  }
 
   if (missing.length) {
     // Loud, greppable, and names the fix — this is the line that should have
@@ -115,6 +148,6 @@ export async function logModelHealth(): Promise<void> {
   }
 
   console.log(
-    `[model-health] ${ok.length} model(s) live, ${missing.length} missing, ${results.filter((r) => r.status === "unchecked").length} unchecked.`
+    `[model-health] ${ok.length} model(s) live, ${missing.length} missing, ${unchecked.length} unchecked.`
   );
 }
