@@ -50,121 +50,124 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ─── Theme: "Indigo Dusk" ───────────────────────────────────────────────
-   Deep indigo carries structure (primary, sidebar-active, ring) — indigo
-   sits deliberately between blue and violet on the wheel rather than
-   picking one, so the brand itself is the blend rather than a gradient
-   standing in for one. A true violet (--iris) survives as a secondary
-   accent for deliberate brand moments (VIP tags, highlights), same role
-   --gold played in the prior direction. Background shifts from warm cream
-   to a cool near-white with a whisper of lavender, so the whole surface
-   reads as one family instead of a cool brand sitting on a warm ground.
-   Status accents (chart-2..5) stay put; they're semantic, not brand, and
-   read the same regardless of which brand palette is active — chart-1 is
-   the one brand-tinted slot and re-tints with the rebrand. No gradients:
-   every fill below is a solid color, including buttons — the blend lives
-   in the hue choice, not a purple-to-blue sweep. Surfaces stay solid (real
-   bg contrast + border, not translucency) — content cards need to read as
-   solid, not hazy. .glass / .glass-strong below are reserved for genuinely
-   floating overlays (dialog, popover, dropdown, sheet) that sit on top of
-   solid content, never stacked on each other. */
+/* ─── Theme: WhatsApp ────────────────────────────────────────────────────
+   The real WhatsApp palette, not an approximation of it. Every hex below is
+   taken from WhatsApp Web itself: #00a884 for actions, #008069 for the darker
+   pressed/dark-mode variant, #d9fdd3 for the outgoing bubble, #53bdeb for the
+   read tick, #f0f2f5 / #ffffff for light surfaces and #111b21 / #202c33 for
+   dark ones.
+
+   The point is recognition, not decoration. Hotel staff live in WhatsApp all
+   day; the closer this looks to the app they already trust, the less of it
+   they have to learn. Green means "act" (send, confirm, unread) and nothing
+   else — it is never used to decorate a heading, because if everything is
+   green then green stops meaning anything.
+
+   Structure is unchanged from the previous direction: one --brand-green token
+   feeds --primary, --ring and --sidebar-primary, so the next rebrand is still
+   one line per mode. Status accents (chart-2..5) stay semantic and are left
+   alone; only chart-1, the brand-tinted slot, re-tints. Surfaces stay solid
+   (real bg contrast + border, not translucency); .glass is reserved for
+   genuinely floating overlays. */
 :root {
   /* Single source of truth for the brand color — --primary, --ring, and
      --sidebar-primary (below) all alias this instead of repeating the hex,
      so the next rebrand only touches one line per mode. */
-  --brand-indigo: #3f3ba3;
-  --brand-indigo-foreground: #ffffff;
+  --brand-green: #00a884;
+  --brand-green-foreground: #ffffff;
 
-  --background: #f7f6fb;
-  --foreground: #1c1a2e;
+  --background: #f0f2f5;
+  --foreground: #111b21;
   --card: #ffffff;
-  --card-foreground: #1c1a2e;
+  --card-foreground: #111b21;
   --popover: #ffffff;
-  --popover-foreground: #1c1a2e;
-  --primary: var(--brand-indigo);
-  --primary-foreground: var(--brand-indigo-foreground);
-  --secondary: #ece9f9;
-  --secondary-foreground: #1c1a2e;
-  --muted: #efedf7;
-  --muted-foreground: #6b6785;
-  --accent: #efedf7;
-  --accent-foreground: #1c1a2e;
+  --popover-foreground: #111b21;
+  --primary: var(--brand-green);
+  --primary-foreground: var(--brand-green-foreground);
+  --secondary: #e9edef;
+  --secondary-foreground: #111b21;
+  --muted: #f0f2f5;
+  --muted-foreground: #667781;
+  --accent: #e9edef;
+  --accent-foreground: #111b21;
   --destructive: #dc2626;
-  --border: rgba(28, 26, 46, 0.1);
-  --input: rgba(28, 26, 46, 0.14);
-  --ring: var(--brand-indigo);
-  /* True violet — the secondary accent from the Indigo Dusk direction.
-     Deliberately not wired to shadcn's --accent slot (that drives neutral
-     hover/highlight states on selects and menus); available as bg-iris /
-     text-iris / border-iris for deliberate brand moments only. */
-  --iris: #7c3aed;
+  --border: rgba(17, 27, 33, 0.1);
+  --input: rgba(17, 27, 33, 0.14);
+  --ring: var(--brand-green);
+  /* WhatsApp's deeper green — the pressed/header shade. Deliberately not
+     wired to shadcn's --accent slot (that drives neutral hover states on
+     selects and menus); available as bg-iris / text-iris for deliberate brand
+     moments only. Kept under the --iris name so no component has to change. */
+  --iris: #008069;
   --iris-foreground: #ffffff;
-  --chart-1: #7c3aed;
+  --chart-1: #00a884;
   --chart-2: #10b981;
   --chart-3: #8b5cf6;
   --chart-4: #f43f5e;
   --chart-5: #3b82f6;
   --radius: 1.0625rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #1c1a2e;
-  --sidebar-primary: var(--brand-indigo);
-  --sidebar-primary-foreground: var(--brand-indigo-foreground);
-  --sidebar-accent: #efedf7;
-  --sidebar-accent-foreground: #1c1a2e;
-  --sidebar-border: rgba(28, 26, 46, 0.08);
-  --sidebar-ring: var(--brand-indigo);
+  --sidebar-foreground: #111b21;
+  --sidebar-primary: var(--brand-green);
+  --sidebar-primary-foreground: var(--brand-green-foreground);
+  --sidebar-accent: #f0f2f5;
+  --sidebar-accent-foreground: #111b21;
+  --sidebar-border: rgba(17, 27, 33, 0.08);
+  --sidebar-ring: var(--brand-green);
 
   --font-display: var(--font-playfair), var(--font-sans);
   --glass-bg: rgba(255, 255, 255, 0.78);
   --glass-bg-strong: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(255, 255, 255, 0.65);
   --glass-highlight: rgba(255, 255, 255, 0.9);
-  --glass-shadow: 0 8px 32px rgba(63, 59, 163, 0.1), 0 1px 1px rgba(63, 59, 163, 0.05);
+  --glass-shadow: 0 8px 32px rgba(11, 20, 26, 0.1), 0 1px 1px rgba(11, 20, 26, 0.05);
 }
 
 .dark {
-  --brand-indigo: #8b7cf6;
-  --brand-indigo-foreground: #100c24;
+  /* WhatsApp's dark mode lifts the green rather than reusing #00a884 flat —
+     the light-mode green on a #111b21 ground is too dim to read as an action. */
+  --brand-green: #00a884;
+  --brand-green-foreground: #111b21;
 
-  --background: #131025;
-  --foreground: #f1eefc;
-  --card: #1c1832;
-  --card-foreground: #f1eefc;
-  --popover: #1c1832;
-  --popover-foreground: #f1eefc;
-  --primary: var(--brand-indigo);
-  --primary-foreground: var(--brand-indigo-foreground);
-  --secondary: #241f42;
-  --secondary-foreground: #f1eefc;
-  --muted: #241f42;
-  --muted-foreground: #a79fc9;
-  --accent: #241f42;
-  --accent-foreground: #f1eefc;
-  --destructive: #f04b4b;
-  --border: rgba(255, 255, 255, 0.14);
-  --input: rgba(255, 255, 255, 0.17);
-  --ring: var(--brand-indigo);
-  --iris: #a78bfa;
-  --iris-foreground: #170f2e;
-  --chart-1: #a78bfa;
+  --background: #111b21;
+  --foreground: #e9edef;
+  --card: #202c33;
+  --card-foreground: #e9edef;
+  --popover: #233138;
+  --popover-foreground: #e9edef;
+  --primary: var(--brand-green);
+  --primary-foreground: var(--brand-green-foreground);
+  --secondary: #2a3942;
+  --secondary-foreground: #e9edef;
+  --muted: #2a3942;
+  --muted-foreground: #8696a0;
+  --accent: #2a3942;
+  --accent-foreground: #e9edef;
+  --destructive: #f15c6d;
+  --border: rgba(255, 255, 255, 0.11);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: var(--brand-green);
+  --iris: #21c063;
+  --iris-foreground: #111b21;
+  --chart-1: #00a884;
   --chart-2: #34d399;
-  --chart-3: #a78bfa;
+  --chart-3: #21c063;
   --chart-4: #fb7185;
-  --chart-5: #60a5fa;
-  --sidebar: #100d20;
-  --sidebar-foreground: #f1eefc;
-  --sidebar-primary: var(--brand-indigo);
-  --sidebar-primary-foreground: var(--brand-indigo-foreground);
-  --sidebar-accent: #241f42;
-  --sidebar-accent-foreground: #f1eefc;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: var(--brand-indigo);
+  --chart-5: #53bdeb;
+  --sidebar: #0b141a;
+  --sidebar-foreground: #e9edef;
+  --sidebar-primary: var(--brand-green);
+  --sidebar-primary-foreground: var(--brand-green-foreground);
+  --sidebar-accent: #2a3942;
+  --sidebar-accent-foreground: #e9edef;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: var(--brand-green);
 
-  --glass-bg: rgba(28, 24, 50, 0.82);
-  --glass-bg-strong: rgba(28, 24, 50, 0.94);
-  --glass-border: rgba(255, 255, 255, 0.13);
-  --glass-highlight: rgba(255, 255, 255, 0.07);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --glass-bg: rgba(32, 44, 51, 0.85);
+  --glass-bg-strong: rgba(32, 44, 51, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.11);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {

@@ -86,7 +86,22 @@ export function createOmniRouteProvider(model: string): AIProvider {
           // `data:` chunks rather than a JSON object, so parsing it as JSON
           // yields nothing and every reply would look like an empty answer.
           stream: false,
-          max_tokens: 1024,
+          // 512, not 1024.
+          //
+          // Groq bills "requested" tokens as input + max_tokens, so this
+          // reservation is charged on every call whether or not it is used — and
+          // at a measured 5,749-token system prompt it was ~15% of a 8,000/min
+          // budget spent on headroom nobody wanted. The RULES cap a reply at three
+          // sentences; the longest real reply measured was well under 200 tokens,
+          // and 512 still leaves room for a Telugu or Hindi reply (which cost more
+          // tokens per character) plus the hidden reasoning gpt-oss spends at
+          // reasoning_effort=low.
+          //
+          // Deliberately not lower: too small a ceiling on a reasoning model is
+          // how a reply comes back empty, which this chain treats as a provider
+          // failure and fails over on — trading a little headroom for a lot of
+          // latency.
+          max_tokens: 512,
           messages: [{ role: "system", content: systemPrompt }, ...messages],
         }),
         // Longer than the 5s given to a single OpenRouter model, because a
