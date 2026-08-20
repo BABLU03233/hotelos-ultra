@@ -2,6 +2,7 @@
 
 import { History, Target } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { avatarColorClass } from "@/lib/avatar-color";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { LEAD_STATUS_DOT } from "@/lib/lead-status-colors";
 import { Contact } from "@/types";
@@ -22,7 +23,7 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
       )}
     >
       <Avatar>
-        <AvatarFallback>{initials(contact.name || contact.phone)}</AvatarFallback>
+        <AvatarFallback className={avatarColorClass(contact.id)}>{initials(contact.name || contact.phone)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">

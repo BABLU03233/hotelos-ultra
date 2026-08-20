@@ -12,7 +12,14 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
   const agentName = hotelProfile?.aiAgentName || "Anushka";
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+    // No max-width here, unlike every other page in this app. Those are
+    // reading/forms pages where a constrained line length helps; this is a
+    // chat desk, and the reference this was built to match runs edge to
+    // edge under the top bar — the extra width is what makes room for the
+    // docked guest-profile column alongside the list and the conversation.
+    // CrmWorkspace sizes itself via its own viewport calc below, not a
+    // parent height, so nothing else here needs to change.
+    <div className="flex flex-col gap-4">
       <Reveal>
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">CRM</h1>

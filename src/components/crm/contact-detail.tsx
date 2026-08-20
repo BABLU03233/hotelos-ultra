@@ -32,8 +32,10 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { useFetch } from "@/hooks/use-fetch";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "sonner";
+import { avatarColorClass } from "@/lib/avatar-color";
 import { dayKey, formatCountdown, formatDaySeparator, initials } from "@/lib/format";
 
 import { useAuthStore } from "@/store/use-auth-store";
@@ -200,6 +202,10 @@ function ContactDetailPane({
   const [reminderAt, setReminderAt] = React.useState("");
   const [reminderNote, setReminderNote] = React.useState("");
   const [detailsOpen, setDetailsOpen] = React.useState(false);
+  // 1280px = Tailwind's xl breakpoint used everywhere else in this app. Below
+  // it there is not enough width for list + chat + a docked profile column
+  // side by side, so the panel falls back to the Sheet it always was.
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
   const [detailsTab, setDetailsTab] = React.useState<"details" | "automation">("details");
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
@@ -256,133 +262,19 @@ function ContactDetailPane({
     await updateContact({ followUpDate: null, followUpNote: null });
   }
 
-  return (
-    <div className="flex h-full min-w-0 flex-1 flex-col">
-      <div className="flex flex-col gap-2 border-b border-border p-3">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <Button variant="ghost" size="icon-sm" className="-ml-1 shrink-0 md:hidden" onClick={onBack}>
-              <ArrowLeft />
-            </Button>
-          )}
-          <button
-            onClick={() => setDetailsOpen(true)}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-0.5 text-left transition hover:bg-muted/60"
-          >
-            <Avatar>
-              <AvatarFallback>{initials(contact.name || contact.phone)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{contact.name || contact.phone}</p>
-              <p className="truncate text-xs text-muted-foreground">{contact.whatsappNumber}</p>
-              {contact.optedOutAt && (
-                <p className="text-xs font-medium text-amber-600">Opted out</p>
-              )}
-            </div>
-          </button>
-          {contact.aiPaused ? (
-            <div className="flex shrink-0 items-center gap-1">
-              {/* Visible at every width. This badge was hidden below lg, so on
-                  the phone staff actually use there was no sign the assistant
-                  had stopped — which is how five contacts sat silently paused
-                  for a day while guests messaged into nothing. */}
-              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600">
-                <Bot className="size-3" /> AI paused
-              </span>
-              <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
-                Resume AI
-              </Button>
-            </div>
-          ) : (
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary lg:flex">
-                <Bot className="size-3" /> {agentName} active
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
-                Pause AI
-              </Button>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0"
-            onClick={() => setDetailsOpen(true)}
-            aria-label="Contact details"
-          >
-            <CircleUserRound />
-          </Button>
-        </div>
-
-        {contact.aiSummary && <p className="text-xs text-muted-foreground italic">{contact.aiSummary}</p>}
-
-        {escalation && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium">{agentName} escalated this conversation</p>
-              <p className="text-xs text-muted-foreground">{escalation.reason}</p>
-            </div>
-            <button onClick={resolveEscalation} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
-              Mark resolved
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* WhatsApp's chat surface: a warm sand ground in light mode, deep slate
-          in dark, with its faint doodle tile. The tile is an inline SVG data
-          URI rather than an asset — the artifact CSP and our own build both
-          stay simpler with nothing external to fetch. */}
-      <ScrollArea
-        className="min-h-0 flex-1 bg-[#efeae2] dark:bg-[#0b141a]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='0.035' stroke-width='1.2'%3E%3Cpath d='M12 8c2-3 6-3 8 0M40 14c3 1 4 5 1 7M20 44c-3 1-6-2-4-5M46 40c2 2 1 6-2 6'/%3E%3Ccircle cx='31' cy='27' r='3'/%3E%3Cpath d='M8 30h5M50 22h5M28 52v4M33 4v4'/%3E%3C/g%3E%3C/svg%3E\")",
-        }}
-      >
-        <div className="flex flex-col gap-[3px] px-3 py-4">
-          {!messages
-            ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-2/3" />)
-            : messages.map((m, i) => {
-                // A day separator whenever the calendar day changes, exactly
-                // like WhatsApp — without it a long conversation reads as one
-                // undifferentiated wall.
-                const prev = i > 0 ? messages[i - 1] : null;
-                const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
-                return (
-                  <React.Fragment key={m.id}>
-                    {newDay && (
-                      <div className="my-2 flex justify-center">
-                        <span className="rounded-md bg-white/90 px-3 py-1 text-[12.5px] font-medium text-[#54656f] uppercase shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">
-                          {formatDaySeparator(m.createdAt)}
-                        </span>
-                      </div>
-                    )}
-                    <MessageBubble message={m} />
-                  </React.Fragment>
-                );
-              })}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
-
-      {/* No 24-hour-window notice, in either direction. Staff can message any
-          contact at any time; if WhatsApp refuses one, the message itself says
-          why (see explainFailure in message-bubble.tsx). */}
-      <MessageComposer onSend={sendReply} onSendFile={sendFile} onSendTemplate={sendTemplate} sending={sending} />
-
-      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">
-          <SheetHeader className="border-b border-border">
-            <SheetTitle>Contact details</SheetTitle>
-            <SheetDescription className="sr-only">
-              Lead status, booking status, tags, notes, and automation for {contact.name || contact.phone}.
-            </SheetDescription>
-          </SheetHeader>
-
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-4 p-4">
+  // The panel that used to live only inside a slide-over Sheet, factored
+  // out so the exact same JSX renders in two different homes depending on
+  // screen width: docked as a permanent third column on desktop, matching
+  // a real CRM's always-visible guest profile — the reference this was
+  // built against keeps Profile/Notes/Timeline docked at all times, and a
+  // slide-over that has to be opened for every lookup reads as an
+  // afterthought next to that. Below the width a third column can't fit,
+  // it stays a Sheet exactly as before. Built once per render and consumed
+  // by exactly one of the two homes — see isDesktop below — so there is
+  // never a moment where both are mounted at once, fighting over the same
+  // controlled inputs (notes, tags, the reminder form).
+  const detailsBody = (
+    <>
               {contact.leadSource !== "DIRECT" && (
                 <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   {contact.leadSource === "META_AD" ? (
@@ -556,10 +448,161 @@ function ContactDetailPane({
                   )}
                 </TabsContent>
               </Tabs>
+    </>
+  );
+
+  return (
+    <>
+      <div className="flex h-full min-w-0 flex-1">
+        <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div className="flex flex-col gap-2 border-b border-border p-3">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon-sm" className="-ml-1 shrink-0 md:hidden" onClick={onBack}>
+              <ArrowLeft />
+            </Button>
+          )}
+          <button
+            onClick={() => setDetailsOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-0.5 text-left transition hover:bg-muted/60"
+          >
+            <Avatar>
+              <AvatarFallback className={avatarColorClass(contact.id)}>{initials(contact.name || contact.phone)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{contact.name || contact.phone}</p>
+              <p className="truncate text-xs text-muted-foreground">{contact.whatsappNumber}</p>
+              {contact.optedOutAt && (
+                <p className="text-xs font-medium text-amber-600">Opted out</p>
+              )}
             </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
-    </div>
+          </button>
+          {contact.aiPaused ? (
+            <div className="flex shrink-0 items-center gap-1">
+              {/* Visible at every width. This badge was hidden below lg, so on
+                  the phone staff actually use there was no sign the assistant
+                  had stopped — which is how five contacts sat silently paused
+                  for a day while guests messaged into nothing. */}
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600">
+                <Bot className="size-3" /> AI paused
+              </span>
+              <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
+                Resume AI
+              </Button>
+            </div>
+          ) : (
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary lg:flex">
+                <Bot className="size-3" /> {agentName} active
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
+                Pause AI
+              </Button>
+            </div>
+          )}
+          {/* Redundant on desktop, where the panel is already docked and
+              always visible — only needed below xl, where it opens the
+              Sheet. */}
+          {!isDesktop && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0"
+              onClick={() => setDetailsOpen(true)}
+              aria-label="Contact details"
+            >
+              <CircleUserRound />
+            </Button>
+          )}
+        </div>
+
+        {contact.aiSummary && <p className="text-xs text-muted-foreground italic">{contact.aiSummary}</p>}
+
+        {escalation && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium">{agentName} escalated this conversation</p>
+              <p className="text-xs text-muted-foreground">{escalation.reason}</p>
+            </div>
+            <button onClick={resolveEscalation} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
+              Mark resolved
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* WhatsApp's chat surface: a warm sand ground in light mode, deep slate
+          in dark, with its faint doodle tile. The tile is an inline SVG data
+          URI rather than an asset — the artifact CSP and our own build both
+          stay simpler with nothing external to fetch. */}
+      <ScrollArea
+        className="min-h-0 flex-1 bg-[#efeae2] dark:bg-[#0b141a]"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='0.035' stroke-width='1.2'%3E%3Cpath d='M12 8c2-3 6-3 8 0M40 14c3 1 4 5 1 7M20 44c-3 1-6-2-4-5M46 40c2 2 1 6-2 6'/%3E%3Ccircle cx='31' cy='27' r='3'/%3E%3Cpath d='M8 30h5M50 22h5M28 52v4M33 4v4'/%3E%3C/g%3E%3C/svg%3E\")",
+        }}
+      >
+        <div className="flex flex-col gap-[3px] px-3 py-4">
+          {!messages
+            ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-2/3" />)
+            : messages.map((m, i) => {
+                // A day separator whenever the calendar day changes, exactly
+                // like WhatsApp — without it a long conversation reads as one
+                // undifferentiated wall.
+                const prev = i > 0 ? messages[i - 1] : null;
+                const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
+                return (
+                  <React.Fragment key={m.id}>
+                    {newDay && (
+                      <div className="my-2 flex justify-center">
+                        <span className="rounded-md bg-white/90 px-3 py-1 text-[12.5px] font-medium text-[#54656f] uppercase shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">
+                          {formatDaySeparator(m.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    <MessageBubble message={m} />
+                  </React.Fragment>
+                );
+              })}
+          <div ref={bottomRef} />
+        </div>
+      </ScrollArea>
+
+      {/* No 24-hour-window notice, in either direction. Staff can message any
+          contact at any time; if WhatsApp refuses one, the message itself says
+          why (see explainFailure in message-bubble.tsx). */}
+      <MessageComposer onSend={sendReply} onSendFile={sendFile} onSendTemplate={sendTemplate} sending={sending} />
+
+        </div>
+
+        {isDesktop && (
+          <div className="flex w-80 shrink-0 flex-col border-l border-border">
+            <div className="border-b border-border p-3">
+              <p className="text-sm font-semibold">Contact details</p>
+            </div>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="flex flex-col gap-4 p-4">{detailsBody}</div>
+            </ScrollArea>
+          </div>
+        )}
+      </div>
+
+      {!isDesktop && (
+        <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">
+            <SheetHeader className="border-b border-border">
+              <SheetTitle>Contact details</SheetTitle>
+              <SheetDescription className="sr-only">
+                Lead status, booking status, tags, notes, and automation for {contact.name || contact.phone}.
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="flex flex-col gap-4 p-4">{detailsBody}</div>
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      )}
+    </>
   );
 }

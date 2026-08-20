@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Kanban, List } from "lucide-react";
+import { Kanban, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,11 @@ type View = "list" | "pipeline";
 export function CrmWorkspace({ initialContactId }: { initialContactId: string | null }) {
   const [selectedId, setSelectedId] = React.useState<string | null>(initialContactId);
   const [reloadToken, setReloadToken] = React.useState(0);
-  const [view, setView] = React.useState<View>(initialContactId ? "list" : "pipeline");
+  // Chat-first landing, matching the reference this was built against:
+  // opening the CRM shows the WhatsApp-style desk immediately, the same way
+  // opening WhatsApp Web itself lands you in the conversation list, not a
+  // board. Pipeline is one click away for the funnel view, not the default.
+  const [view, setView] = React.useState<View>("list");
 
   function onChanged() {
     setReloadToken((t) => t + 1);
@@ -40,7 +44,7 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
             className={cn("h-7 px-2.5 text-xs", view === "list" && "shadow-sm")}
             onClick={() => setView("list")}
           >
-            <List className="size-3.5" /> List
+            <MessagesSquare className="size-3.5" /> Chats
           </Button>
         </div>
         <div className="flex items-center gap-2">
@@ -63,7 +67,7 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
         <Card className="min-h-0 flex-1 flex-row overflow-hidden p-0">
           <div
             className={cn(
-              "w-full shrink-0 border-border p-3 md:w-80 md:border-r",
+              "w-full shrink-0 border-border p-3 md:w-[22rem] md:border-r",
               selectedId ? "hidden md:block" : "block"
             )}
           >
