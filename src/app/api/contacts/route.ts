@@ -3,6 +3,7 @@ import { apiRoute } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
 import { prisma } from "@/lib/prisma";
 import { contactListQuerySchema } from "@/lib/validation/contact";
+import { hotLead } from "@/lib/crm/hot-lead";
 
 export const GET = apiRoute(async (req: NextRequest) => {
   const { session, db } = requireTenantDb(req);
@@ -45,7 +46,20 @@ export const GET = apiRoute(async (req: NextRequest) => {
   `;
   const unreadByContact = new Map(unreadRows.map((r) => [r.contactId, Number(r.count)]));
 
-  return NextResponse.json({
-    contacts: contacts.map((c) => ({ ...c, unreadCount: unreadByContact.get(c.id) ?? 0 })),
+  // Hotness is derived, never stored — see hot-lead.ts for why a flag someone
+  // has to tick was the wrong shape. Computed here rather than in the client
+  // so the list, the filter chip's count and any future export all agree, and
+  // so the rule lives in one testable place.
+  const now = new Date();
+  const withHotness = contacts.map((c) => {
+    const hot = hotLead(c, now);
+    return {
+      ...c,
+      unreadCount: unreadByContact.get(c.id) ?? 0,
+      hotScore: hot.score,
+      hotReasons: hot.reasons,
+    };
   });
+
+  return NextResponse.json({ contacts: withHotness });
 });

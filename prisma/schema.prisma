@@ -374,6 +374,24 @@ model Contact {
   // StaffNotification prompting staff to personally reach out, then clears
   // both fields — it's a nudge to a human, not an automatic WhatsApp send,
   // since a one-off manual follow-up usually needs personal context.
+  // A HUMAN has explicitly taken this conversation. Distinct from aiPaused
+  // above, and the distinction is the whole point: an auto-pause expires after
+  // 12 hours so a forgotten one cannot silence Anushka forever, but a
+  // receptionist mid-booking must NOT have her wake up overnight and start
+  // talking over them. While this is set the pause never goes stale — it ends
+  // only when someone taps "Return to Anushka".
+  handoverAt      DateTime?
+  // Who took it, and why. A plain string, not a relation: this is the record a
+  // receptionist reads on the next shift, and it has to survive the staff
+  // account being deleted.
+  handoverByName  String?
+  handoverReason  String?
+  // What the receptionist wants Anushka to know when she picks the
+  // conversation back up — "quoted 2400 for the deluxe, guest is checking with
+  // family". Fed into her prompt (see ABOUT THIS GUEST in pipeline.ts), NOT
+  // just filed in the CRM: a handover note nobody reads is how the guest ends
+  // up being asked the same question twice.
+  aiBriefing      String?       @db.Text
   followUpDate    DateTime?
   followUpNote    String?
   notes           String?       @db.Text

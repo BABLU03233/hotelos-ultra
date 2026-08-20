@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquarePlus, Search, Users } from "lucide-react";
+import { Flame, MessageSquarePlus, Search, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { useFetch } from "@/hooks/use-fetch";
+import { HOT_THRESHOLD } from "@/lib/crm/hot-lead";
 import { cn } from "@/lib/utils";
 import { Contact, LeadStatus } from "@/types";
 import { ContactListItem } from "./contact-list-item";
@@ -20,11 +21,15 @@ import { ContactListItem } from "./contact-list-item";
  * to read WhatsApp; the closer this is, the less there is to learn.
  */
 
-type Filter = { key: LeadStatus | "ALL" | "UNREAD"; label: string };
+type Filter = { key: LeadStatus | "ALL" | "UNREAD" | "HOT"; label: string };
 
 const FILTERS: Filter[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
+  // Second only to Unread, because it is the other list worth opening cold:
+  // guests who got close to booking and stopped. Derived per request from what
+  // they actually did — see lib/crm/hot-lead.ts.
+  { key: "HOT", label: "Hot" },
   { key: "NEW", label: "New" },
   { key: "INTERESTED", label: "Interested" },
   { key: "FOLLOW_UP", label: "Follow-up" },
@@ -46,7 +51,7 @@ export function ContactList({
   const params = new URLSearchParams();
   // UNREAD is a client-side view of whatever the server returned, not a lead
   // status — sending it as one would filter on a value the API doesn't know.
-  if (filter !== "ALL" && filter !== "UNREAD") params.set("leadStatus", filter);
+  if (filter !== "ALL" && filter !== "UNREAD" && filter !== "HOT") params.set("leadStatus", filter);
   if (search) params.set("search", search);
 
   const { data, loading, reload } = useFetch<{ contacts: Contact[] }>(`/api/contacts?${params.toString()}`, 20_000);
@@ -58,10 +63,18 @@ export function ContactList({
 
   const contacts = React.useMemo(() => {
     const all = data?.contacts ?? [];
-    return filter === "UNREAD" ? all.filter((c) => (c.unreadCount ?? 0) > 0) : all;
+    if (filter === "UNREAD") return all.filter((c) => (c.unreadCount ?? 0) > 0);
+    // Hottest first, not newest first. This list exists to be worked top-down
+    // in whatever time reception has, so the guest closest to booking has to be
+    // the one at the top.
+    if (filter === "HOT") {
+      return all.filter((c) => (c.hotScore ?? 0) >= HOT_THRESHOLD).sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
+    }
+    return all;
   }, [data?.contacts, filter]);
 
   const unreadTotal = (data?.contacts ?? []).filter((c) => (c.unreadCount ?? 0) > 0).length;
+  const hotTotal = (data?.contacts ?? []).filter((c) => (c.hotScore ?? 0) >= HOT_THRESHOLD).length;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -99,6 +112,7 @@ export function ContactList({
           >
             {f.label}
             {f.key === "UNREAD" && unreadTotal > 0 && <span className="ml-1 tabular-nums">{unreadTotal}</span>}
+            {f.key === "HOT" && hotTotal > 0 && <span className="ml-1 tabular-nums">{hotTotal}</span>}
           </button>
         ))}
       </div>
@@ -129,12 +143,14 @@ export function ContactList({
 
         {!loading && contacts.length === 0 && (
           <EmptyState
-            icon={Users}
-            title={filter === "UNREAD" ? "Nothing unread" : "No chats yet"}
+            icon={filter === "HOT" ? Flame : Users}
+            title={filter === "UNREAD" ? "Nothing unread" : filter === "HOT" ? "No hot leads" : "No chats yet"}
             description={
-              search || filter !== "ALL"
-                ? "Try a different search or filter."
-                : "Conversations appear here as guests message your WhatsApp number."
+              filter === "HOT"
+                ? "Guests who picked a room or gave dates and then went quiet show up here, closest to booking first."
+                : search || filter !== "ALL"
+                  ? "Try a different search or filter."
+                  : "Conversations appear here as guests message your WhatsApp number."
             }
           />
         )}

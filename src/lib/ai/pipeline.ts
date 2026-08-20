@@ -216,6 +216,12 @@ export interface ReplyContext {
    */
   guestName?: string | null;
   /**
+   * A note a receptionist left when handing the conversation back to Anushka
+   * — Contact.aiBriefing. Carried through the context rather than re-read from
+   * the database here, same as every other guest fact on this interface.
+   */
+  staffBriefing?: string | null;
+  /**
    * A guest who has stayed before, from their own confirmed bookings.
    *
    * The single most valuable thing a hotel concierge can know and the one
@@ -462,6 +468,18 @@ export async function buildSystemPrompt(
   if (stay && bookableRooms.length > 0 && bookableRooms.length <= 2 && rooms.length > bookableRooms.length) {
     guestFacts.push(
       `Only ${bookableRooms.length} of the hotel's ${rooms.length} rooms ${bookableRooms.length === 1 ? "is" : "are"} still free for their dates. This is true, so it is fair to mention once, plainly, as a reason not to leave it too late — never dress it up as a countdown or repeat it.`
+    );
+  }
+  // What a receptionist wrote when they handed the conversation back.
+  //
+  // Placed last so it is the final thing said about the guest, and worded so
+  // the model treats it as fact from a colleague rather than a suggestion:
+  // this is a human who spoke to the guest, and the whole reason handover
+  // notes exist is so the guest is not asked something they already answered
+  // on the phone.
+  if (context?.staffBriefing) {
+    guestFacts.push(
+      `A member of the hotel team spoke to this guest and left you this note: "${context.staffBriefing}". Treat it as true and current. Do not contradict it, do not ask them for anything it already tells you, and do not read it out or mention that a note exists.`
     );
   }
   const guestSection = guestFacts.length ? `\nABOUT THIS GUEST\n${guestFacts.map((f) => `- ${f}`).join("\n")}\n` : "";

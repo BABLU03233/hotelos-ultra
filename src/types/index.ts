@@ -18,6 +18,12 @@ export interface Contact {
   bookingStatus: BookingStatus;
   aiSummary: string | null;
   aiPaused: boolean;
+  /** Set while a person explicitly holds the conversation — see lib/crm/handover.ts. */
+  handoverAt: string | null;
+  handoverByName: string | null;
+  handoverReason: string | null;
+  /** A receptionist's note for the AI, written when handing the chat back. */
+  aiBriefing: string | null;
   followUpDate: string | null;
   followUpNote: string | null;
   notes: string | null;
@@ -32,6 +38,11 @@ export interface Contact {
   // Only populated by GET /api/contacts (the list endpoint) — a real count
   // of inbound messages since lastReadAt, not just a boolean unread flag.
   unreadCount?: number;
+  // Also list-endpoint only. Derived per request from what the guest actually
+  // did (see lib/crm/hot-lead.ts), never stored — a stored flag goes stale the
+  // moment nobody updates it.
+  hotScore?: number;
+  hotReasons?: string[];
 }
 
 export type MessageDirection = "IN" | "OUT";

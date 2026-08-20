@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { fireBookingNotification } from "@/lib/contacts/fire-booking-notification";
+import { HANDOVER_REASON, takeOverFields } from "@/lib/crm/handover";
 import { todayMidnightIST } from "@/lib/india-time";
 import { derivePrefix, randomReferenceCode } from "./reference-code";
 
@@ -133,6 +134,18 @@ export async function completeBooking(
       pendingCheckIn: null,
       pendingCheckOut: null,
       pendingGuestCount: null,
+      // Hand the conversation to a person the moment a booking exists.
+      //
+      // Everything after this point is human work — taking payment, checking
+      // an ID, agreeing an arrival time, honouring a request Anushka has no
+      // authority over. She is explicitly forbidden from taking payment or
+      // quoting a binding rate, so leaving her in charge of a booked guest
+      // means the one conversation that has already produced revenue is the
+      // one nobody is watching.
+      //
+      // Not a pause: a pause expires after twelve hours and would put her back
+      // in the middle of a settled booking overnight. See handover.ts.
+      ...takeOverFields(HANDOVER_REASON.BOOKED),
     },
   });
 

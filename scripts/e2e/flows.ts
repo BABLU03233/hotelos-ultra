@@ -143,6 +143,101 @@ export const FLOWS: Flow[] = [
     },
   },
   {
+    id: "booking-hands-over-to-a-human",
+    area: "handover",
+    title: "A completed booking hands the chat to a person",
+    because:
+      "Everything after a booking — payment, ID, arrival time — is work Anushka is forbidden from doing. Left in charge, the one conversation that already produced revenue is the one nobody is watching.",
+    async run({ prisma, tenantId }) {
+      const { completeBooking } = await import("@/lib/booking/complete-booking");
+      const { conversationMode } = await import("@/lib/crm/handover");
+      const { isPauseStale } = await import("@/lib/inbound/ai-pause");
+      const checks: FlowCheck[] = [];
+
+      const number = `95551${String(seedCounter++).padStart(6, "0")}`;
+      const contact = await prisma.contact.create({
+        data: { tenantId, whatsappNumber: number, phone: number, name: "Booking Guest", leadStatus: "INTERESTED" },
+      });
+
+      const before = await prisma.contact.findUnique({ where: { id: contact.id } });
+      checks.push({ label: "before booking, the AI is answering", passed: conversationMode(before) === "ai" });
+
+      await completeBooking(prisma, tenantId, contact.id);
+
+      const after = await prisma.contact.findUnique({ where: { id: contact.id } });
+      checks.push({ label: "after booking, a human holds the chat", passed: conversationMode(after) === "human" });
+      checks.push({ label: "aiPaused is set, so the inbound pipeline stays quiet", passed: after.aiPaused === true });
+      checks.push({ label: "the reason is recorded for the next shift", passed: Boolean(after.handoverReason) });
+
+      // The bug this exists to prevent: the 12h auto-expiry firing on a
+      // deliberate handover and putting Anushka back into a settled booking.
+      const thirtyHoursLater = new Date(Date.now() + 30 * 3_600_000);
+      checks.push({
+        label: "the handover does NOT expire after 12 hours",
+        passed: isPauseStale(after, thirtyHoursLater) === false,
+      });
+
+      return checks;
+    },
+  },
+  {
+    id: "return-to-ai-carries-the-note",
+    area: "handover",
+    title: "Handing a chat back gives the AI the receptionist's note",
+    because:
+      "A handover note nobody reads is how a guest gets asked on WhatsApp for something they already answered on the phone.",
+    async run({ prisma, tenantId }) {
+      const { returnToAiFields, takeOverFields, HANDOVER_REASON } = await import("@/lib/crm/handover");
+      const { conversationMode } = await import("@/lib/crm/handover");
+      const { buildSystemPrompt } = await import("@/lib/ai/pipeline");
+      const checks: FlowCheck[] = [];
+
+      const number = `95552${String(seedCounter++).padStart(6, "0")}`;
+      const contact = await prisma.contact.create({
+        data: {
+          tenantId,
+          whatsappNumber: number,
+          phone: number,
+          name: "Handover Guest",
+          ...takeOverFields(HANDOVER_REASON.MANUAL, "Priya"),
+        },
+      });
+
+      const briefing = "Quoted 2400 for the Deluxe on the phone. Guest is checking with family.";
+      const returned = await prisma.contact.update({
+        where: { id: contact.id },
+        data: returnToAiFields(briefing),
+      });
+
+      checks.push({ label: "the chat is back with the AI", passed: conversationMode(returned) === "ai" });
+      checks.push({ label: "the note is stored on the contact", passed: returned.aiBriefing === briefing });
+      checks.push({ label: "the handover fields are cleared", passed: returned.handoverAt === null && returned.handoverByName === null });
+
+      // The half that actually matters: it has to reach the model, not just
+      // the database.
+      const { prompt } = await buildSystemPrompt(tenantId, [], {
+        isFirstReply: false,
+        daysSinceLastInbound: 1,
+        leadSource: "DIRECT",
+        sourceDetail: null,
+        knownGuestCount: null,
+        stayDates: null,
+        staffBriefing: returned.aiBriefing,
+      });
+      checks.push({ label: "the note appears in the AI's prompt", passed: prompt.includes(briefing) });
+      checks.push({
+        label: "the AI is told not to read it out to the guest",
+        passed: /do not read it out/i.test(prompt),
+      });
+
+      // And an empty briefing must not leave a stale note behind.
+      const cleared = await prisma.contact.update({ where: { id: contact.id }, data: returnToAiFields() });
+      checks.push({ label: "handing back with no note clears the old one", passed: cleared.aiBriefing === null });
+
+      return checks;
+    },
+  },
+  {
     id: "campaign-auto-review-flags-bad-copy",
     area: "campaigns",
     title: "The automated reviewer flags risky promotional copy",

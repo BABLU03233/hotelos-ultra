@@ -4,12 +4,12 @@ import * as React from "react";
 import {
   ArrowLeft,
   BellOff,
-  Bot,
   CalendarClock,
   CircleUserRound,
   Clock,
   History,
   MessagesSquare,
+  StickyNote,
   Target,
   TriangleAlert,
   X,
@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { BookingStatus, Contact, FollowUpAction, LeadStatus, Message, ScheduledFollowUp, StaffMember, StaffNotification } from "@/types";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
+import { HandoverControls } from "./handover-controls";
 
 const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   NEW: "New",
@@ -187,6 +188,10 @@ export function ContactDetail({
       sendReply={sendReply}
       sendFile={sendFile}
       sendTemplate={sendTemplate}
+      refresh={() => {
+        reloadContact();
+        onChanged?.();
+      }}
       onBack={onBack}
     />
   );
@@ -200,6 +205,7 @@ function ContactDetailPane({
   sendReply,
   sendFile,
   sendTemplate,
+  refresh,
   onBack,
 }: {
   contact: Contact;
@@ -209,6 +215,8 @@ function ContactDetailPane({
   sendReply: (text: string) => Promise<void>;
   sendFile: (file: File, caption: string) => Promise<void>;
   sendTemplate: (name: string, language: string) => Promise<void>;
+  /** Re-reads the contact and tells the list to refresh — used after a handover. */
+  refresh: () => void;
   onBack?: () => void;
 }) {
   const [notes, setNotes] = React.useState(contact.notes ?? "");
@@ -491,29 +499,6 @@ function ContactDetailPane({
               )}
             </div>
           </button>
-          {contact.aiPaused ? (
-            <div className="flex shrink-0 items-center gap-1">
-              {/* Visible at every width. This badge was hidden below lg, so on
-                  the phone staff actually use there was no sign the assistant
-                  had stopped — which is how five contacts sat silently paused
-                  for a day while guests messaged into nothing. */}
-              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-600">
-                <Bot className="size-3" /> AI paused
-              </span>
-              <Button variant="outline" size="sm" onClick={() => updateContact({ aiPaused: false })}>
-                Resume AI
-              </Button>
-            </div>
-          ) : (
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary lg:flex">
-                <Bot className="size-3" /> {agentName} active
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => updateContact({ aiPaused: true })}>
-                Pause AI
-              </Button>
-            </div>
-          )}
           {/* Redundant on desktop, where the panel is already docked and
               always visible — only needed below xl, where it opens the
               Sheet. */}
@@ -530,7 +515,29 @@ function ContactDetailPane({
           )}
         </div>
 
+        {/* Full width, directly under the name. Who is replying is the first
+            thing a receptionist has to know before typing, and it used to be a
+            chip that was `hidden lg:flex` — invisible on the phone they
+            actually work from. */}
+        <HandoverControls
+          contact={contact}
+          agentName={agentName}
+          onChanged={refresh}
+        />
+
         {contact.aiSummary && <p className="text-xs text-muted-foreground italic">{contact.aiSummary}</p>}
+
+        {/* The note the last person left for Anushka. Shown to staff too — the
+            next receptionist needs to know what the guest was already told, and
+            a note only the model can see is a note the team cannot correct. */}
+        {contact.aiBriefing && (
+          <div className="flex items-start gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
+            <StickyNote className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Note for {agentName}:</span> {contact.aiBriefing}
+            </p>
+          </div>
+        )}
 
         {escalation && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">

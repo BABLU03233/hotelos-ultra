@@ -192,6 +192,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // it; until now it never reached the prompt, so the model was told to use
     // the guest's name without ever being given one.
     guestName: contact.name,
+    staffBriefing: contact.aiBriefing,
     returning,
     // The RAW stored value, not resolveLanguage() — see languageAlreadyChosen.
     languageAlreadyChosen: Boolean(contact.language),

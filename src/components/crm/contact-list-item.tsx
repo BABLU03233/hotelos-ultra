@@ -1,8 +1,10 @@
 "use client";
 
-import { Bot, History, Target, UserRound } from "lucide-react";
+import { Bot, Flame, History, Target, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
+import { conversationMode } from "@/lib/crm/handover";
+import { HOT_THRESHOLD } from "@/lib/crm/hot-lead";
 import { Contact } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +57,8 @@ function Chip({ className, children }: { className?: string; children: React.Rea
 export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
   const unreadCount = contact.unreadCount ?? 0;
   const unread = unreadCount > 0;
+  const mode = conversationMode(contact);
+  const hot = (contact.hotScore ?? 0) >= HOT_THRESHOLD;
 
   return (
     <button
@@ -95,13 +99,29 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
               know before they type into it. A paused assistant means a human
               is expected to answer, and that must be visible without opening
               the chat. */}
-          {contact.aiPaused ? (
+          {mode === "human" ? (
+            // A person formally holds this one. Distinct from the softer
+            // "paused" below, because the two call for different behaviour: a
+            // handover is somebody else's job right now, a pause is nobody's.
+            <Chip className="bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <UserRound className="size-2.5" /> {contact.handoverByName || "Reception"}
+            </Chip>
+          ) : mode === "paused" ? (
             <Chip className="bg-amber-500/10 text-amber-600 dark:text-amber-500">
               <UserRound className="size-2.5" /> Human
             </Chip>
           ) : (
             <Chip className="bg-primary/10 text-primary">
               <Bot className="size-2.5" /> Anushka
+            </Chip>
+          )}
+
+          {/* Hot leads carry their strongest reason inline. A flame with no
+              explanation is a badge staff learn to ignore; "Picked a room and
+              gave dates" tells them what to open the chat and say. */}
+          {hot && (
+            <Chip className="bg-orange-500/10 font-semibold text-orange-600 dark:text-orange-400">
+              <Flame className="size-2.5" /> {contact.hotReasons?.[0] ?? "Close to booking"}
             </Chip>
           )}
 
