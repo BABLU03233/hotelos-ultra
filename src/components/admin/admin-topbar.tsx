@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { ADMIN_NAV_ITEMS } from "@/components/admin/admin-sidebar";
 import { MobileNav } from "@/components/app-shell/mobile-nav";
+import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
 
@@ -46,6 +47,7 @@ export function AdminTopbar({ name }: { name: string }) {
       </div>
       <div className="flex items-center gap-3">
         <span className="hidden text-xs text-muted-foreground sm:inline">{name}</span>
+        <ThemeToggle />
         <Button variant="ghost" size="sm" onClick={logout}>
           <LogOut /> Log out
         </Button>

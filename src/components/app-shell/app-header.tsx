@@ -4,6 +4,7 @@ import { MobileNav } from "@/components/app-shell/mobile-nav";
 import { NAV_ITEMS } from "@/components/app-shell/nav-config";
 import { UserMenu } from "@/components/app-shell/user-menu";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { ThemeToggle } from "@/components/app-shell/theme-toggle";
 
 /**
  * Client wrapper around the app header's interactive pieces. NAV_ITEMS carries Lucide icon
@@ -26,6 +27,7 @@ export function AppHeader({
         <span className="truncate font-heading text-sm font-semibold">{hotelName}</span>
       </div>
       <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
         <NotificationBell />
         <UserMenu name={userName} email={userEmail} />
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Upload } from "lucide-react";
+import { UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,7 +87,7 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
-            <Upload /> Import contacts
+            <UserRoundPlus /> Import contacts
           </Button>
         }
       />

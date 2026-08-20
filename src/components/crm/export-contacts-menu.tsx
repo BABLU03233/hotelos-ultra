@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Download, FileSpreadsheet, Megaphone } from "lucide-react";
+import { FileDown, FileSpreadsheet, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -52,7 +52,7 @@ export function ExportContactsMenu() {
       <PopoverTrigger
         render={
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-            <Download className="size-3.5" /> Export
+            <FileDown className="size-3.5" /> Export
           </Button>
         }
       />
