@@ -552,9 +552,6 @@ describe("greetMenuPrompt / dateQuickPickPrompt", () => {
 });
 
 const GUEST_COUNT_BUTTON_IDS = ["guests_1", "guests_2", "guests_3plus"];
-const asRowIds = (p: InteractivePrompt | undefined) =>
-  p?.type === "list" ? p.rows.map((r) => r.id) : (p?.buttons?.map((b) => b.id) ?? []);
-
 describe("selectDeterministicInteractive", () => {
   const base = {
     isFirstReply: false,
