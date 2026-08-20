@@ -105,7 +105,7 @@ export function MessageComposer({
   const canSend = Boolean(file) || Boolean(text.trim());
 
   return (
-    <div className="flex flex-col gap-1.5 bg-[#f0f2f5] p-2.5 dark:bg-[#202c33]">
+    <div className="flex flex-col gap-2 bg-[#f0f2f5] px-4 py-3 dark:bg-[#202c33]">
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {SHORT_REPLIES.map((reply) => (
           <button
@@ -165,18 +165,18 @@ export function MessageComposer({
               </Button>
             }
           />
-          <PopoverContent align="start" side="top" className="w-80 p-0">
+          <PopoverContent align="start" side="top" sideOffset={8} className="w-80 max-w-[calc(100vw-2rem)] p-0">
             <div className="border-b border-border px-3 py-2">
               <p className="text-xs font-medium">📋 Your FAQ answers</p>
               <p className="text-[11px] text-muted-foreground">Tap to insert, then edit before sending.</p>
             </div>
-            <ScrollArea className="max-h-64">
+            <ScrollArea className="max-h-[min(20rem,45vh)]">
               {!data ? (
                 <p className="p-4 text-center text-xs text-muted-foreground">Loading…</p>
               ) : data.faqs.length === 0 ? (
                 <p className="p-4 text-center text-xs text-muted-foreground">No FAQs yet — add some in Settings.</p>
               ) : (
-                <div className="flex flex-col p-1">
+                <div className="flex flex-col gap-0.5 p-1.5">
                   {data.faqs.map((faq) => (
                     <button
                       key={faq.id}
@@ -184,7 +184,7 @@ export function MessageComposer({
                         setText(faq.answer);
                         setQuickReplyOpen(false);
                       }}
-                      className="rounded-md p-2 text-left text-xs hover:bg-muted"
+                      className="rounded-md px-2.5 py-2 text-left text-xs leading-relaxed hover:bg-muted"
                     >
                       <p className="font-medium">{faq.question}</p>
                       <p className="mt-0.5 line-clamp-2 text-muted-foreground">{faq.answer}</p>
@@ -218,7 +218,7 @@ export function MessageComposer({
                   The only messages WhatsApp delivers to a guest who hasn&apos;t written in 24 hours.
                 </p>
               </div>
-              <ScrollArea className="max-h-72">
+              <ScrollArea className="max-h-[min(20rem,45vh)]">
                 {!templateData ? (
                   <p className="p-4 text-center text-xs text-muted-foreground">Loading…</p>
                 ) : templateData.templates.length === 0 ? (
@@ -226,7 +226,7 @@ export function MessageComposer({
                     No approved templates yet — create one under Templates and submit it to Meta.
                   </p>
                 ) : (
-                  <div className="flex flex-col p-1">
+                  <div className="flex flex-col gap-0.5 p-1.5">
                     {templateData.templates.map((t) => (
                       <button
                         key={`${t.name}:${t.language}`}

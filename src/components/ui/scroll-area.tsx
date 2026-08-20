@@ -13,7 +13,11 @@ function ScrollArea({
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn("relative", className)}
+      // overflow-hidden is load-bearing, not cosmetic. Callers pass
+      // max-h-* to bound a popover; without a clip the box just grows past
+      // it and the viewport never has a reason to scroll — which is how the
+      // FAQ quick-replies panel ended up drawn on top of the whole chat.
+      className={cn("relative overflow-hidden", className)}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport

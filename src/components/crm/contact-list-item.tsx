@@ -87,7 +87,7 @@ export function ContactListItem({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-start gap-3 border-b border-border/60 px-3 py-2.5 text-left transition-colors last:border-b-0",
+        "group flex w-full cursor-pointer items-start gap-3 border-b border-border/60 px-4 py-3 text-left transition-colors last:border-b-0",
         active ? "bg-muted" : "hover:bg-muted/50"
       )}
     >
@@ -118,7 +118,7 @@ export function ContactListItem({
           )}
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {/* Who is driving the conversation — the first thing staff need to
               know before they type into it. A paused assistant means a human
               is expected to answer, and that must be visible without opening

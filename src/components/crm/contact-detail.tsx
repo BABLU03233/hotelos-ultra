@@ -475,9 +475,9 @@ function ContactDetailPane({
 
   return (
     <>
-      <div className="flex h-full min-w-0 flex-1">
-        <div className="flex h-full min-w-0 flex-1 flex-col">
-      <div className="flex flex-col gap-2 border-b border-border p-3">
+      <div className="flex h-full min-w-0 flex-1 overflow-hidden">
+        <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex flex-col gap-2.5 border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
           {onBack && (
             <Button variant="ghost" size="icon-sm" className="-ml-1 shrink-0 md:hidden" onClick={onBack}>
@@ -564,7 +564,7 @@ function ContactDetailPane({
             "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='0.035' stroke-width='1.2'%3E%3Cpath d='M12 8c2-3 6-3 8 0M40 14c3 1 4 5 1 7M20 44c-3 1-6-2-4-5M46 40c2 2 1 6-2 6'/%3E%3Ccircle cx='31' cy='27' r='3'/%3E%3Cpath d='M8 30h5M50 22h5M28 52v4M33 4v4'/%3E%3C/g%3E%3C/svg%3E\")",
         }}
       >
-        <div className="flex flex-col gap-[3px] px-3 py-4">
+        <div className="flex flex-col gap-2 px-4 py-5 sm:px-6">
           {!messages
             ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-2/3" />)
             : messages.map((m, i) => {
@@ -598,7 +598,7 @@ function ContactDetailPane({
         </div>
 
         {isDesktop && (
-          <div className="flex w-80 shrink-0 flex-col border-l border-border">
+          <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-border">
             <div className="border-b border-border p-3">
               <p className="text-sm font-semibold">Contact details</p>
             </div>

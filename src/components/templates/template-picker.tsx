@@ -29,7 +29,7 @@ export function TemplatePicker({ onInsert, bulkOnly = false }: { onInsert: (body
           </Button>
         }
       />
-      <PopoverContent align="start" className="w-80 p-0">
+      <PopoverContent align="start" sideOffset={8} className="w-80 max-w-[calc(100vw-2rem)] p-0">
         <div className="border-b border-border px-3 py-2">
           <p className="text-xs font-medium">{bulkOnly ? "Broadcast templates" : "Message templates"}</p>
           <p className="text-[11px] text-muted-foreground">
@@ -38,7 +38,7 @@ export function TemplatePicker({ onInsert, bulkOnly = false }: { onInsert: (body
               : "Insert, then edit before sending. Starter copy — not the same as a Meta-approved template."}
           </p>
         </div>
-        <ScrollArea className="max-h-72">
+        <ScrollArea className="max-h-[min(20rem,45vh)]">
           <div className="flex flex-col p-1">
             {templates.map((t) => (
               <button
