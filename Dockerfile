@@ -29,6 +29,12 @@ COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/src ./src
 COPY --from=build /app/prisma ./prisma
+# scripts/ ships too: the OmniRoute gateway these tools talk to is only
+# reachable on the internal Docker network and is never exposed publicly, so
+# ai-code / e2e / soak / quality can ONLY be run from inside this image.
+# Without this they were dead weight in the repo — present locally, absent
+# exactly where they had to run.
+COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/next.config.ts ./next.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
