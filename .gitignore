@@ -49,3 +49,4 @@ next-env.d.ts
 .neon
 .gstack/
 e2e-report.md
+.next-build

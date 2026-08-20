@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Flame, MailOpen, MessageSquarePlus, Search, UserRound, Users } from "lucide-react";
+import { Bot, Flame, MailOpen, Search, UserRound, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Contact } from "@/types";
 import { ContactListItem } from "./contact-list-item";
+import { DeskStatus } from "./desk-status";
 
 /**
  * The chat list, built to match WhatsApp Web rather than a CRM table.
@@ -97,12 +98,16 @@ export function ContactList({
       {/* Header — WhatsApp Web keeps the product name and actions on their own
           line above the search, which is what makes the column read as an
           inbox rather than a filtered table. */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h2 className="text-[19px] font-semibold tracking-tight">Chats</h2>
-        <MessageSquarePlus className="size-[18px] text-muted-foreground" />
+      <div className="flex items-baseline justify-between gap-2 px-3 pt-2.5 pb-1.5">
+        <h2 className="shrink-0 text-[19px] font-semibold tracking-tight">Chats</h2>
+        {/* Takes the slot the decorative compose icon used to occupy. That icon
+            did nothing — new conversations start when a guest messages the
+            hotel, not from here — and this is the same pixels answering a
+            question staff actually have. */}
+        <DeskStatus contacts={all} onFilter={setFilter} className="min-w-0 overflow-x-auto" />
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-1.5">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -119,7 +124,7 @@ export function ContactList({
           and answering them with one undifferentiated strip of chips made the
           urgent ones sit beside labels that change nothing about what to do
           next. The divider is doing real work, not decoration. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-2.5">
+      <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-2">
         {attention.map((f) => (
           <Chip key={f.key} f={f} />
         ))}

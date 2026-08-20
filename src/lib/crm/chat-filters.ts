@@ -11,11 +11,11 @@ import { HOT_THRESHOLD } from "./hot-lead";
  * the urgent ones (unread, waiting on a human) sit beside stage labels that
  * change nothing about what to do next.
  *
- *   attention — work waiting. Carries a count, because a category whose size
- *               you cannot see is one you have to open to check.
- *   stage     — where the lead is. No counts; these are for browsing, not
- *               triage, and numbers on them would compete with the ones that
- *               actually mean "do something".
+ *   attention — work waiting. All counted, because a category whose size you
+ *               cannot see is one you have to open to check.
+ *   stage     — where the lead is. Mostly for browsing, so mostly uncounted;
+ *               "Anushka" is the exception, since it is the other half of the
+ *               AI-vs-human split and that ratio is the thing an owner watches.
  *
  * Every predicate runs client-side against the already-fetched list. That is
  * deliberate: the counts must reflect the whole inbox, not the current view,
@@ -39,7 +39,14 @@ export interface ChatFilter {
   key: ChatFilterKey;
   label: string;
   group: "attention" | "stage";
-  /** Show a live count on the chip — only where the number prompts an action. */
+  /**
+   * Show a live count on the chip.
+   *
+   * Reserved for the chips whose SIZE is itself the information: the work
+   * waiting, and the split between what the assistant is handling and what has
+   * landed on a person. A number on "Interested" would just be a row count
+   * competing for attention with the ones that mean "do something".
+   */
   counted: boolean;
   /** Shown when the filter matches nothing, so an empty list explains itself. */
   emptyTitle: string;
@@ -102,7 +109,10 @@ export const CHAT_FILTERS: ChatFilter[] = [
     key: "AI",
     label: "Anushka",
     group: "stage",
-    counted: false,
+    // Counted: this is the other half of the AI-vs-human split, and a hotel
+    // owner watching whether the assistant is actually carrying the load needs
+    // to see both numbers, not infer one from the other.
+    counted: true,
     emptyTitle: "Anushka isn't on any chats",
     emptyBody: "Every open conversation is being handled by a person right now.",
     match: (c) => conversationMode(c) === "ai",
@@ -187,4 +197,61 @@ export function chatFilterCounts(contacts: Contact[]): Record<string, number> {
     if (f.counted) counts[f.key] = contacts.filter(f.match).length;
   }
   return counts;
+}
+
+export interface DeskStatus {
+  total: number;
+  /** Conversations the assistant is currently running by itself. */
+  withAi: number;
+  /** Conversations that will not be answered unless a person answers them. */
+  needsHuman: number;
+  /** Of those, the ones where the guest has actually messaged and is waiting. */
+  waiting: number;
+  /** How long the longest-waiting guest has been waiting, in ms. Null if none. */
+  longestWaitMs: number | null;
+}
+
+/**
+ * The one-line answer to "how is the desk doing right now".
+ *
+ * The split between `needsHuman` and `waiting` is the part that earns its
+ * place. A conversation can need a person without anyone being kept waiting —
+ * a receptionist took it over and already replied, so the guest has their
+ * answer and the ball is with them. What actually costs the hotel money is the
+ * subset where the guest has sent something and nobody has answered, and
+ * that is a different, usually much smaller, number.
+ *
+ * `longestWaitMs` exists because a count alone cannot tell you whether to act.
+ * "3 need you" is fine at 9:02am and bad at 6pm; "3 need you, longest waiting
+ * 4h" is the same fact with the urgency attached, and it is the only figure
+ * here that reliably makes someone open a chat.
+ */
+export function deskStatus(contacts: Contact[], now: Date = new Date()): DeskStatus {
+  const human = contacts.filter(needsHuman);
+  // Waiting means the guest spoke last and nobody has answered. Unread is the
+  // honest proxy: it counts inbound messages newer than the last time a person
+  // opened the chat.
+  const waiting = human.filter(isUnread);
+
+  const waits = waiting
+    .map((c) => (c.lastInboundAt ? now.getTime() - new Date(c.lastInboundAt).getTime() : null))
+    .filter((v): v is number => v !== null && v >= 0);
+
+  return {
+    total: contacts.length,
+    withAi: contacts.length - human.length,
+    needsHuman: human.length,
+    waiting: waiting.length,
+    longestWaitMs: waits.length ? Math.max(...waits) : null,
+  };
+}
+
+/** "4h", "2d", "just now" — compact enough to sit inside a status line. */
+export function formatWait(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
