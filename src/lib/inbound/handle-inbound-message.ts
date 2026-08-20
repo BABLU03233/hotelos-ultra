@@ -19,6 +19,7 @@ import { transcribeAudio } from "@/lib/ai/transcription";
 import { todayMidnightIST } from "@/lib/india-time";
 import { GuestLanguage, LANGUAGE_BUTTON_VALUES, resolveContactLanguageUpdate, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
+import { roomsFittingParty } from "@/lib/booking/room-capacity";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
@@ -69,8 +70,24 @@ function replyLanguage(contact: { language: string | null }): GuestLanguage {
   return resolveLanguage(contact.language);
 }
 
-async function bookableRooms(tenantId: string, contact: { pendingCheckIn: Date | null; pendingCheckOut: Date | null }) {
-  const rooms = await prisma.room.findMany({ where: { tenantId }, orderBy: { price: "asc" } });
+async function bookableRooms(
+  tenantId: string,
+  contact: { pendingCheckIn: Date | null; pendingCheckOut: Date | null; pendingGuestCount?: number | null }
+) {
+  const all = await prisma.room.findMany({ where: { tenantId }, orderBy: { price: "asc" } });
+
+  // Party size first. Probed live: a guest tapping "3+ people" was offered the
+  // Classic Room, which sleeps 2 — the funnel would have taken them all the way
+  // to a booking reference for a room that cannot hold them, and reception
+  // finds out at check-in.
+  //
+  // Falls back to the full list when nothing fits rather than showing an empty
+  // one: a party larger than any single room needs several rooms, which is a
+  // conversation for a person, and the callers below already treat an empty
+  // list as "no availability on these dates" — a different and wrong thing to
+  // tell them.
+  const rooms = roomsFittingParty(all, contact.pendingGuestCount);
+
   if (!contact.pendingCheckIn || !contact.pendingCheckOut) return rooms;
   const taken = await findUnavailableRoomIds(prisma, tenantId, contact.pendingCheckIn, contact.pendingCheckOut).catch(() => new Set<string>());
   return rooms.filter((r) => !taken.has(r.id));
@@ -637,7 +654,16 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     const rooms = await bookableRooms(tenant.id, contact);
     if (rooms.length) {
-      await sendAndPersist(tenant, contact, buildRoomListMessage(rooms), "Failed to send room list");
+      // This row is also the greeting menu's "Availability & price", which a
+      // guest can tap before mentioning any date at all — so the copy has to
+      // stop claiming an availability check that never ran.
+      const datesKnown = Boolean(contact.pendingCheckIn && contact.pendingCheckOut);
+      await sendAndPersist(
+        tenant,
+        contact,
+        buildRoomListMessage(rooms, replyLanguage(contact), datesKnown),
+        "Failed to send room list"
+      );
       return;
     }
     // Everything is booked for the dates they've settled on -- say so and
@@ -823,10 +849,43 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     return;
   }
 
-  // POST_BOOKING's "All set, thanks!" — a sign-off, not a question. Answer
-  // it as one and stop, rather than handing a conversation-ender to the AI.
+  // POST_BOOKING's two rows. Both are fixed acknowledgements, and neither
+  // continues the sale — which is why they deliberately run even while the
+  // chat is paused or handed to reception.
+  //
+  // That exemption exists because of a regression these probes caught:
+  // completing a booking now hands the conversation to a person (see
+  // lib/crm/handover.ts), which sets aiPaused — so the buttons attached to the
+  // confirmation message itself both fell through the aiPaused guard and sent
+  // absolutely nothing. A guest tapped the only two options they were given
+  // and the hotel went silent, one second after taking their booking.
+  //
+  // The aiPaused guard is there to stop the ASSISTANT talking over a human.
+  // A canned "type your question, our team will reply" is not that.
+  if (msg.interactiveId === "post_booking_question") {
+    await sendAndPersist(
+      tenant,
+      contact,
+      { type: "text", text: t(lang).postBookingQuestionAck },
+      "Failed to send post-booking acknowledgement"
+    );
+    // Flagged so it lands in the CRM's attention list rather than relying on
+    // someone noticing an unread row. The promise above is only true if a
+    // person actually sees it.
+    await prisma.staffNotification
+      .create({
+        data: {
+          tenantId: tenant.id,
+          contactId: contact.id,
+          type: "ESCALATION",
+          reason: `${contact.name || contact.phone} has a question about their booking.`,
+        },
+      })
+      .catch((err) => console.error("Failed to flag post-booking question:", err));
+    return;
+  }
+
   if (msg.interactiveId === "post_booking_done") {
-    if (contact.aiPaused) return;
     await sendAndPersist(tenant, contact, { type: "text", text: t(lang).farewell }, "Failed to send farewell");
     return;
   }

@@ -168,6 +168,25 @@ interface Strings {
   continueAnyway: string;
   farewell: string;
   roomChoiceBody: (n: number) => string;
+  /**
+   * Same list, but for a guest who has NOT given dates yet.
+   *
+   * The dated version claims "free for your dates", which is a statement about
+   * an availability check. Said to someone who never mentioned a date it is
+   * simply untrue, and it is the kind of untrue that costs a booking: the
+   * guest reasonably reads it as confirmed for the days they had in mind.
+   */
+  roomChoiceBodyNoDates: (n: number) => string;
+  /**
+   * Reply to the post-booking "I have a question" tap.
+   *
+   * Deliberately promises a person rather than answering. Once a booking
+   * exists the conversation is handed to reception (see lib/crm/handover.ts),
+   * so a person genuinely is the next responder — and the assistant is
+   * forbidden from the things a booked guest usually asks about anyway
+   * (payment, early check-in, an invoice).
+   */
+  postBookingQuestionAck: string;
   bookRoom: (name: string) => string;
   knowMore: string;
   knowMoreDesc: string;
@@ -255,6 +274,8 @@ const EN: Strings = {
   continueAnyway: "Perfect — shall I lock this room in for you?",
   farewell: "Lovely — see you soon! 😊 Message me anytime if anything comes up.",
   roomChoiceBody: (n) => `We have ${n} room${n === 1 ? "" : "s"} free for your dates 😊 Which one would you like?`,
+  roomChoiceBodyNoDates: (n) => `Here ${n === 1 ? "is our room" : `are our ${n} rooms`} 😊 Tell me your dates and I'll check what's free — or pick one to start.`,
+  postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
   bookRoom: (name) => `Book ${name}`,
   knowMore: "Know more",
   knowMoreDesc: "Check-in, parking, policies & more",
@@ -343,6 +364,8 @@ const HI: Strings = {
   continueAnyway: "बढ़िया — यही कमरा बुक कर दूँ?",
   farewell: "बहुत बढ़िया — जल्दी मिलते हैं! 😊 कुछ भी हो तो मैसेज कीजिए।",
   roomChoiceBody: (n) => `आपकी तारीख़ों पर ${n} कमरे खाली हैं 😊 कौन सा पसंद करेंगे?`,
+  roomChoiceBodyNoDates: (n) => `हमारे ${n} कमरे ये रहे 😊 अपनी तारीख़ें बताइए, मैं उपलब्धता देख लूँगी — या कोई एक चुन लीजिए.`,
+  postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
   bookRoom: (name) => `${name} बुक करें`,
   knowMore: "और जानकारी",
   knowMoreDesc: "चेक-इन, पार्किंग, नियम वग़ैरह",
@@ -431,6 +454,8 @@ const TE: Strings = {
   continueAnyway: "చాలా బాగుంది — ఈ రూమ్ ఖరారు చేయనా?",
   farewell: "చాలా బాగుంది — త్వరలో కలుద్దాం! 😊 ఏదైనా ఉంటే మెసేజ్ చేయండి.",
   roomChoiceBody: (n) => `మీ తేదీలకు ${n} రూమ్‌లు ఖాళీగా ఉన్నాయి 😊 ఏది కావాలి?`,
+  roomChoiceBodyNoDates: (n) => `మా ${n} రూమ్‌లు ఇవి 😊 మీ తేదీలు చెప్పండి, ఖాళీ ఉందా చూస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
+  postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
   bookRoom: (name) => `${name} బుక్ చేయండి`,
   knowMore: "మరిన్ని వివరాలు",
   knowMoreDesc: "చెక్-ఇన్, పార్కింగ్, నిబంధనలు",

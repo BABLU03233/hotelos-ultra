@@ -1,8 +1,8 @@
+import { truncateRowTitle } from "./row-title";
 import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { GREET_QUESTION_BUTTON_ID } from "@/lib/ai/interactive-prompts";
 
 const MAX_ROWS = 10; // WhatsApp Cloud API: max 10 rows total across all sections
-const ROW_TITLE_MAX = 24;
 const ROW_DESCRIPTION_MAX = 72;
 
 export interface RoomListMessage {
@@ -33,13 +33,24 @@ export interface RoomListMessage {
  */
 export function buildRoomListMessage(
   rooms: { id: string; name: string; price: number; capacity: number }[],
-  lang?: GuestLanguage | null
+  lang?: GuestLanguage | null,
+  /**
+   * Whether real dates are known for this guest.
+   *
+   * Probed live: tapping "Availability & price" straight from the greeting —
+   * before any date was mentioned — answered "We have 3 rooms free for your
+   * dates". There were no dates. Claiming an availability check that never
+   * happened is worse than saying nothing, because the guest plans around it.
+   *
+   * Defaults to true so existing callers that DO have dates are unchanged.
+   */
+  datesKnown: boolean = true
 ): RoomListMessage {
   const s = t(resolveLanguage(lang));
   // One slot is reserved for "Know more", so rooms take at most 9 of the 10.
   const rows = rooms.slice(0, MAX_ROWS - 1).map((r) => ({
     id: `room_pick_${r.id}`,
-    title: s.bookRoom(r.name).slice(0, ROW_TITLE_MAX),
+    title: truncateRowTitle(s.bookRoom(r.name)),
     description: s.roomListDesc(r.price, r.capacity).slice(0, ROW_DESCRIPTION_MAX),
   }));
 
@@ -48,13 +59,13 @@ export function buildRoomListMessage(
   // and no new routing has to be written or tested.
   rows.push({
     id: GREET_QUESTION_BUTTON_ID,
-    title: s.knowMore.slice(0, ROW_TITLE_MAX),
+    title: truncateRowTitle(s.knowMore),
     description: s.knowMoreDesc.slice(0, ROW_DESCRIPTION_MAX),
   });
 
   return {
     type: "list",
-    body: s.roomChoiceBody(rooms.length),
+    body: datesKnown ? s.roomChoiceBody(rooms.length) : s.roomChoiceBodyNoDates(rooms.length),
     buttonText: s.roomListButton,
     sections: [{ rows }],
   };

@@ -12,7 +12,7 @@ describe("buildFaqListMessage", () => {
     expect(msg.type).toBe("list");
     expect(msg.sections).toHaveLength(1);
     expect(msg.sections[0].rows).toEqual([
-      { id: "faq_pick_f1", title: "What time is check-in an", description: "Check-in is from 12:00 PM and check-out is by 11:00 AM." },
+      { id: "faq_pick_f1", title: "What time is check-in…", description: "Check-in is from 12:00 PM and check-out is by 11:00 AM." },
       { id: "faq_pick_f2", title: "Is parking available?", description: "Yes, we have free covered parking on-site for guests." },
     ]);
   });

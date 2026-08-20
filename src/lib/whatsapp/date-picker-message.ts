@@ -1,8 +1,8 @@
+import { truncateRowTitle } from "./row-title";
 import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { todayMidnightIST } from "@/lib/india-time";
 
 const MAX_ROWS = 10; // WhatsApp Cloud API: max 10 rows total across all sections
-const ROW_TITLE_MAX = 24;
 const ROW_DESCRIPTION_MAX = 72;
 
 /**
@@ -90,7 +90,7 @@ export function buildCheckInPickerMessage(now: Date = new Date(), lang?: GuestLa
     const label = i === 0 ? s.labelToday : i === 1 ? s.labelTomorrow : "";
     return {
       id: `${CHECK_IN_PREFIX}${isoDay(d)}`,
-      title: human(d).slice(0, ROW_TITLE_MAX),
+      title: truncateRowTitle(human(d)),
       description: label,
     };
   });
@@ -118,7 +118,7 @@ export function buildNightsPickerMessage(checkIn: Date, lang?: GuestLanguage | n
     const out = addDays(checkIn, nights);
     return {
       id: `${NIGHTS_PREFIX}${nights}`,
-      title: s.night(nights).slice(0, ROW_TITLE_MAX),
+      title: truncateRowTitle(s.night(nights)),
       description: s.checkOutOn(human(out)).slice(0, ROW_DESCRIPTION_MAX),
     };
   });

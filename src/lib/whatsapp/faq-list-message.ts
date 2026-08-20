@@ -1,5 +1,5 @@
+import { truncateRowTitle } from "./row-title";
 const MAX_ROWS = 10; // WhatsApp Cloud API: max 10 rows total across all sections
-const ROW_TITLE_MAX = 24;
 const ROW_DESCRIPTION_MAX = 72;
 
 export interface FaqListMessage {
@@ -22,7 +22,7 @@ export interface FaqListMessage {
 export function buildFaqListMessage(faqs: { id: string; question: string; answer: string }[]): FaqListMessage {
   const rows = faqs.slice(0, MAX_ROWS).map((f) => ({
     id: `faq_pick_${f.id}`,
-    title: f.question.slice(0, ROW_TITLE_MAX),
+    title: truncateRowTitle(f.question),
     description: f.answer.slice(0, ROW_DESCRIPTION_MAX),
   }));
   return {

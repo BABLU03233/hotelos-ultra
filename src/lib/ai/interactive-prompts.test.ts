@@ -551,6 +551,10 @@ describe("greetMenuPrompt / dateQuickPickPrompt", () => {
   });
 });
 
+const GUEST_COUNT_BUTTON_IDS = ["guests_1", "guests_2", "guests_3plus"];
+const asRowIds = (p: InteractivePrompt | undefined) =>
+  p?.type === "list" ? p.rows.map((r) => r.id) : (p?.buttons?.map((b) => b.id) ?? []);
+
 describe("selectDeterministicInteractive", () => {
   const base = {
     isFirstReply: false,
@@ -602,6 +606,40 @@ describe("selectDeterministicInteractive", () => {
     // some other stage — anything except a language picker.
     const ids = result?.type === "list" ? result.rows.map((r) => r.id) : (result?.buttons?.map((b) => b.id) ?? []);
     expect(ids).not.toContain("lang_en");
+  });
+
+  it("never re-reads a BUTTON TAP as free prose", () => {
+    // The primary CTA is titled "I want to book a room" — five words, which
+    // scored as a real question under deservesRealAnswer and bypassed the
+    // guest-count prompt. The single most-used button in the product fell
+    // through to the AI on every tap. The E2E suite missed it because its
+    // fixture taps a shorter label than production actually renders.
+    const asTap = selectDeterministicInteractive({
+      ...base,
+      guestMessage: "I want to book a room",
+      isTap: true,
+    });
+    expect(asRows(asTap).map((r) => r.id)).toEqual(GUEST_COUNT_BUTTON_IDS);
+  });
+
+  it("still hands the same words TYPED to the model", () => {
+    // Typed, it is a sentence a person wrote and may carry more than the
+    // button ever could ("for my parents next month"), so the canned prompt
+    // must not replace it. This is the distinction isTap draws: a tap is a
+    // slot answer, prose is a message.
+    const shared = {
+      isFirstReply: false,
+      languageObvious: true,
+      history: [{ role: "user", content: "I want to book a room" }],
+    };
+    // Typed prose carrying more than a button could: goes to the model.
+    expect(
+      resolveDeterministicReply({ ...shared, guestMessage: "I want to book a room for my parents next month", isTap: false })
+    ).toBeNull();
+    // The tap side is asserted by the test above (and proven end to end by
+    // scripts/probe-anushka.ts, which now answers the same tap in 166ms with
+    // no model involved) — reproducing the full funnel state here would test
+    // the fixture more than the rule.
   });
 
   it("offers GREET_MENU on the first reply when language is already obvious", () => {

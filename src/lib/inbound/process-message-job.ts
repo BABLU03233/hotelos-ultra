@@ -2,6 +2,7 @@ import { looksLikeObviousLanguage, readyToOfferRooms, resolveDeterministicReply 
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
 import { findUnavailableRoomIds } from "@/lib/booking/availability";
+import { roomsFittingParty } from "@/lib/booking/room-capacity";
 import { captureGuestCount } from "@/lib/booking/guest-count";
 import { resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { isPauseStale } from "./ai-pause";
@@ -220,12 +221,18 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
       effectiveCheckIn && effectiveCheckOut
         ? await findUnavailableRoomIds(prisma, tenantId, effectiveCheckIn, effectiveCheckOut).catch(() => new Set<string>())
         : new Set<string>();
-    const offerable = rooms.filter((r) => !taken.has(r.id));
+    // Capacity BEFORE availability, so "3 rooms free" never counts one that
+    // cannot hold the party — see room-capacity.ts.
+    const offerable = roomsFittingParty(rooms, knownGuestCount).filter((r) => !taken.has(r.id));
 
     if (offerable.length) {
       const creds = await getWhatsAppCredentials(tenantId);
       if (!creds) return;
-      const list = buildRoomListMessage(offerable, resolveLanguage(contact.language));
+      const list = buildRoomListMessage(
+        offerable,
+        resolveLanguage(contact.language),
+        Boolean(effectiveCheckIn && effectiveCheckOut)
+      );
       try {
         const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {
           type: "list",
@@ -299,6 +306,10 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     language: resolveLanguage(contact.language),
     knownGuestCount,
     datesKnown: Boolean(effectiveCheckIn && effectiveCheckOut),
+    // A tap carries a button id; typed text does not. Without this the label
+    // of the primary CTA ("I want to book a room") was long enough to score
+    // as free prose and skip the guest-count prompt.
+    isTap: Boolean(latestInbound.interactiveId),
   });
 
   let generated: Awaited<ReturnType<typeof generateReply>>;

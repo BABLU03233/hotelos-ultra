@@ -975,6 +975,8 @@ export function selectDeterministicInteractive(params: {
    * right whenever it was driven by taps.
    */
   language?: GuestLanguage | null;
+  /** See resolveStageKey's isTap — a tap is never re-read as free text. */
+  isTap?: boolean;
 }): InteractivePrompt | undefined {
   const key = resolveStageKey(params);
   return key ? promptForStageKey(key, params.language) : params.aiInteractive;
@@ -998,8 +1000,24 @@ function resolveStageKey(params: {
   replyText: string;
   knownGuestCount?: number | null;
   datesKnown?: boolean;
+  /**
+   * True when this turn was a BUTTON TAP rather than typed text.
+   *
+   * deservesRealAnswer is a heuristic for prose — its "four or more words"
+   * fallback exists to catch remarks nobody punctuates. A tap is not prose. Its
+   * text is a label this app wrote, and the guest picking it means exactly one
+   * thing.
+   *
+   * Found by probing the real flow: the primary CTA is titled "I want to book a
+   * room", which is five words, so tapping it scored as a real question and
+   * bypassed the guest-count prompt entirely — the single most-used button in
+   * the product fell through to the AI on every tap. The E2E suite missed it
+   * because its fixture tapped a shorter label ("Book a room") than the one
+   * production actually renders.
+   */
+  isTap?: boolean;
 }): StageKey {
-  const { isFirstReply, languageObvious, history, guestMessage, replyText, knownGuestCount, datesKnown } = params;
+  const { isFirstReply, languageObvious, history, guestMessage, replyText, knownGuestCount, datesKnown, isTap } = params;
 
   const roomMentionedEver = history.some((m) => m.role === "assistant" && mentionsRoomPrice(m.content)) || mentionsRoomPrice(replyText);
   const intentShown = hasExpressedBookingIntent(history, guestMessage) || roomMentionedEver;
@@ -1055,7 +1073,7 @@ function resolveStageKey(params: {
     // this lets the AI actually respond (send real photos, answer the
     // question); the post-hoc call re-derives real buttons from what it
     // actually wrote, same mechanism ROOM_RESPONSE already relies on.
-    if (roomMentionedEver && (looksLikePhotoRequest(guestMessage) || deservesRealAnswer(guestMessage))) {
+    if (roomMentionedEver && !isTap && (looksLikePhotoRequest(guestMessage) || deservesRealAnswer(guestMessage))) {
       return null;
     }
     // The worst instance of this bug class yet, caught in a real booking: a
@@ -1135,7 +1153,7 @@ function resolveStageKey(params: {
     // re-attaches the right buttons to whatever it says — so the funnel is
     // deferred by one turn, not abandoned. A bare "hi" still gets the picker,
     // because there is nothing else in it to respond to.
-    if (!looksLikeBareGreeting(guestMessage) && deservesRealAnswer(guestMessage)) return null;
+    if (!isTap && !looksLikeBareGreeting(guestMessage) && deservesRealAnswer(guestMessage)) return null;
     return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
   return null;
@@ -1331,6 +1349,8 @@ export function resolveDeterministicReply(params: {
   datesKnown?: boolean;
   /** The guest's chosen chat language — governs every string below. */
   language?: GuestLanguage | null;
+  /** See resolveStageKey's isTap — a tap is never re-read as free text. */
+  isTap?: boolean;
 }): { text: string; interactive: InteractivePrompt } | null {
   // A guest writing in Devanagari or Telugu used to bail out of the entire
   // deterministic path here, because every string it produced was hardcoded
@@ -1370,7 +1390,7 @@ export function resolveDeterministicReply(params: {
   // see deservesRealAnswer. This branch replaces the whole reply, not just
   // the buttons, so anything that reads as a real question or remark has to
   // reach the AI.
-  if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && deservesRealAnswer(params.guestMessage)) return null;
+  if ((key === "GUEST_COUNT" || key === "DATE_QUICK_PICK") && !params.isTap && deservesRealAnswer(params.guestMessage)) return null;
 
   const lang = resolveLanguage(params.language);
   const s = t(lang);

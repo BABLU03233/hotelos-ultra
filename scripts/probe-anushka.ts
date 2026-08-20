@@ -92,6 +92,133 @@ const PROBES: Probe[] = [
     watch: "Never takes payment or invents a payment link.",
     turns: [{ say: "book it for tomorrow, 2 people" }, { say: "can i pay online now? send me a link" }],
   },
+  // ── Tap-driven branches. These need no model at all: the deterministic
+  //    waterfall owns them end to end, so every bug here is a real one that
+  //    ships regardless of which AI tier is up.
+  {
+    id: "tap-know-more",
+    watch: "GREET_MENU 'I need more details' — does it answer, or dead-end?",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_question", label: "I need more details" } },
+    ],
+  },
+  {
+    id: "tap-availability-first",
+    watch: "GREET_MENU 'Availability & price' before any dates are known.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "room_other", label: "Availability & price" } },
+    ],
+  },
+  {
+    id: "tap-decline-confirm",
+    watch: "Tapping 'Not yet' at the confirm step must not repeat the same push.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "not_yet", label: "Not yet" } },
+    ],
+  },
+  {
+    id: "tap-see-other-options",
+    watch: "After picking a room, 'See other options' should re-offer the list.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "room_other", label: "See other options" } },
+    ],
+  },
+  {
+    id: "tap-photos",
+    watch: "'View photos' when the fixture rooms have NO images — must not send a broken/empty media message.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "view_photos", label: "View photos" } },
+    ],
+  },
+  {
+    id: "tap-offers",
+    watch: "'Show me offers' should name the real WELCOME10 offer.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "show_offers", label: "Show me offers" } },
+    ],
+  },
+  {
+    id: "tap-custom-dates",
+    watch: "'Pick exact dates' must open a real date picker, not dead-end.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_custom", label: "Pick exact dates" } },
+    ],
+  },
+  {
+    id: "tap-3plus-guests",
+    watch: "3+ guests — rooms shown must actually fit them.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_3plus", label: "3+ people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+    ],
+  },
+  {
+    id: "after-booking-question",
+    watch: "Post-booking 'I have a question' must not restart the funnel.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "confirm_booking", label: "Confirm booking" } },
+      { tap: { id: "post_booking_question", label: "I have a question" } },
+    ],
+  },
+  {
+    id: "greeting-after-booking",
+    watch: "Saying hi right after booking must NOT wipe the booking or re-ask language.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "confirm_booking", label: "Confirm booking" } },
+      { say: "hi" },
+    ],
+  },
+  {
+    id: "double-confirm",
+    watch: "Tapping Confirm twice must not create two bookings.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "confirm_booking", label: "Confirm booking" } },
+      { tap: { id: "confirm_booking", label: "Confirm booking" } },
+    ],
+  },
+  {
+    id: "stop-opt-out",
+    watch: "STOP must opt them out and say so.",
+    turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],
+  },
 ];
 
 const arg = process.argv.slice(2).find((a) => a.startsWith("--only="))?.split("=")[1];
@@ -118,8 +245,15 @@ async function main() {
       for (const turn of probe.turns) {
         resetTurnState();
         const started = Date.now();
+        // A room row id is only knowable once the fixture exists — same
+        // resolution the E2E runner does.
+        const t = turn as { say?: string; tap?: { id: string; label: string } };
+        const resolved =
+          t.tap?.id === "ROOM_CHEAPEST"
+            ? { ...t, tap: { ...t.tap, id: `room_pick_${fixture.roomIds["Classic Room"]}` } }
+            : t;
         try {
-          await handleInboundMessage(inbound(waId, turn as { say?: string; tap?: { id: string; label: string } }));
+          await handleInboundMessage(inbound(waId, resolved));
           if (peekOutbox().length === 0) {
             const contact = await prisma.contact.findFirst({
               where: { tenantId: fixture.tenantId, whatsappNumber: waId },

@@ -1,7 +1,7 @@
+import { truncateRowTitle } from "./row-title";
 import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 
 const MAX_ROWS = 10; // WhatsApp Cloud API: max 10 rows total across all sections
-const ROW_TITLE_MAX = 24;
 const ROW_DESCRIPTION_MAX = 72;
 
 export interface OfferListMessage {
@@ -41,7 +41,7 @@ export function buildOfferListMessage(
     const { label, code } = splitTitleAndCode(o.title);
     return {
       id: `offer_pick_${o.id}`,
-      title: label.slice(0, ROW_TITLE_MAX),
+      title: truncateRowTitle(label),
       description: [o.discount, code ? `code ${code}` : null, o.description].filter(Boolean).join(" — ").slice(0, ROW_DESCRIPTION_MAX),
     };
   });
