@@ -1,11 +1,12 @@
 "use client";
 
-import { Bot, Flame, History, Target, UserRound } from "lucide-react";
+import { Bot, Flame, History, Pin, Target, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { conversationMode } from "@/lib/crm/handover";
 import { HOT_THRESHOLD } from "@/lib/crm/hot-lead";
 import { Contact } from "@/types";
+import { ContactRowMenu } from "./contact-row-menu";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,18 +55,39 @@ function Chip({ className, children }: { className?: string; children: React.Rea
   );
 }
 
-export function ContactListItem({ contact, active, onClick }: { contact: Contact; active: boolean; onClick: () => void }) {
+export function ContactListItem({
+  contact,
+  active,
+  onClick,
+  onChanged,
+}: {
+  contact: Contact;
+  active: boolean;
+  onClick: () => void;
+  /** Re-reads the list after a row action (pin, mark unread, handover). */
+  onChanged?: () => void;
+}) {
   const unreadCount = contact.unreadCount ?? 0;
   const unread = unreadCount > 0;
   const mode = conversationMode(contact);
   const hot = (contact.hotScore ?? 0) >= HOT_THRESHOLD;
 
   return (
-    <button
-      type="button"
+    // A div with a button role rather than a <button>: the options menu is
+    // itself a button, and nesting one inside another is invalid HTML that
+    // browsers resolve by silently unnesting it — which breaks the row.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
-        "flex w-full items-start gap-3 border-b border-border/60 px-3 py-2.5 text-left transition-colors last:border-b-0",
+        "group flex w-full cursor-pointer items-start gap-3 border-b border-border/60 px-3 py-2.5 text-left transition-colors last:border-b-0",
         active ? "bg-muted" : "hover:bg-muted/50"
       )}
     >
@@ -81,6 +103,8 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
           <span className={cn("shrink-0 text-[11px]", unread ? "font-medium text-emerald-600" : "text-muted-foreground")}>
             {formatRelativeTime(contact.lastInboundAt || contact.updatedAt)}
           </span>
+          {contact.pinnedAt && <Pin className="size-3 shrink-0 rotate-45 text-muted-foreground" aria-label="Pinned" />}
+          {onChanged && <ContactRowMenu contact={contact} onChanged={onChanged} />}
         </div>
 
         <div className="mt-0.5 flex items-center gap-2">
@@ -154,6 +178,6 @@ export function ContactListItem({ contact, active, onClick }: { contact: Contact
           ))}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

@@ -29,6 +29,8 @@ export interface Contact {
   notes: string | null;
   tags: string[];
   lastReadAt: string | null;
+  /** Pinned to the top of the chat list — see lib/crm/chat-filters.ts. */
+  pinnedAt: string | null;
   assignedToId: string | null;
   assignedTo?: { id: string; name: string } | null;
   leadSource: LeadSource;

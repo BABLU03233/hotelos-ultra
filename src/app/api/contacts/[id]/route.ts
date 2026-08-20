@@ -21,7 +21,7 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
 export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const { db } = requireTenantDb(req);
   const { id } = await ctx.params;
-  const { markRead, ...body } = contactUpdateSchema.parse(await req.json());
+  const { markRead, markUnread, pinned, ...body } = contactUpdateSchema.parse(await req.json());
 
   const existing = await db.contact.findUnique({ where: { id } });
   if (!existing) throw notFound("Contact not found");
@@ -31,7 +31,13 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     data: {
       ...body,
       followUpDate: body.followUpDate === undefined ? undefined : body.followUpDate ? new Date(body.followUpDate) : null,
-      lastReadAt: markRead ? new Date() : undefined,
+      // Clearing lastReadAt is what makes a chat unread: the unread count is
+      // "inbound messages newer than lastReadAt", so null means every one of
+      // them counts again. markRead wins if both are somehow sent — a request
+      // asking for both is malformed, and leaving a chat read is the safer of
+      // the two outcomes to guess at.
+      lastReadAt: markRead ? new Date() : markUnread ? null : undefined,
+      pinnedAt: pinned === undefined ? undefined : pinned ? new Date() : null,
     },
     include: { assignedTo: { select: { id: true, name: true } } },
   });

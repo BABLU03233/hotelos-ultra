@@ -238,6 +238,59 @@ export const FLOWS: Flow[] = [
     },
   },
   {
+    id: "chat-list-row-actions",
+    area: "handover",
+    title: "Pin and mark-unread survive a round trip through the database",
+    because:
+      "Both are read back out of columns rather than held in the page, so a wrong write shows up as a row that silently springs back on the next 20-second refetch.",
+    async run({ prisma, tenantId }) {
+      const { applyChatFilter } = await import("@/lib/crm/chat-filters");
+      const checks: FlowCheck[] = [];
+
+      const mk = async (over: Record<string, unknown> = {}) => {
+        const number = `95553${String(seedCounter++).padStart(6, "0")}`;
+        return prisma.contact.create({ data: { tenantId, whatsappNumber: number, phone: number, ...over } });
+      };
+
+      const older = await mk({ lastInboundAt: new Date("2026-08-01T00:00:00Z") });
+      const newer = await mk({ lastInboundAt: new Date("2026-08-20T00:00:00Z") });
+
+      // Pin the older one — it must outrank the more recent chat.
+      await prisma.contact.update({ where: { id: older.id }, data: { pinnedAt: new Date() } });
+
+      const rows = await prisma.contact.findMany({ where: { tenantId } });
+      const asJson = JSON.parse(JSON.stringify(rows));
+      const ordered = applyChatFilter(asJson, "ALL");
+      checks.push({ label: "a pinned chat sorts above a more recent one", passed: ordered[0].id === older.id });
+
+      await prisma.contact.update({ where: { id: older.id }, data: { pinnedAt: null } });
+      const afterUnpin = await prisma.contact.findUnique({ where: { id: older.id } });
+      checks.push({ label: "unpinning clears the column", passed: afterUnpin.pinnedAt === null });
+
+      // Mark-unread works by clearing lastReadAt, so the unread count query
+      // starts counting inbound messages again.
+      await prisma.message.create({
+        data: { tenantId, contactId: newer.id, direction: "IN", type: "TEXT", content: "hello", status: "DELIVERED" },
+      });
+      await prisma.contact.update({ where: { id: newer.id }, data: { lastReadAt: new Date() } });
+
+      const readCount = await prisma.message.count({
+        where: { contactId: newer.id, direction: "IN", createdAt: { gt: (await prisma.contact.findUnique({ where: { id: newer.id } })).lastReadAt } },
+      });
+      checks.push({ label: "marking read zeroes the unread count", passed: readCount === 0 });
+
+      await prisma.contact.update({ where: { id: newer.id }, data: { lastReadAt: null } });
+      const reopened = await prisma.contact.findUnique({ where: { id: newer.id } });
+      const unreadAgain = await prisma.message.count({ where: { contactId: newer.id, direction: "IN" } });
+      checks.push({
+        label: "marking unread makes the messages count again",
+        passed: reopened.lastReadAt === null && unreadAgain === 1,
+      });
+
+      return checks;
+    },
+  },
+  {
     id: "campaign-auto-review-flags-bad-copy",
     area: "campaigns",
     title: "The automated reviewer flags risky promotional copy",

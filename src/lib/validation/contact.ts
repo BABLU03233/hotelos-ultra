@@ -11,6 +11,12 @@ export const contactUpdateSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   assignedToId: z.string().nullable().optional(),
   markRead: z.boolean().optional(),
+  // Puts a chat back in the unread pile — the WhatsApp gesture for "I saw
+  // this, I am not dealing with it yet". Separate from markRead rather than a
+  // nullable date, so the client never has to reason about what timestamp
+  // makes a chat unread.
+  markUnread: z.boolean().optional(),
+  pinned: z.boolean().optional(),
 });
 export type ContactUpdateInput = z.infer<typeof contactUpdateSchema>;
 
