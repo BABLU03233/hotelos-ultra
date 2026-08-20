@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { useFetch } from "@/hooks/use-fetch";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,11 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setScheduledAt("");
       setSelectedIds(new Set());
       onCreated();
+    } catch (err) {
+      // The dialog deliberately stays open so the owner does not lose a
+      // campaign they just spent minutes composing — but it has to say why,
+      // or the only feedback is a button that appears to do nothing.
+      toast.error(err instanceof Error ? err.message : "Couldn’t create that campaign");
     } finally {
       setSubmitting(false);
     }

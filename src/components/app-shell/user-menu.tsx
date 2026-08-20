@@ -17,7 +17,23 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
   const router = useRouter();
 
   async function logout() {
-    await apiFetch("/api/auth/logout", { method: "POST" });
+    // The redirect happens whatever the server says.
+    //
+    // This used to await the call bare, so a failed request — an expired
+    // session, a network blip, a 500 — threw before router.push ever ran and
+    // left the user sitting on the page looking signed in. On a shared
+    // machine at a hotel front desk, "Log out" silently doing nothing is the
+    // worst possible failure: the next person inherits the session.
+    //
+    // The cookie is cleared server-side by the call; if that fails, sending
+    // them to the sign-in page is still strictly better than pretending
+    // nothing happened, and the middleware will reject the stale cookie on
+    // the next protected request anyway.
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Intentionally swallowed — see above.
+    }
     router.push("/login");
     router.refresh();
   }

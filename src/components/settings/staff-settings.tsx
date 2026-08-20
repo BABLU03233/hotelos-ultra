@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { useAuthStore } from "@/store/use-auth-store";
 import { StaffMember } from "@/types";
 import { toast } from "sonner";
@@ -44,7 +45,14 @@ export function StaffSettings() {
   }
 
   async function updateRole(id: string, role: "OWNER" | "STAFF") {
-    await apiFetch(`/api/settings/staff/${id}`, { method: "PATCH", body: JSON.stringify({ role }) });
+    // A permissions change. Failing quietly here means the owner believes
+    // they granted or revoked Owner access and it never happened — which they
+    // would only discover when someone can, or cannot, do something.
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/settings/staff/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+      "Couldn’t change that role"
+    );
+    if (!ok) return;
     reload();
   }
 

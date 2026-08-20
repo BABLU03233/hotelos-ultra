@@ -13,6 +13,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { formatDateTime } from "@/lib/format";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { cn } from "@/lib/utils";
 import { Campaign, CampaignReport } from "@/types";
 
@@ -31,18 +32,32 @@ export default function CampaignDetailPage() {
   const [rescheduleValue, setRescheduleValue] = React.useState("");
   const [rescheduling, setRescheduling] = React.useState(false);
 
+  // These three all reach guests, so a silent failure is expensive in a way
+  // a failed form save is not. Cancelling is the worst of them: the owner
+  // believes they have stopped a broadcast, walks away, and it keeps sending.
+  // Every one of them now says so, and reloads either way so the screen shows
+  // the campaign as it actually is rather than as the click intended.
   async function send() {
-    await apiFetch(`/api/campaigns/${params.id}/send`, { method: "POST" });
+    await saveWithFeedback(
+      () => apiFetch(`/api/campaigns/${params.id}/send`, { method: "POST" }),
+      "Couldn’t start that campaign"
+    );
     reload();
   }
 
   async function cancelRemaining() {
-    await apiFetch(`/api/campaigns/${params.id}/cancel`, { method: "POST" });
+    await saveWithFeedback(
+      () => apiFetch(`/api/campaigns/${params.id}/cancel`, { method: "POST" }),
+      "Couldn’t cancel the remaining sends — the campaign may still be going out"
+    );
     reload();
   }
 
   async function cancelSchedule() {
-    await apiFetch(`/api/campaigns/${params.id}`, { method: "PATCH", body: JSON.stringify({ scheduledAt: null }) });
+    await saveWithFeedback(
+      () => apiFetch(`/api/campaigns/${params.id}`, { method: "PATCH", body: JSON.stringify({ scheduledAt: null }) }),
+      "Couldn’t cancel the schedule — it may still send at the planned time"
+    );
     reload();
   }
 

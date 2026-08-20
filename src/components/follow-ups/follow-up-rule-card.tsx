@@ -20,6 +20,7 @@ import { MetaTemplatePicker } from "@/components/templates/meta-template-picker"
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { GlossaryTerm } from "@/components/shared/glossary-term";
 import { apiFetch } from "@/lib/api-client";
+import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { FollowUpAction, FollowUpRule } from "@/types";
 
 const ACTION_LABELS: Record<FollowUpAction, string> = {
@@ -66,7 +67,11 @@ export function FollowUpRuleCard({ rule, isLast, onChanged }: { rule: FollowUpRu
   }
 
   async function remove() {
-    await apiFetch(`/api/follow-up-rules/${rule.id}`, { method: "DELETE" });
+    const ok = await saveWithFeedback(
+      () => apiFetch(`/api/follow-up-rules/${rule.id}`, { method: "DELETE" }),
+      "Couldn’t delete that follow-up"
+    );
+    if (!ok) return;
     onChanged();
   }
 
