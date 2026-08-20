@@ -187,6 +187,26 @@ interface Strings {
    * (payment, early check-in, an invoice).
    */
   postBookingQuestionAck: string;
+  /** Caption sent alongside the hotel's map pin. */
+  locationCaption: string;
+  /**
+   * A corporate or group enquiry — several rooms at once.
+   *
+   * Kept as its own branch rather than a bigger number in the party-size
+   * question, because it is a different sale: rates are negotiated, a block of
+   * rooms has to be held, and there is usually an invoice. None of that is
+   * something the assistant may decide, so this path collects the shape of the
+   * request and hands it to a person.
+   */
+  guestGroup: string;
+  groupRoomsBody: string;
+  rooms3to5: string;
+  rooms6to10: string;
+  rooms10plus: string;
+  groupHandover: (rooms: string) => string;
+  /** Row label offering directions. */
+  locationRow: string;
+  locationRowDesc: string;
   bookRoom: (name: string) => string;
   knowMore: string;
   knowMoreDesc: string;
@@ -276,6 +296,15 @@ const EN: Strings = {
   roomChoiceBody: (n) => `We have ${n} room${n === 1 ? "" : "s"} free for your dates 😊 Which one would you like?`,
   roomChoiceBodyNoDates: (n) => `Here ${n === 1 ? "is our room" : `are our ${n} rooms`} 😊 Tell me your dates and I'll check what's free — or pick one to start.`,
   postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
+  locationCaption: `Here's our exact location 📍 Tap it for directions.`,
+  guestGroup: "Group / corporate",
+  groupRoomsBody: "Happy to help with a group booking 😊 Roughly how many rooms do you need?",
+  rooms3to5: "3–5 rooms",
+  rooms6to10: "6–10 rooms",
+  rooms10plus: "More than 10",
+  groupHandover: (rooms) => `Thanks! For ${rooms}, our team handles the rates and blocks the rooms personally — they'll message you here shortly. If you can share your dates and company name meanwhile, that speeds things up 😊`,
+  locationRow: "Where are you?",
+  locationRowDesc: "Get our exact location and directions",
   bookRoom: (name) => `Book ${name}`,
   knowMore: "Know more",
   knowMoreDesc: "Check-in, parking, policies & more",
@@ -366,6 +395,15 @@ const HI: Strings = {
   roomChoiceBody: (n) => `आपकी तारीख़ों पर ${n} कमरे खाली हैं 😊 कौन सा पसंद करेंगे?`,
   roomChoiceBodyNoDates: (n) => `हमारे ${n} कमरे ये रहे 😊 अपनी तारीख़ें बताइए, मैं उपलब्धता देख लूँगी — या कोई एक चुन लीजिए.`,
   postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
+  locationCaption: `ये रही हमारी लोकेशन 📍 रास्ते के लिए टैप कीजिए.`,
+  guestGroup: "ग्रुप / कॉर्पोरेट",
+  groupRoomsBody: "ग्रुप बुकिंग में मदद करके खुशी होगी 😊 लगभग कितने कमरे चाहिए?",
+  rooms3to5: "3–5 कमरे",
+  rooms6to10: "6–10 कमरे",
+  rooms10plus: "10 से ज़्यादा",
+  groupHandover: (rooms) => `धन्यवाद! ${rooms} के लिए हमारी टीम खुद रेट तय करके कमरे ब्लॉक करती है — वे जल्द ही यहीं मैसेज करेंगे. इस बीच अपनी तारीख़ें और कंपनी का नाम बता दें तो और तेज़ी होगी 😊`,
+  locationRow: "हम कहाँ हैं?",
+  locationRowDesc: "हमारी सटीक लोकेशन और रास्ता",
   bookRoom: (name) => `${name} बुक करें`,
   knowMore: "और जानकारी",
   knowMoreDesc: "चेक-इन, पार्किंग, नियम वग़ैरह",
@@ -456,6 +494,15 @@ const TE: Strings = {
   roomChoiceBody: (n) => `మీ తేదీలకు ${n} రూమ్‌లు ఖాళీగా ఉన్నాయి 😊 ఏది కావాలి?`,
   roomChoiceBodyNoDates: (n) => `మా ${n} రూమ్‌లు ఇవి 😊 మీ తేదీలు చెప్పండి, ఖాళీ ఉందా చూస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
   postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
+  locationCaption: `ఇదే మా లొకేషన్ 📍 దారి కోసం ట్యాప్ చేయండి.`,
+  guestGroup: "గ్రూప్ / కార్పొరేట్",
+  groupRoomsBody: "గ్రూప్ బుకింగ్‌కి సాయం చేస్తాను 😊 సుమారు ఎన్ని రూమ్‌లు కావాలి?",
+  rooms3to5: "3–5 రూమ్‌లు",
+  rooms6to10: "6–10 రూమ్‌లు",
+  rooms10plus: "10 కంటే ఎక్కువ",
+  groupHandover: (rooms) => `ధన్యవాదాలు! ${rooms} కోసం మా టీమ్ స్వయంగా రేట్లు నిర్ణయించి రూమ్‌లు బ్లాక్ చేస్తుంది — వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు. ఈలోపు మీ తేదీలు, కంపెనీ పేరు చెబితే వేగంగా ఉంటుంది 😊`,
+  locationRow: "మీరు ఎక్కడ ఉన్నారు?",
+  locationRowDesc: "మా కచ్చితమైన లొకేషన్ మరియు దారి",
   bookRoom: (name) => `${name} బుక్ చేయండి`,
   knowMore: "మరిన్ని వివరాలు",
   knowMoreDesc: "చెక్-ఇన్, పార్కింగ్, నిబంధనలు",

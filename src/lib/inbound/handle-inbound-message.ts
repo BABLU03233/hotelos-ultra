@@ -2,6 +2,10 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  GROUP_BOOKING_BUTTON_ID,
+  GROUP_ROOM_BUTTON_IDS,
+  SHOW_LOCATION_BUTTON_ID,
+  groupRoomsPrompt,
   GUEST_COUNT_BUTTON_VALUES,
   InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
@@ -20,6 +24,7 @@ import { todayMidnightIST } from "@/lib/india-time";
 import { GuestLanguage, LANGUAGE_BUTTON_VALUES, resolveContactLanguageUpdate, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { roomsFittingParty } from "@/lib/booking/room-capacity";
+import { takeOverFields } from "@/lib/crm/handover";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
 import { matchRecommendedRoom } from "@/lib/booking/room-match";
@@ -124,6 +129,9 @@ async function downloadInboundMedia(tenantId: string, msg: InboundMessage): Prom
 
 type ShortCircuitMessage =
   | { type: "text"; text: string }
+  // The WhatsApp client has supported location messages all along; this union
+  // simply never listed one, so no deterministic path could send a map pin.
+  | { type: "location"; latitude: number; longitude: number; name?: string; address?: string }
   | { type: "interactive"; body: string; buttons: { id: string; title: string }[] }
   | { type: "list"; body: string; buttonText: string; sections: { title?: string; rows: { id: string; title: string; description?: string }[] }[] }
   | { type: "flow"; body: string; flowId: string; flowCta: string; screen: string };
@@ -150,8 +158,16 @@ async function sendAndPersist(
         tenantId: tenant.id,
         contactId: contact.id,
         direction: "OUT",
-        type: message.type === "text" ? "TEXT" : "INTERACTIVE",
-        content: message.type === "text" ? message.text : message.body,
+        // A location has its own message type and no body text — persisting
+        // it as INTERACTIVE with an undefined content is how the CRM ends up
+        // showing an empty bubble for a pin that sent perfectly well.
+        type: message.type === "text" ? "TEXT" : message.type === "location" ? "LOCATION" : "INTERACTIVE",
+        content:
+          message.type === "text"
+            ? message.text
+            : message.type === "location"
+              ? (message.name ?? "Hotel location")
+              : message.body,
         whatsappMessageId,
         status: "SENT",
       },
@@ -621,12 +637,107 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   if (msg.interactiveId === GREET_QUESTION_BUTTON_ID) {
     if (contact.aiPaused) return;
 
-    const faqs = await prisma.faq.findMany({ where: { tenantId: tenant.id }, orderBy: { createdAt: "asc" } });
-    if (faqs.length) {
-      await sendAndPersist(tenant, contact, buildFaqListMessage(faqs), "Failed to send FAQ list");
+    const [faqs, locProfile] = await Promise.all([
+      prisma.faq.findMany({ where: { tenantId: tenant.id }, orderBy: { createdAt: "asc" } }),
+      prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id }, select: { lat: true, lng: true } }),
+    ]);
+    // Only offered when there is a pin to send — a row promising directions
+    // that then sends nothing is worse than no row at all.
+    const locationRow =
+      locProfile?.lat != null && locProfile?.lng != null
+        ? { row: t(lang).locationRow, description: t(lang).locationRowDesc }
+        : null;
+    if (faqs.length || locationRow) {
+      await sendAndPersist(tenant, contact, buildFaqListMessage(faqs, locationRow), "Failed to send FAQ list");
       return;
     }
     // No FAQs configured — fall through to the AI queue.
+  }
+
+  // "Where are you?" — a real map pin, not a link.
+  //
+  // A Google Maps URL costs the guest a browser, a consent screen and a
+  // hand-off to their map app. A WhatsApp location message opens straight in
+  // whatever maps app they already have, with a Directions button, without
+  // leaving the chat. The pin comes from HotelProfile.lat/lng, which the owner
+  // sets by pasting their Maps link into Settings.
+  if (msg.interactiveId === SHOW_LOCATION_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id } });
+    if (profile?.lat != null && profile?.lng != null) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        {
+          type: "location",
+          latitude: profile.lat,
+          longitude: profile.lng,
+          name: profile.name,
+          address: profile.address ?? undefined,
+        },
+        "Failed to send hotel location"
+      );
+      // The caption goes second so the pin is what they see first.
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).locationCaption }, "Failed to send location caption");
+      return;
+    }
+    // No coordinates set for this hotel — fall through to the AI, which still
+    // has the address and the maps link in its prompt.
+  }
+
+  // "Group / corporate" on the party-size question.
+  //
+  // Deliberately does NOT continue the normal funnel. A block of rooms is a
+  // different sale: rates get negotiated, the rooms have to be held together,
+  // and there is usually an invoice — none of which the assistant may decide.
+  // So it asks the one question that shapes the request and then hands over.
+  if (msg.interactiveId === GROUP_BOOKING_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(t(lang).groupRoomsBody, groupRoomsPrompt(lang)),
+      "Failed to send group room-count prompt"
+    );
+    return;
+  }
+
+  // How many rooms the group needs — the last thing the assistant asks before
+  // a person takes over.
+  if (msg.interactiveId && (GROUP_ROOM_BUTTON_IDS as readonly string[]).includes(msg.interactiveId)) {
+    if (contact.aiPaused) return;
+
+    const s = t(lang);
+    const rooms =
+      msg.interactiveId === "group_rooms_3_5" ? s.rooms3to5 : msg.interactiveId === "group_rooms_6_10" ? s.rooms6to10 : s.rooms10plus;
+
+    await sendAndPersist(tenant, contact, { type: "text", text: s.groupHandover(rooms) }, "Failed to send group handover");
+
+    // Handed to reception for real, not just promised. takeOverFields sets
+    // aiPaused too, so the assistant stops rather than negotiating underneath
+    // whoever picks this up — see lib/crm/handover.ts.
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        leadStatus: "INTERESTED",
+        ...takeOverFields(`Group booking — ${rooms}`),
+        aiBriefing: `Corporate/group enquiry: ${rooms}. Dates and company name not yet captured.`,
+      },
+    });
+
+    await prisma.staffNotification
+      .create({
+        data: {
+          tenantId: tenant.id,
+          contactId: contact.id,
+          type: "ESCALATION",
+          reason: `Group booking enquiry from ${contact.name || contact.phone} — ${rooms}.`,
+        },
+      })
+      .catch((err) => console.error("Failed to flag group booking:", err));
+    return;
   }
 
   // A tap on a specific FAQ row — send the real stored answer directly, zero

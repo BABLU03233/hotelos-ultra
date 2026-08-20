@@ -19,7 +19,12 @@ export const HOTEL = {
   cancellationPolicy: "Free cancellation up to 24 hours before check-in.",
   refundPolicy: "Full refund for cancellations within policy.",
   nearbyAttractions: "Close to a major checkpost in Uppal, about 4 km from the nearest metro station.",
-  googleMapsUrl: "https://maps.google.com/?q=e2e-test-hotel",
+  googleMapsUrl: "https://maps.google.com/?q=17.4065,78.4772",
+  // Real coordinates so the location-pin path is exercised. Without these the
+  // "Where are you?" row is correctly hidden, and the pin would never be
+  // tested at all.
+  lat: 17.4065,
+  lng: 78.4772,
   aiAgentName: "Anushka",
   aiSystemPrompt: "Best-value direct-booking stay in Hyderabad. Always highlight free covered parking.",
 };

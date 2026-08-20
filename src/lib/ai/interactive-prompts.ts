@@ -41,6 +41,37 @@ export const SHOW_OFFERS_BUTTON_ID = "show_offers";
 // too (shows the tenant's real FAQ list instead of free-texting through the AI).
 export const GREET_QUESTION_BUTTON_ID = "greet_question";
 
+/**
+ * "Where are you?" — answered with a real WhatsApp location pin.
+ *
+ * A Google Maps URL makes the guest leave the chat, wait for a browser, clear
+ * a consent screen, then hand off to a map app. A location message opens
+ * straight in whatever maps app they already have, with a Directions button,
+ * without leaving WhatsApp. The hotel's pin comes from HotelProfile.lat/lng
+ * (see settings/location-setting.tsx).
+ */
+export const SHOW_LOCATION_BUTTON_ID = "show_location";
+
+/** The party-size row for a corporate/group enquiry — see GROUP_ROOMS below. */
+export const GROUP_BOOKING_BUTTON_ID = "guests_group";
+
+/** How many rooms a group needs. Answered, then handed to a person. */
+export const GROUP_ROOM_BUTTON_IDS = ["group_rooms_3_5", "group_rooms_6_10", "group_rooms_10plus"] as const;
+
+/** The room-count question shown after "Group / corporate". */
+export function groupRoomsPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  const s = t(resolveLanguage(lang));
+  return {
+    type: "list",
+    buttonText: s.chooseButton,
+    rows: [
+      { id: "group_rooms_3_5", title: s.rooms3to5 },
+      { id: "group_rooms_6_10", title: s.rooms6to10 },
+      { id: "group_rooms_10plus", title: s.rooms10plus },
+    ],
+  };
+}
+
 // WhatsApp reply-buttons always render a small reply-arrow icon next to
 // every button — a hard, universal platform UI detail (every business,
 // every button, no exceptions; not something the Cloud API exposes any
@@ -114,6 +145,10 @@ function buildCatalog(lang: GuestLanguage): Record<string, CatalogEntry> {
         { id: "guests_1", title: s.guestJustMe },
         { id: "guests_2", title: s.guest2 },
         { id: "guests_3plus", title: s.guest3Plus },
+        // A corporate block is a different sale from a bigger family, and the
+        // old buttons made a company booking eight rooms answer "3+ people" —
+        // after which the funnel offered them a single room.
+        { id: GROUP_BOOKING_BUTTON_ID, title: s.guestGroup },
       ],
     },
     ROOM_RESPONSE: {

@@ -19,12 +19,31 @@ export interface FaqListMessage {
  * the guest gets the untruncated answer the instant they tap either way.
  * Pure/DB-free so it's unit-testable; the caller does the actual Faq query.
  */
-export function buildFaqListMessage(faqs: { id: string; question: string; answer: string }[]): FaqListMessage {
-  const rows = faqs.slice(0, MAX_ROWS).map((f) => ({
+export function buildFaqListMessage(
+  faqs: { id: string; question: string; answer: string }[],
+  /**
+   * Adds a "Where are you?" row that answers with a map pin rather than text.
+   *
+   * Only when the hotel has actually set coordinates — a row that promises
+   * directions and then sends nothing is worse than no row.
+   */
+  location?: { row: string; description: string } | null
+): FaqListMessage {
+  // One slot reserved for the location row when there is one.
+  const faqLimit = location ? MAX_ROWS - 1 : MAX_ROWS;
+  const rows = faqs.slice(0, faqLimit).map((f) => ({
     id: `faq_pick_${f.id}`,
     title: truncateRowTitle(f.question),
     description: f.answer.slice(0, ROW_DESCRIPTION_MAX),
   }));
+  if (location) {
+    rows.unshift({
+      id: "show_location",
+      title: truncateRowTitle(location.row),
+      description: location.description.slice(0, ROW_DESCRIPTION_MAX),
+    });
+  }
+
   return {
     type: "list",
     body: "Here are some things guests often ask — tap one:",

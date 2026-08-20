@@ -10,12 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { LocationSetting } from "@/components/settings/location-setting";
 import { HotelProfile } from "@/types";
 
 const FIELDS: { key: keyof HotelProfile; label: string; textarea?: boolean; placeholder?: string }[] = [
   { key: "name", label: "Hotel name" },
   { key: "address", label: "Address" },
-  { key: "googleMapsUrl", label: "Google Maps link", placeholder: "e.g. https://maps.app.goo.gl/... or https://share.google/..." },
   { key: "checkInTime", label: "Check-in time (e.g. 14:00)" },
   { key: "checkOutTime", label: "Check-out time (e.g. 11:00)" },
   { key: "businessHours", label: "Business hours", placeholder: "e.g. 24/7 front desk, restaurant 7am–11pm" },
@@ -87,6 +87,18 @@ function HotelSettingsForm({ initialProfile }: { initialProfile: HotelProfile | 
           <CardDescription>What {agentName} tells guests when they ask about the property.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Its own control rather than a plain text field: pasting the link
+              is what fills lat/lng, and the derived pin is shown back so the
+              owner can check it. See location-setting.tsx. */}
+          <div className="sm:col-span-2">
+            <LocationSetting
+              mapsUrl={form.googleMapsUrl ?? ""}
+              lat={form.lat}
+              lng={form.lng}
+              onChange={(next) => setForm({ ...form, ...next })}
+            />
+          </div>
+
           {FIELDS.map((f) => (
             <div key={f.key} className={`flex flex-col gap-1.5 ${f.textarea ? "sm:col-span-2" : ""}`}>
               <Label>{f.label}</Label>

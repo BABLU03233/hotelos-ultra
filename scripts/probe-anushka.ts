@@ -215,6 +215,25 @@ const PROBES: Probe[] = [
     ],
   },
   {
+    id: "group-booking-flow",
+    watch: "Corporate block: asks how many ROOMS, then hands to a person rather than selling one room.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_group", label: "Group / corporate" } },
+      { tap: { id: "group_rooms_6_10", label: "6-10 rooms" } },
+    ],
+  },
+  {
+    id: "location-pin",
+    watch: "Sends a real map pin, not a link. Fixture has no lat/lng, so this must NOT promise directions.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_question", label: "I need more details" } },
+      { tap: { id: "show_location", label: "Where are you?" } },
+    ],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

@@ -14,6 +14,7 @@ import {
   guestCountPrompt,
   hasExpressedBookingIntent,
   hasStatedDates,
+  GROUP_BOOKING_BUTTON_ID,
   GUEST_COUNT_BUTTON_VALUES,
   hasStatedGuestCount,
   looksLikeBareGreeting,
@@ -49,12 +50,13 @@ describe("extractInteractivePrompt", () => {
       { id: "guests_1", title: "Just me" },
       { id: "guests_2", title: "2 people" },
       { id: "guests_3plus", title: "3+ people" },
+      { id: "guests_group", title: "Group / corporate" },
     ]);
   });
 
   it("is case-insensitive on the key", () => {
     const result = extractInteractivePrompt("How many guests?\nbuttons: guest_count");
-    expect(asRows(result.interactive)).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(4);
   });
 
   it("resolves the ROOM_RESPONSE key at the RECOMMEND stage", () => {
@@ -75,7 +77,7 @@ describe("extractInteractivePrompt", () => {
   it("only resolves the first marker if the model emits more than one", () => {
     const result = extractInteractivePrompt("Hi!\nBUTTONS: GUEST_COUNT\nBUTTONS: GUEST_COUNT");
     expect(result.text).toBe("Hi!");
-    expect(asRows(result.interactive)).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(4);
   });
 
   it("exports a stable CONFIRM_BOOKING_BUTTON_ID for downstream matching", () => {
@@ -112,7 +114,7 @@ describe("extractInteractivePrompt", () => {
   it("substitutes a fallback body when only whitespace is left after stripping the marker", () => {
     const result = extractInteractivePrompt("   \n BUTTONS: GUEST_COUNT \n  ");
     expect(result.text.length).toBeGreaterThan(0);
-    expect(asRows(result.interactive)).toHaveLength(3);
+    expect(asRows(result.interactive)).toHaveLength(4);
   });
 
   it("resolves the LANGUAGE_SELECT key, and ROOM_RESPONSE's 'see other options' button matches SEE_OTHER_ROOMS_BUTTON_ID", () => {
@@ -197,7 +199,7 @@ describe("guestCountPrompt", () => {
   it("returns a list (not buttons) with the same three GUEST_COUNT rows -- no reply-arrow icon, per user request", () => {
     const prompt = guestCountPrompt();
     expect(prompt.type).toBe("list");
-    expect(asRows(prompt).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+    expect(asRows(prompt).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus", "guests_group"]);
   });
 
   it("has a stored party size for every row, so no tap can go uncaptured", () => {
@@ -206,6 +208,11 @@ describe("guestCountPrompt", () => {
     // size it means, whose only visible symptom is guests being asked their
     // headcount all over again several turns later.
     for (const row of asRows(guestCountPrompt())) {
+      // The group row is the one exception, and deliberately so: a corporate
+      // block is not a headcount, so it has no party size to store. It is
+      // captured by its own handler in handle-inbound-message.ts, which asks
+      // how many ROOMS and then hands the conversation to a person.
+      if (row.id === GROUP_BOOKING_BUTTON_ID) continue;
       expect(GUEST_COUNT_BUTTON_VALUES[row.id]).toBeGreaterThan(0);
     }
   });
@@ -551,7 +558,7 @@ describe("greetMenuPrompt / dateQuickPickPrompt", () => {
   });
 });
 
-const GUEST_COUNT_BUTTON_IDS = ["guests_1", "guests_2", "guests_3plus"];
+const GUEST_COUNT_BUTTON_IDS = ["guests_1", "guests_2", "guests_3plus", "guests_group"];
 describe("selectDeterministicInteractive", () => {
   const base = {
     isFirstReply: false,
@@ -1093,7 +1100,7 @@ describe("a real question is never swallowed by the funnel", () => {
       guestMessage: "do you have wifi",
       replyText: "Yes, free high-speed WiFi throughout! 😊",
     });
-    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus", "guests_group"]);
   });
 });
 
@@ -1137,7 +1144,7 @@ describe("resolveDeterministicReply", () => {
     // right reply and skipping the AI is pure win.
     const result = resolveDeterministicReply({ ...base, history: [{ role: "user", content: "I want to book a room" }, { role: "assistant", content: "Happy to help!" }], guestMessage: "ok" });
     expect(result?.text).toBe("How many people will be staying? 😊");
-    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+    expect(asRows(result?.interactive).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus", "guests_group"]);
   });
 
   it("hands a substantive opener to the AI, but still attaches the guest-count picker", () => {
@@ -1153,7 +1160,7 @@ describe("resolveDeterministicReply", () => {
       guestMessage: "I'd like to book a room",
       replyText: "Lovely — happy to help you book!",
     });
-    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus"]);
+    expect(asRows(buttons).map((r) => r.id)).toEqual(["guests_1", "guests_2", "guests_3plus", "guests_group"]);
   });
 
   it("returns null (lets the AI actually answer) for a genuine question, even once booking intent is already shown -- a real gap found live: 'am I talking to a real person or a bot?' was silently swallowed and funneled straight into 'how many people will be staying?' just because the assistant's own earlier message had mentioned 'book a room'", () => {
