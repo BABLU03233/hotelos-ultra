@@ -1312,6 +1312,15 @@ function timeOfDayGreeting(now: Date): string {
   // now.getHours() returned the SERVER's hour, not India's (confirmed live:
   // 8:32am UTC = 2:02pm IST said "Good morning!"). See india-time.ts.
   const hour = currentHourIST(now);
+  // Before 5am there is no greeting that fits. Caught live on a real guest's
+  // very first message: "Hii" at 00:24 IST was answered "Good morning!", which
+  // at half past midnight reads as either a machine or a joke — and it is the
+  // first line the hotel ever says to them.
+  //
+  // The prompt already tells the model the same thing for its own greetings
+  // ("when in doubt use a greeting that works at any hour"); this is the
+  // deterministic path finally agreeing with it.
+  if (hour < 5) return "Hello!";
   if (hour < 12) return "Good morning!";
   if (hour < 17) return "Good afternoon!";
   return "Good evening!";
@@ -1343,6 +1352,14 @@ export function resolveDeterministicReply(params: {
   history: { role: string; content: string }[];
   guestMessage: string;
   hotelName?: string;
+  /**
+   * The hotel's own name for its assistant, from HotelProfile.aiAgentName.
+   *
+   * The greeting below hardcoded "Anushka", so a hotel that renamed its agent
+   * in Settings still had it introduce itself as Anushka to every new guest —
+   * the setting worked everywhere except the one line every guest reads first.
+   */
+  agentName?: string;
   now?: Date;
   bookingSummary?: { roomName: string; checkIn: Date; checkOut: Date };
   knownGuestCount?: number | null;
@@ -1401,7 +1418,8 @@ export function resolveDeterministicReply(params: {
     // language, so it has to be readable before one has been chosen.
     const greeting = timeOfDayGreeting(params.now ?? new Date());
     const from = params.hotelName ? ` from ${params.hotelName}` : "";
-    text = `${greeting} 😊 This is Anushka${from} — thank you for reaching out! Which language are you comfortable in?`;
+    const agent = params.agentName?.trim() || "Anushka";
+    text = `${greeting} 😊 This is ${agent}${from} — thank you for reaching out! Which language are you comfortable in?`;
   } else if (key === "CONFIRM_BOOKING") {
     // Live-caught: a guest tapping "Not yet" (CONFIRM_BOOKING's own decline
     // row) got the exact same push-to-confirm text repeated verbatim right

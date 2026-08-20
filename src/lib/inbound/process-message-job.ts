@@ -302,6 +302,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     history,
     guestMessage: latestInbound.content,
     hotelName: profile?.name ?? undefined,
+    agentName: agentNameFallback,
     bookingSummary,
     language: resolveLanguage(contact.language),
     knownGuestCount,
