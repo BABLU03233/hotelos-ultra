@@ -1,7 +1,16 @@
 import { CrmWorkspace } from "@/components/crm/crm-workspace";
+import { CHAT_FILTERS } from "@/lib/crm/chat-filters";
 
-export default async function CrmPage({ searchParams }: { searchParams: Promise<{ contact?: string }> }) {
-  const { contact } = await searchParams;
+export default async function CrmPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ contact?: string; filter?: string }>;
+}) {
+  const { contact, filter } = await searchParams;
+  // Validated against the real filter list rather than cast: ?filter= is
+  // user-editable, and an unknown value should open the normal list, not
+  // render an empty one with no chip selected.
+  const initialFilter = CHAT_FILTERS.find((f) => f.key === filter)?.key;
 
   // Deliberately bare: no page title, no description, no max-width.
   //
@@ -14,5 +23,5 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
   // and a half of visible history, on every conversation, forever.
   //
   // CrmWorkspace sizes itself from the viewport, so it needs no height here.
-  return <CrmWorkspace initialContactId={contact ?? null} />;
+  return <CrmWorkspace initialContactId={contact ?? null} initialFilter={initialFilter} />;
 }

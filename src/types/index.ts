@@ -258,6 +258,10 @@ export interface DashboardMetrics {
   activeChats: number;
   activeChatsPrev: number;
   bookings: number;
+  /** Guests close to booking who then went quiet — see lib/crm/hot-lead.ts. */
+  hotLeads: number;
+  /** Conversations no one will answer unless a person does. */
+  needsHuman: number;
   pendingFollowUps: number;
   aiConversationsToday: number;
   aiConversationsPrev: number;

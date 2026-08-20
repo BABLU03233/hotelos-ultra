@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Kanban, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { type ChatFilterKey } from "@/lib/crm/chat-filters";
 import { cn } from "@/lib/utils";
 import { ContactDetail } from "./contact-detail";
 import { ContactList } from "./contact-list";
@@ -12,7 +13,13 @@ import { ImportContactsDialog } from "./import-contacts-dialog";
 
 type View = "list" | "pipeline";
 
-export function CrmWorkspace({ initialContactId }: { initialContactId: string | null }) {
+export function CrmWorkspace({
+  initialContactId,
+  initialFilter,
+}: {
+  initialContactId: string | null;
+  initialFilter?: ChatFilterKey;
+}) {
   const [selectedId, setSelectedId] = React.useState<string | null>(initialContactId);
   const [reloadToken, setReloadToken] = React.useState(0);
   // Chat-first landing, matching the reference this was built against:
@@ -94,7 +101,12 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
               selectedId ? "hidden md:block" : "block"
             )}
           >
-            <ContactList selectedId={selectedId} onSelect={setSelectedId} reloadToken={reloadToken} />
+            <ContactList
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              reloadToken={reloadToken}
+              initialFilter={initialFilter}
+            />
           </div>
           <div className={cn("min-w-0 flex-1", selectedId ? "flex" : "hidden md:flex")}>
             <ContactDetail contactId={selectedId} onChanged={onChanged} onBack={() => setSelectedId(null)} />

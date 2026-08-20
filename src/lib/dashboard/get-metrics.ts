@@ -1,3 +1,5 @@
+import { conversationMode } from "@/lib/crm/handover";
+import { isHotLead } from "@/lib/crm/hot-lead";
 import { prisma } from "@/lib/prisma";
 import { tenantDb } from "@/lib/tenant";
 import { DashboardMetrics, LeadSource, LeadStatus } from "@/types";
@@ -34,6 +36,7 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     roomCount,
     faqCount,
     tenant,
+    deskContacts,
   ] = await Promise.all([
     db.contact.count({ where: { leadStatus: "NEW" } }),
     db.contact.count({ where: { leadStatus: "BOOKED" } }),
@@ -72,7 +75,30 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     db.room.count(),
     db.faq.count(),
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { whatsappPhoneNumberId: true } }),
+    // Everything the two desk figures below are derived from. Fetched as rows
+    // rather than counted in SQL because "hot" is a scored rule over several
+    // columns (see lib/crm/hot-lead.ts) and "needs a human" spans two — and
+    // re-implementing either in a query is how the dashboard and the CRM start
+    // disagreeing about the same guests. One list, one rule, two readers.
+    db.contact.findMany({
+      where: { leadStatus: { notIn: ["CLOSED"] } },
+      select: {
+        leadStatus: true,
+        bookingStatus: true,
+        pendingRoomId: true,
+        pendingCheckIn: true,
+        pendingCheckOut: true,
+        pendingGuestCount: true,
+        lastInboundAt: true,
+        optedOutAt: true,
+        aiPaused: true,
+        handoverAt: true,
+      },
+    }),
   ]);
+
+  const hotLeads = deskContacts.filter((c) => isHotLead(c)).length;
+  const needsHuman = deskContacts.filter((c) => conversationMode(c) !== "ai").length;
 
   const campaignPerformance = await Promise.all(
     recentCampaigns.map(async (c) => {
@@ -119,6 +145,8 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
     activeChatsPrev: activeChatContactIdsPrev.length,
     bookings,
     pendingFollowUps,
+    hotLeads,
+    needsHuman,
     aiConversationsToday: aiConversationsToday.length,
     aiConversationsPrev: aiConversationsYesterday.length,
     aiMessagesToday: todayCounts.ai,

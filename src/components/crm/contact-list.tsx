@@ -47,13 +47,23 @@ export function ContactList({
   selectedId,
   onSelect,
   reloadToken,
+  initialFilter,
 }: {
   selectedId: string | null;
   onSelect: (id: string) => void;
   reloadToken?: number;
+  /**
+   * Which list to open on, from ?filter= in the URL.
+   *
+   * Lets the dashboard cards deep-link: "Hot leads 4" goes straight to those
+   * four conversations instead of dropping the owner on All and leaving them
+   * to find the chip. Read once as the initial value — after that the chips
+   * own it, so clicking one does not fight the URL.
+   */
+  initialFilter?: ChatFilterKey;
 }) {
   const [search, setSearch] = React.useState("");
-  const [filter, setFilter] = React.useState<ChatFilterKey>("ALL");
+  const [filter, setFilter] = React.useState<ChatFilterKey>(initialFilter ?? "ALL");
 
   const params = new URLSearchParams();
   if (search) params.set("search", search);

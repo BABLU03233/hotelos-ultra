@@ -1,4 +1,4 @@
-import { Bot, CalendarCheck, Clock, Megaphone, MessagesSquare, PieChart, UserPlus } from "lucide-react";
+import { Bot, CalendarCheck, Clock, Flame, Megaphone, MessagesSquare, PieChart, UserPlus, UserRound } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/components/motion/reveal";
@@ -32,11 +32,38 @@ export default async function DashboardPage() {
 
       <OnboardingChecklist setup={metrics.setup} agentName={metrics.aiAgentName} />
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-5">
+      {/* The two figures that name work, first — a dashboard should open with
+          what needs doing, not with a total. Both link straight to the filtered
+          chat list rather than making the owner go and find it. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StaggerItem index={0}>
-          <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} />
+          <MetricCard
+            label="Hot leads"
+            value={metrics.hotLeads}
+            icon={Flame}
+            href="/crm?filter=HOT"
+            hint="Close to booking, gone quiet"
+          />
         </StaggerItem>
         <StaggerItem index={1}>
+          <MetricCard
+            label="Needs a person"
+            value={metrics.needsHuman}
+            icon={UserRound}
+            href="/crm?filter=HUMAN"
+            hint={`${metrics.aiAgentName} is not replying to these`}
+          />
+        </StaggerItem>
+        <StaggerItem index={2}>
+          <MetricCard label="New leads" value={metrics.newLeads} icon={UserPlus} href="/crm?filter=NEW" />
+        </StaggerItem>
+        <StaggerItem index={3}>
+          <MetricCard label="Bookings" value={metrics.bookings} icon={CalendarCheck} href="/crm?filter=BOOKED" />
+        </StaggerItem>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-3">
+        <StaggerItem index={0}>
           <MetricCard
             label="Active chats (24h)"
             value={metrics.activeChats}
@@ -44,13 +71,10 @@ export default async function DashboardPage() {
             previous={metrics.activeChatsPrev}
           />
         </StaggerItem>
+        <StaggerItem index={1}>
+          <MetricCard label="Pending follow-ups" value={metrics.pendingFollowUps} icon={Clock} href="/follow-ups" />
+        </StaggerItem>
         <StaggerItem index={2}>
-          <MetricCard label="Bookings" value={metrics.bookings} icon={CalendarCheck} />
-        </StaggerItem>
-        <StaggerItem index={3}>
-          <MetricCard label="Pending follow-ups" value={metrics.pendingFollowUps} icon={Clock} />
-        </StaggerItem>
-        <StaggerItem index={4}>
           <MetricCard
             label="AI conversations today"
             value={metrics.aiConversationsToday}
