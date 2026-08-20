@@ -127,6 +127,24 @@ enum CampaignSendPacing {
   SPACED
 }
 
+// Platform review of a broadcast before it reaches guests.
+//
+// A campaign goes to many people at once and cannot be recalled, and every
+// complaint lands on the WhatsApp number's quality rating — which is shared
+// infrastructure: one hotel sending something careless degrades delivery for
+// everyone on the platform. So a broadcast is held until the operator has
+// looked at it, rather than trusting each hotel to self-police copy they are
+// motivated to send.
+//
+// DRAFT exists so a half-written campaign is not queued for review. Only
+// APPROVED can send.
+enum CampaignApproval {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 // ─── Tenant & auth ──────────────────────────────────────────────────────
 
 model Tenant {
@@ -609,6 +627,23 @@ model Campaign {
   sendPacing          CampaignSendPacing @default(ALL_AT_ONCE)
   sendIntervalSeconds Int?
 
+  // Review state. Defaults to PENDING_REVIEW rather than APPROVED on purpose:
+  // a campaign created before this field existed, or by a code path that
+  // forgets to set it, must fail closed (held) rather than open (sent).
+  approval       CampaignApproval @default(PENDING_REVIEW)
+  submittedAt    DateTime?
+  reviewedAt     DateTime?
+  // The PlatformAdmin who decided. Deliberately a plain string, not a relation:
+  // the reviewer's identity is an audit record and must survive that admin
+  // account being deleted.
+  reviewedByName String?
+  // Why it was rejected, shown to the hotel so they can fix and resubmit.
+  reviewNote     String?          @db.Text
+  // The automated policy check that runs on submission, so the operator sees a
+  // recommendation rather than reading every broadcast cold. Shape:
+  // { verdict, concerns: [{ severity, issue, suggestion }], checkedAt }
+  autoReview     Json?
+
   metaTemplateId         String?
   metaTemplate           MetaTemplate? @relation(fields: [metaTemplateId], references: [id], onDelete: SetNull)
   // Campaign-wide values for the template's "custom" variable slots (e.g. a
@@ -620,6 +655,9 @@ model Campaign {
   recipients CampaignRecipient[]
 
   @@index([tenantId])
+  // The operator's review queue is "everything pending, oldest first",
+  // across all tenants.
+  @@index([approval, submittedAt])
 }
 
 model CampaignRecipient {

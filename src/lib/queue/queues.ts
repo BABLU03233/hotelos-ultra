@@ -49,8 +49,15 @@ export const messageQueue: MinimalQueue<ProcessMessageJob> = queueDisabled
       defaultJobOptions,
     });
 
-/** One job per CampaignRecipient — keeps sends rate-limited and individually retryable. */
-export const campaignQueue = new Queue<CampaignSendJob>("campaign-send", {
-  connection: redisConnection,
-  defaultJobOptions,
-});
+/** One job per CampaignRecipient — keeps sends rate-limited and individually retryable.
+ *
+ *  Honours E2E_DISABLE_QUEUE for the same reason messageQueue does. It was
+ *  missed when that flag was added, which meant the suite could not cover the
+ *  campaign send path at all without a live Redis — so the approval gate, the
+ *  single most damaging thing to get wrong here, was untestable. */
+export const campaignQueue: MinimalQueue<CampaignSendJob> = queueDisabled
+  ? inertQueue<CampaignSendJob>("campaign-send")
+  : new Queue<CampaignSendJob>("campaign-send", {
+      connection: redisConnection,
+      defaultJobOptions,
+    });

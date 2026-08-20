@@ -131,7 +131,13 @@ const OMNIROUTE_MODELS = process.env.OMNIROUTE_MODELS?.split(",")
   .map((m) => m.trim())
   .filter(Boolean) ?? ["auto/coding:free", "auto/reasoning:free", "auto/best-free"];
 
-const aiProvider: AIProvider = createFallbackProvider([
+/**
+ * Exported so other AI features (the campaign copy reviewer, for one) reuse
+ * this exact chain rather than each assembling their own. The ordering,
+ * timeouts and key rotation here were tuned against live traffic; a second
+ * copy would drift from it silently.
+ */
+export const aiProvider: AIProvider = createFallbackProvider([
   groqProvider,
   createGroqProvider("GROQ_API_KEY_2", "groq-2"),
   geminiProvider,

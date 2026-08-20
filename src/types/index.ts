@@ -113,6 +113,14 @@ export interface MetaTemplate {
 
 export type CampaignMessageType = "TEXT" | "IMAGE" | "TEMPLATE";
 export type CampaignSendPacing = "ALL_AT_ONCE" | "SPACED";
+export type CampaignApproval = "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+
+/** One concern raised by the automated pre-review — see lib/campaigns/auto-review.ts. */
+export interface CampaignReviewConcern {
+  severity: "block" | "warn" | "note";
+  issue: string;
+  suggestion: string;
+}
 
 export interface Campaign {
   id: string;
@@ -129,6 +137,12 @@ export interface Campaign {
   scheduledAt: string | null;
   createdAt: string;
   sentAt: string | null;
+  approval: CampaignApproval;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewedByName: string | null;
+  reviewNote: string | null;
+  autoReview: { verdict: string; concerns: CampaignReviewConcern[]; checkedAt: string } | null;
   _count?: { recipients: number };
 }
 

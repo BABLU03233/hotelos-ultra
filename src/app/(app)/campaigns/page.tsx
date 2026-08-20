@@ -10,6 +10,8 @@ import { Reveal } from "@/components/motion/reveal";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
 import { StaggerItem } from "@/components/motion/stagger-item";
 import { useFetch } from "@/hooks/use-fetch";
+import { campaignStatus, campaignStatusClass } from "@/lib/campaigns/status";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { useAuthStore } from "@/store/use-auth-store";
 import { Campaign } from "@/types";
@@ -53,17 +55,14 @@ export default function CampaignsPage() {
                           {c.type} · {c._count?.recipients ?? 0} recipients · {formatDate(c.createdAt)}
                         </p>
                       </div>
-                      <span
-                        className={
-                          c.sentAt
-                            ? "text-xs font-medium text-emerald-600"
-                            : c.scheduledAt
-                              ? "text-xs font-medium text-amber-600"
-                              : "text-xs text-muted-foreground"
-                        }
-                      >
-                        {c.sentAt ? "Sent" : c.scheduledAt ? "Scheduled" : "Draft"}
-                      </span>
+                      {(() => {
+                        const status = campaignStatus(c);
+                        return (
+                          <span className={cn("text-xs font-medium", campaignStatusClass(status.tone))}>
+                            {status.label}
+                          </span>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 </Link>

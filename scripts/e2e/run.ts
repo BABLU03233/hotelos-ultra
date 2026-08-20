@@ -13,6 +13,7 @@ import "dotenv/config";
 import { writeFileSync } from "fs";
 import { assertLocalDatabase, inbound, installStubs, peekOutbox, queueAiReply, resetTurnState, takeOutbox, type SentMessage } from "./harness";
 import { SCENARIOS, type Check, type Scenario } from "./scenarios";
+import { FLOWS } from "./flows";
 
 // Before ANY app module is imported, so nothing captures the real fetch first.
 installStubs();
@@ -29,7 +30,9 @@ interface TurnResult {
   error?: string;
 }
 interface ScenarioResult {
-  scenario: Scenario;
+  // Only the descriptive fields, so a conversational Scenario and a
+  // non-conversational Flow can share one result shape and one report.
+  scenario: Pick<Scenario, "id" | "area" | "title" | "because">;
   turns: TurnResult[];
   passed: boolean;
   durationMs: number;
@@ -59,15 +62,17 @@ async function main() {
   const { processMessageJob } = await import("@/lib/inbound/process-message-job");
   const { createFixture, destroyFixture, ageConversation } = await import("./fixture");
 
-  const selected = SCENARIOS.filter(
-    (s) => (!only || only.includes(s.id)) && (!area || s.area.toLowerCase() === area.toLowerCase())
-  );
-  if (!selected.length) {
+  const matchesFilter = (s: { id: string; area: string }) =>
+    (!only || only.includes(s.id)) && (!area || s.area.toLowerCase() === area.toLowerCase());
+
+  const selected = SCENARIOS.filter(matchesFilter);
+  const selectedFlows = FLOWS.filter(matchesFilter);
+  if (!selected.length && !selectedFlows.length) {
     console.error("No scenarios matched that filter.");
     process.exit(1);
   }
 
-  console.log(`\nFunctional E2E — ${selected.length} scenario(s)\n`);
+  console.log(`\nFunctional E2E — ${selected.length + selectedFlows.length} scenario(s)\n`);
 
   const results: ScenarioResult[] = [];
   const startedAll = Date.now();
@@ -122,6 +127,36 @@ async function main() {
         `  ${passed ? "PASS" : "FAIL"}  ${scenario.area.padEnd(10)} ${scenario.id}${passed ? "" : `  (${failedChecks.length} check(s) failed)`}`
       );
 
+      if (!passed || verbose) printTranscript(turns);
+      await destroyFixture(prisma);
+    }
+
+    // Non-conversational scenarios. Folded into the same result shape so the
+    // summary line, the exit code and the report treat them exactly like any
+    // other scenario — a flow that fails must fail the suite, not print a note
+    // nobody reads.
+    for (const flow of selectedFlows) {
+      const fixture = await createFixture(prisma);
+      const started = Date.now();
+
+      let checks: CheckResult[] = [];
+      let error: string | undefined;
+      try {
+        checks = await flow.run({ prisma, tenantId: fixture.tenantId });
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+
+      const turns: TurnResult[] = [
+        { guest: `(flow: ${flow.title})`, replies: [], checks, error },
+      ];
+      const passed = !error && checks.every((c) => c.passed);
+      results.push({ scenario: flow, turns, passed, durationMs: Date.now() - started });
+
+      console.log(
+        `  ${passed ? "PASS" : "FAIL"}  ${flow.area.padEnd(10)} ${flow.id}` +
+          (passed ? "" : `  (${checks.filter((c) => !c.passed).length + (error ? 1 : 0)} check(s) failed)`)
+      );
       if (!passed || verbose) printTranscript(turns);
       await destroyFixture(prisma);
     }

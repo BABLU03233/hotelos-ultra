@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ApiError, apiRoute } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
 import { campaignCreateSchema } from "@/lib/validation/campaign";
+import { reviewCampaignCopy, templateBodyText } from "@/lib/campaigns/auto-review";
+import { Prisma } from "@/generated/prisma/client";
 
 export const GET = apiRoute(async (req: NextRequest) => {
   const { db } = requireTenantDb(req);
@@ -27,9 +29,11 @@ export const POST = apiRoute(async (req: NextRequest) => {
   // returns null (not another tenant's template) if the id doesn't belong
   // to this tenant, closing the gap where a client-supplied id could
   // otherwise reference any template in the database.
+  let templateComponents: unknown = null;
   if (body.metaTemplateId) {
     const template = await db.metaTemplate.findUnique({ where: { id: body.metaTemplateId } });
     if (!template) throw new ApiError(400, "That template wasn't found for this hotel.");
+    templateComponents = template.components;
   }
 
   // contactIds are tenant-scoped independently since createMany's nested
@@ -39,6 +43,19 @@ export const POST = apiRoute(async (req: NextRequest) => {
     select: { id: true },
   });
   if (!validContacts.length) throw new ApiError(400, "No valid contacts selected");
+
+  // The automated first pass, run at creation so the operator opens the review
+  // queue with a recommendation already attached instead of reading every
+  // broadcast cold. Reviews the guest-facing text — the template body for a
+  // template campaign, the typed body otherwise.
+  //
+  // Awaited rather than backgrounded: it normally costs a few hundred
+  // milliseconds on the chain's first link, and a campaign that reaches the
+  // queue with its check still "pending" is a state the admin screen would
+  // have to explain. reviewCampaignCopy never throws — it degrades to the
+  // deterministic checks alone when every free tier is exhausted.
+  const reviewableText = templateComponents ? templateBodyText(templateComponents) : (body.body ?? "");
+  const autoReview = await reviewCampaignCopy(reviewableText);
 
   const campaign = await db.campaign.create({
     data: {
@@ -54,6 +71,11 @@ export const POST = apiRoute(async (req: NextRequest) => {
       sendPacing: body.sendPacing,
       sendIntervalSeconds: body.sendPacing === "SPACED" ? body.sendIntervalSeconds : null,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
+      // Every new campaign enters the operator's review queue. Nothing the
+      // owner can do from this route creates an already-approved campaign.
+      approval: "PENDING_REVIEW",
+      submittedAt: new Date(),
+      autoReview: autoReview as unknown as Prisma.InputJsonValue,
       recipients: {
         createMany: { data: validContacts.map((c) => ({ contactId: c.id })) },
       },

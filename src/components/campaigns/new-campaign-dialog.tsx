@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -26,6 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
+import { CopyCheck } from "@/components/campaigns/copy-check";
 import { useFetch } from "@/hooks/use-fetch";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
@@ -145,6 +146,11 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setSendTiming("now");
       setScheduledAt("");
       setSelectedIds(new Set());
+      // Creating no longer means sending, so the dialog has to say what
+      // actually happened — otherwise the owner closes it believing the
+      // broadcast is on its way and only finds out days later that it never
+      // went out.
+      toast.success("Sent for approval — we review every broadcast before it reaches guests.");
       onCreated();
     } catch (err) {
       // The dialog deliberately stays open so the owner does not lose a
@@ -219,9 +225,10 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <Label>Message</Label>
-                <TemplatePicker onInsert={setBody} />
+                <TemplatePicker onInsert={setBody} bulkOnly />
               </div>
               <Textarea value={body} onChange={(e) => setBody(e.target.value)} className="min-h-20" />
+              <CopyCheck body={body} />
             </div>
           )}
 
@@ -378,9 +385,17 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {/* Said before the click, not just after it. "Schedule campaign" on
+              a button that actually queues a review would be a promise the
+              product doesn't keep. */}
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground sm:max-w-xs">
+            <ShieldCheck className="mt-px size-3.5 shrink-0" />
+            We review every broadcast before it reaches guests — usually within a few hours.
+            {sendTiming === "scheduled" && " It goes out at your scheduled time once approved."}
+          </p>
           <Button disabled={!canSubmit || submitting} onClick={submit}>
-            {submitting ? "Creating…" : sendTiming === "scheduled" ? "Schedule campaign" : "Create campaign"}
+            {submitting ? "Submitting…" : "Submit for approval"}
           </Button>
         </DialogFooter>
       </DialogContent>

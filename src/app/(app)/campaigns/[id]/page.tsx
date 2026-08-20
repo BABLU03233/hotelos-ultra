@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { formatDateTime } from "@/lib/format";
 import { useFetch } from "@/hooks/use-fetch";
 import { apiFetch } from "@/lib/api-client";
+import { campaignStatus, campaignStatusClass } from "@/lib/campaigns/status";
 import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { cn } from "@/lib/utils";
 import { Campaign, CampaignReport } from "@/types";
@@ -86,6 +87,7 @@ export default function CampaignDetailPage() {
   }
 
   const { campaign, report } = data;
+  const status = campaignStatus(campaign);
   const chartData = [
     { label: "Sent", value: report.sent },
     { label: "Delivered", value: report.delivered },
@@ -105,8 +107,13 @@ export default function CampaignDetailPage() {
               {campaign.type} · {campaign.messageType.toLowerCase()}
             </p>
           </div>
+          {/* The button is disabled rather than hidden while a campaign waits
+              for review. A vanished button reads as a bug; a disabled one next
+              to the status card below explains itself. The server refuses
+              unapproved sends regardless — this is the courtesy, not the
+              guard. */}
           {!campaign.sentAt && (
-            <Button onClick={send} disabled={report.totalContacts === 0}>
+            <Button onClick={send} disabled={report.totalContacts === 0 || campaign.approval !== "APPROVED"}>
               Send now
             </Button>
           )}
@@ -117,6 +124,47 @@ export default function CampaignDetailPage() {
           )}
         </div>
       </Reveal>
+
+      {/* Where this campaign stands. Shown for anything not yet sent, because
+          "why can't I send?" is the first question a held campaign raises and
+          the owner should not have to ask it. */}
+      {!campaign.sentAt && (
+        <Reveal>
+          <Card className={campaign.approval === "REJECTED" ? "border-destructive/30" : undefined}>
+            <CardContent className="flex flex-col gap-1.5">
+              <p className={cn("flex items-center gap-1.5 text-sm font-medium", campaignStatusClass(status.tone))}>
+                {campaign.approval === "PENDING_REVIEW" ? (
+                  <ShieldCheck className="size-4 shrink-0" />
+                ) : campaign.approval === "REJECTED" ? (
+                  <XCircle className="size-4 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="size-4 shrink-0" />
+                )}
+                {status.label}
+              </p>
+              {status.detail && <p className="text-sm text-muted-foreground">{status.detail}</p>}
+              {campaign.approval === "REJECTED" && campaign.reviewNote && (
+                <p className="text-xs text-muted-foreground">
+                  Reviewed by {campaign.reviewedByName ?? "our team"}
+                  {campaign.reviewedAt ? ` on ${formatDateTime(campaign.reviewedAt)}` : ""}.
+                </p>
+              )}
+              {/* The same automated notes the reviewer saw. Showing them to the
+                  hotel turns a rejection into something they can fix without a
+                  support conversation. */}
+              {campaign.approval !== "APPROVED" && (campaign.autoReview?.concerns.length ?? 0) > 0 && (
+                <ul className="mt-1 flex flex-col gap-1">
+                  {campaign.autoReview!.concerns.map((concern, i) => (
+                    <li key={i} className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{concern.issue}</span> {concern.suggestion}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </Reveal>
+      )}
 
       {!campaign.sentAt && campaign.scheduledAt && (
         <Reveal>

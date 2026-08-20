@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CreditCard, ShieldCheck, UserCog } from "lucide-react";
+import { Building2, CreditCard, Megaphone, ShieldCheck, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Tenants", icon: Building2 },
+  { href: "/admin/campaigns", label: "Campaign review", icon: Megaphone },
   { href: "/admin/account", label: "Account", icon: UserCog },
 ] as const;
 
@@ -15,7 +16,13 @@ const COMING_SOON = [
   { label: "Admins", icon: ShieldCheck },
 ] as const;
 
-export function AdminSidebar() {
+/**
+ * `pendingReviews` is counted in the server layout and passed down rather than
+ * fetched here. A review queue nobody knows is full is the same as no queue at
+ * all — the operator needs the count without opening the screen, and one
+ * server-side count on a page they were already loading beats a client poll.
+ */
+export function AdminSidebar({ pendingReviews = 0 }: { pendingReviews?: number }) {
   const pathname = usePathname();
 
   return (
@@ -36,6 +43,16 @@ export function AdminSidebar() {
             >
               <item.icon className="size-4 shrink-0" />
               {item.label}
+              {item.href === "/admin/campaigns" && pendingReviews > 0 && (
+                <span
+                  className={cn(
+                    "ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                    active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-amber-500/15 text-amber-600"
+                  )}
+                >
+                  {pendingReviews}
+                </span>
+              )}
             </Link>
           );
         })}
