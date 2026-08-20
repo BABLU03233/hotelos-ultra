@@ -1119,6 +1119,23 @@ function resolveStageKey(params: {
   // reply that has nothing to do with language. Real booking intent already
   // being shown means this was never actually a blank first message.
   if (!intentShown && (isFirstReply || looksLikeBareGreeting(guestMessage))) {
+    // A first message that actually asks something gets answered, not handed
+    // a form.
+    //
+    // GUEST_COUNT and DATE_QUICK_PICK have been guarded by deservesRealAnswer
+    // for a while; LANGUAGE_SELECT never was, and it is the worst place to
+    // miss it because it is the guest's very first impression. Probed live:
+    // "how much for one night?" and "do you allow pets?" both came back with
+    // "Which language are you comfortable in?" — a direct question answered
+    // with a form, which is exactly what makes a bot feel like a bot.
+    //
+    // Nothing is lost by skipping it. Devanagari and Telugu script are
+    // detected automatically (see resolveContactLanguageUpdate), the AI
+    // answers in whatever language the guest wrote in, and the waterfall
+    // re-attaches the right buttons to whatever it says — so the funnel is
+    // deferred by one turn, not abandoned. A bare "hi" still gets the picker,
+    // because there is nothing else in it to respond to.
+    if (!looksLikeBareGreeting(guestMessage) && deservesRealAnswer(guestMessage)) return null;
     return languageObvious ? "GREET_MENU" : "LANGUAGE_SELECT";
   }
   return null;

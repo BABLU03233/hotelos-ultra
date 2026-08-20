@@ -52,7 +52,16 @@ const AI_HOSTS = ["api.groq.com", "generativelanguage.googleapis.com", "openrout
  * Must run before any app module is imported, so nothing captures the real
  * fetch first.
  */
-export function installStubs() {
+/**
+ * Set by the live probe (scripts/probe-anushka.ts) to let real provider calls
+ * through while still intercepting every WhatsApp send.
+ *
+ * The suite itself must NEVER run this way — scripted replies are what make it
+ * deterministic, and billing a free tier per assertion would make it unrunnable
+ * after every change. It exists so a human can read what the real model
+ * actually says, which is the one thing a stub can never tell you.
+ */
+export function installStubs(opts: { liveAi?: boolean } = {}) {
   // The suite drives processMessageJob inline, so the BullMQ hop is pure
   // overhead here — and requiring a live Redis to throw an enqueue away would
   // make a suite meant to run after every change depend on a service it never
@@ -64,7 +73,7 @@ export function installStubs() {
   // the HTTP stub below is never reached — the model half of the pipeline
   // would go completely untested while the suite still looked busy. Groq is
   // first in the chain, so a working stub there means nothing else is tried.
-  process.env.GROQ_API_KEY ||= "e2e-stub-key";
+  if (!opts.liveAi) process.env.GROQ_API_KEY ||= "e2e-stub-key";
   // Deliberately NOT filling the rest: if a scenario ever falls past Groq the
   // suite should say so loudly rather than quietly answering from a different
   // stubbed link.
@@ -92,7 +101,7 @@ export function installStubs() {
       });
     }
 
-    if (AI_HOSTS.some((h) => url.includes(h))) {
+    if (!opts.liveAi && AI_HOSTS.some((h) => url.includes(h))) {
       aiCallCount++;
       const reply = scriptedReplies.shift() ?? DEFAULT_AI_REPLY;
       // Groq/OpenRouter/Anthropic all read choices[0].message.content in this

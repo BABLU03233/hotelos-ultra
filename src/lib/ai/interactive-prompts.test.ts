@@ -566,6 +566,44 @@ describe("selectDeterministicInteractive", () => {
     expect(asRows(result).map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
   });
 
+  it("still offers LANGUAGE_SELECT for a bare greeting", () => {
+    // "hi" carries nothing else to respond to, so asking which language is
+    // the most useful thing the first reply can do.
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: true,
+      languageObvious: false,
+      guestMessage: "hi",
+    });
+    expect(asRows(result).map((b) => b.id)).toEqual(["lang_en", "lang_hi", "lang_te"]);
+  });
+
+  it.each([
+    ["how much for one night?"],
+    ["do you allow pets?"],
+    ["is there parking"],
+    ["kitna hai price"],
+  ])("does NOT answer a real first question with a language form: %s", (guestMessage) => {
+    // Probed live against the real pipeline: both of the first two came back
+    // with "Which language are you comfortable in?". A direct question
+    // answered with a form is exactly what makes a bot feel like a bot, and
+    // it is the guest's very first impression of the hotel.
+    //
+    // Nothing is lost by deferring: script detection still sets the language,
+    // the AI answers in whatever the guest wrote, and the waterfall
+    // re-attaches the funnel buttons to the reply.
+    const result = selectDeterministicInteractive({
+      ...base,
+      isFirstReply: true,
+      languageObvious: false,
+      guestMessage,
+    });
+    // Either no deterministic prompt at all (the turn goes to the AI), or
+    // some other stage — anything except a language picker.
+    const ids = result?.type === "list" ? result.rows.map((r) => r.id) : (result?.buttons?.map((b) => b.id) ?? []);
+    expect(ids).not.toContain("lang_en");
+  });
+
   it("offers GREET_MENU on the first reply when language is already obvious", () => {
     const result = selectDeterministicInteractive({ ...base, isFirstReply: true, languageObvious: true });
     expect(result).toEqual(greetMenuPrompt());

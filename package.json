@@ -18,7 +18,8 @@
     "soak": "tsx scripts/soak-conversations.ts",
     "quality": "tsx scripts/quality-report.ts",
     "e2e": "tsx scripts/e2e/run.ts",
-    "ai:code": "tsx scripts/ai-code.ts"
+    "ai:code": "tsx scripts/ai-code.ts",
+    "probe": "tsx scripts/probe-anushka.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
