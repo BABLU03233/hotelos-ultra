@@ -29,16 +29,16 @@ import { DeskStatus } from "./desk-status";
  *
  * Filtering is entirely client-side now, against one fetch of the whole list.
  * Two reasons. The counts on the chips have to describe the WHOLE inbox — a
- * "Needs you 3" that silently meant "3 among the ones you are currently looking
+ * "Human mode 3" that silently meant "3 among the ones you are currently looking
  * at" would be worse than no number. And switching filters becomes instant, with
  * no refetch and no skeleton flash, which matters when triage means bouncing
- * between Unread and Needs you a dozen times. Search stays server-side, since
+ * between Unread and Human mode a dozen times. Search stays server-side, since
  * that is a query rather than a view.
  */
 
 const FILTER_ICON: Partial<Record<ChatFilterKey, typeof Users>> = {
   UNREAD: MailOpen,
-  NEEDS_YOU: UserRound,
+  HUMAN: UserRound,
   HOT: Flame,
   AI: Bot,
 };
@@ -104,7 +104,7 @@ export function ContactList({
             did nothing — new conversations start when a guest messages the
             hotel, not from here — and this is the same pixels answering a
             question staff actually have. */}
-        <DeskStatus contacts={all} onFilter={setFilter} className="min-w-0 overflow-x-auto" />
+        <DeskStatus contacts={all} onFilter={setFilter} className="no-scrollbar min-w-0 overflow-x-auto" />
       </div>
 
       <div className="px-3 pb-1.5">
@@ -124,7 +124,7 @@ export function ContactList({
           and answering them with one undifferentiated strip of chips made the
           urgent ones sit beside labels that change nothing about what to do
           next. The divider is doing real work, not decoration. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto px-3 pb-2">
+      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto px-3 pb-2">
         {attention.map((f) => (
           <Chip key={f.key} f={f} />
         ))}

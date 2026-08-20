@@ -189,6 +189,19 @@
   }
 }
 
+/* A row that scrolls sideways without drawing a scrollbar over its own
+   content — filter chips, tag strips. The row still scrolls by wheel, trackpad
+   and touch; only the bar is hidden. Used where a visible track would sit on
+   top of the very controls it is scrolling, which on the CRM chip row pushed
+   the first chip out of sight behind it. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ─── Glass surfaces ─────────────────────────────────────────────────── */
 @utility glass {
   background: var(--glass-bg);

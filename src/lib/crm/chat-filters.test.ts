@@ -47,7 +47,7 @@ describe("chat filters", () => {
     expect(applyChatFilter(contacts, "UNREAD")).toHaveLength(1);
   });
 
-  it("NEEDS_YOU covers both an explicit handover and a plain pause", () => {
+  it("HUMAN covers both an explicit handover and a plain pause", () => {
     // Both mean the same thing to the guest: nobody replies unless a person
     // does. The pause case is the one with no owner at all, so hiding it here
     // would leave the most dangerous state invisible.
@@ -56,7 +56,7 @@ describe("chat filters", () => {
       base({ aiPaused: true, handoverAt: null }),
       base({ aiPaused: false, handoverAt: null }),
     ];
-    expect(applyChatFilter(contacts, "NEEDS_YOU")).toHaveLength(2);
+    expect(applyChatFilter(contacts, "HUMAN")).toHaveLength(2);
   });
 
   it("AI matches only chats the assistant is actually running", () => {
@@ -68,7 +68,7 @@ describe("chat filters", () => {
     expect(applyChatFilter(contacts, "AI")).toHaveLength(1);
   });
 
-  it("NEEDS_YOU and AI together account for every chat", () => {
+  it("HUMAN and AI together account for every chat", () => {
     // They are complements. A chat falling through both would be one nobody
     // can find from the two mode filters.
     const contacts = [
@@ -76,7 +76,7 @@ describe("chat filters", () => {
       base({ aiPaused: true }),
       base({ aiPaused: true, handoverAt: "2026-08-19T09:00:00Z" }),
     ];
-    const needs = applyChatFilter(contacts, "NEEDS_YOU").length;
+    const needs = applyChatFilter(contacts, "HUMAN").length;
     const ai = applyChatFilter(contacts, "AI").length;
     expect(needs + ai).toBe(contacts.length);
   });
@@ -113,7 +113,7 @@ describe("chat filters", () => {
     const contacts = [base({ unreadCount: 2 }), base({ aiPaused: true }), base({ hotScore: 7 })];
     const counts = chatFilterCounts(contacts);
     expect(counts.UNREAD).toBe(1);
-    expect(counts.NEEDS_YOU).toBe(1);
+    expect(counts.HUMAN).toBe(1);
     expect(counts.HOT).toBe(1);
   });
 

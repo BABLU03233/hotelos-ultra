@@ -27,7 +27,7 @@ import { HOT_THRESHOLD } from "./hot-lead";
 export type ChatFilterKey =
   | "ALL"
   | "UNREAD"
-  | "NEEDS_YOU"
+  | "HUMAN"
   | "HOT"
   | "AI"
   | "NEW"
@@ -88,11 +88,11 @@ export const CHAT_FILTERS: ChatFilter[] = [
     match: isUnread,
   },
   {
-    key: "NEEDS_YOU",
-    label: "Needs you",
+    key: "HUMAN",
+    label: "Human mode",
     group: "attention",
     counted: true,
-    emptyTitle: "Nothing waiting on you",
+    emptyTitle: "Nothing in human mode",
     emptyBody: "Anushka is handling every open chat. Take one over any time you want to step in.",
     match: needsHuman,
   },
@@ -222,9 +222,9 @@ export interface DeskStatus {
  * that is a different, usually much smaller, number.
  *
  * `longestWaitMs` exists because a count alone cannot tell you whether to act.
- * "3 need you" is fine at 9:02am and bad at 6pm; "3 need you, longest waiting
- * 4h" is the same fact with the urgency attached, and it is the only figure
- * here that reliably makes someone open a chat.
+ * "3 in human mode" is fine at 9:02am and bad at 6pm; the same figure with
+ * "longest waiting 4h" attached is the only one here that reliably makes
+ * someone open a chat.
  */
 export function deskStatus(contacts: Contact[], now: Date = new Date()): DeskStatus {
   const human = contacts.filter(needsHuman);

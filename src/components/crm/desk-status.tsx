@@ -13,9 +13,9 @@ import { Contact } from "@/types";
  * people — without making them count rows or open a report.
  *
  * The wait time is the part that changes behaviour. A bare count cannot tell
- * you whether to act: "3 need you" is unremarkable at 9am and alarming at 6pm.
- * "3 need you · longest waiting 4h" is the same fact with the urgency attached,
- * and it is the only figure here that reliably makes someone open a chat.
+ * you whether to act: "3 in human mode" is unremarkable at 9am and alarming at 6pm.
+ * The same figure with "longest waiting 4h" attached is the only one here that
+ * reliably makes someone open a chat.
  *
  * Both halves are buttons rather than text, because the reaction to reading a
  * number here is always "show me those" — making that a second click through a
@@ -32,7 +32,7 @@ export function DeskStatus({
 }) {
   const status = deskStatus(contacts);
 
-  // Nothing to summarise. An empty desk showing "0 with Anushka · 0 need you"
+  // Nothing to summarise. An empty desk showing "0 with Anushka · 0 human mode"
   // is chrome pretending to be information.
   if (status.total === 0) return null;
 
@@ -52,7 +52,7 @@ export function DeskStatus({
       </span>
 
       <button
-        onClick={() => onFilter("NEEDS_YOU")}
+        onClick={() => onFilter("HUMAN")}
         className={cn(
           "flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted",
           status.needsHuman > 0 ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground hover:text-foreground"
@@ -60,7 +60,7 @@ export function DeskStatus({
       >
         <UserRound className="size-3 shrink-0" />
         <span className="font-semibold tabular-nums">{status.needsHuman}</span>
-        <span className="truncate">need you</span>
+        <span className="truncate">human mode</span>
       </button>
 
       {/* Only rendered when someone is actually waiting. A "longest wait" of
@@ -71,7 +71,7 @@ export function DeskStatus({
             ·
           </span>
           <button
-            onClick={() => onFilter("NEEDS_YOU")}
+            onClick={() => onFilter("HUMAN")}
             className={cn(
               "flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted",
               // Past an hour a guest has noticed. That is the point where the
