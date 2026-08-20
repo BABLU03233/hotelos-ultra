@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileBadge, MessageSquareQuote, Paperclip, Send, X } from "lucide-react";
+import { FileBadge, FileText, ImageIcon, MessageSquareQuote, Paperclip, Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,6 +61,8 @@ export function MessageComposer({
   const [quickReplyOpen, setQuickReplyOpen] = React.useState(false);
   const [templateOpen, setTemplateOpen] = React.useState(false);
   const fileInput = React.useRef<HTMLInputElement>(null);
+  const imageInput = React.useRef<HTMLInputElement>(null);
+  const [attachOpen, setAttachOpen] = React.useState(false);
   const { data } = useFetch<{ faqs: Faq[] }>(quickReplyOpen ? "/api/settings/faqs" : null);
   // Read live from Meta, not from our own table — templates approved directly
   // in Meta Business Manager never reach our database, and in production that
@@ -266,17 +268,58 @@ export function MessageComposer({
           className="hidden"
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Attach a photo or file"
-          aria-label="Attach a photo or file"
-          onClick={() => fileInput.current?.click()}
-          disabled={sending}
-          className="size-10 shrink-0 rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
-        >
-          <Paperclip className="size-5" />
-        </Button>
+        <input
+          ref={imageInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+        />
+
+        {/* WhatsApp opens a small menu from "+" rather than a raw file dialog,
+            because "Photos" and "Document" are different intents: one wants
+            the image picker, the other wants everything. Matching that means
+            staff sending an invoice never have to hunt past their camera
+            roll. */}
+        <Popover open={attachOpen} onOpenChange={setAttachOpen}>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Attach"
+                aria-label="Attach"
+                disabled={sending}
+                className="size-10 shrink-0 rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
+              >
+                <Plus className="size-5" />
+              </Button>
+            }
+          />
+          <PopoverContent align="start" side="top" className="w-52 p-1.5">
+            <button
+              onClick={() => { setAttachOpen(false); imageInput.current?.click(); }}
+              className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] hover:bg-muted"
+            >
+              <span className="flex size-8 items-center justify-center rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400">
+                <ImageIcon className="size-4" />
+              </span>
+              Photos
+            </button>
+            <button
+              onClick={() => { setAttachOpen(false); fileInput.current?.click(); }}
+              className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] hover:bg-muted"
+            >
+              <span className="flex size-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                <FileText className="size-4" />
+              </span>
+              Document
+            </button>
+            <p className="px-2.5 pt-1.5 pb-1 text-[11px] text-muted-foreground">
+              Photos up to 5MB, documents up to 20MB.
+            </p>
+          </PopoverContent>
+        </Popover>
 
         <Textarea
           value={text}

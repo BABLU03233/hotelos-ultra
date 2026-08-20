@@ -30,7 +30,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { EmptyState } from "@/components/ui/empty-state";
 import { useFetch } from "@/hooks/use-fetch";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { apiFetch } from "@/lib/api-client";
@@ -85,6 +84,8 @@ export function ContactDetail({
   );
   const [sending, setSending] = React.useState(false);
   const contact = contactData?.contact;
+  // Named in the empty-state splash, same source the conversation header uses.
+  const agentNameForSplash = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   async function updateContact(patch: ContactPatch) {
     if (!contactId) return;
@@ -147,9 +148,22 @@ export function ContactDetail({
   }
 
   if (!contactId) {
+    // WhatsApp Web fills this space with a large, calm splash rather than a
+    // small centred label — it is the first thing staff see every morning, and
+    // it should read as "the desk is ready", not as an empty table.
     return (
-      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center">
-        <EmptyState icon={MessagesSquare} title="Select a contact to view the conversation." />
+      <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-center bg-[#f0f2f5] px-8 text-center dark:bg-[#222e35]">
+        <div className="mb-6 flex size-28 items-center justify-center rounded-full bg-background/60">
+          <MessagesSquare className="size-14 text-muted-foreground/50" strokeWidth={1.25} />
+        </div>
+        <h2 className="text-[26px] font-light tracking-tight text-muted-foreground">{agentNameForSplash} Desk</h2>
+        <p className="mt-3 max-w-md text-[14px] leading-relaxed text-muted-foreground/80">
+          Pick a conversation on the left to read the full history, see the guest&apos;s details, and reply yourself
+          whenever you want to step in.
+        </p>
+        <p className="mt-6 border-t border-border/60 pt-4 text-[12px] text-muted-foreground/70">
+          Guests message your WhatsApp number and land here automatically.
+        </p>
       </div>
     );
   }

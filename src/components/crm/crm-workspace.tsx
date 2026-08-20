@@ -26,8 +26,10 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
     setReloadToken((t) => t + 1);
   }
 
+  // Taller than before: the page heading above shrank from three lines to one,
+  // so the desk reclaims that space instead of leaving a gap below the chat.
   return (
-    <div className="flex h-[calc(100dvh-9.5rem)] flex-col gap-3">
+    <div className="flex h-[calc(100dvh-7.5rem)] flex-col gap-2.5">
       <div className={cn("items-center justify-between gap-2", view === "list" && selectedId ? "hidden md:flex" : "flex")}>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
           <Button
@@ -67,7 +69,10 @@ export function CrmWorkspace({ initialContactId }: { initialContactId: string | 
         <Card className="min-h-0 flex-1 flex-row overflow-hidden p-0">
           <div
             className={cn(
-              "w-full shrink-0 border-border p-3 md:w-[22rem] md:border-r",
+              // No padding: the list draws its own header and flush rows, the
+              // way a chat list does. Padding here reintroduced the "cards on
+              // a dashboard" look this is meant to get away from.
+              "w-full shrink-0 border-border md:w-[24rem] md:border-r",
               selectedId ? "hidden md:block" : "block"
             )}
           >
