@@ -61,6 +61,17 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
     const starter = WA_META_TEMPLATE_STARTERS.find((s) => s.id === id);
     if (!starter) return;
     const t = starter.template;
+
+    // Name it too, or "ready to send" still means stopping to invent a name
+    // in Meta's format. Only when the field is untouched — retyping over
+    // someone's own name would be worse than not helping.
+    // Dated, because Meta rejects a name that already exists on the account,
+    // and a second attempt at the same offer is the common case.
+    if (!name.trim()) {
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      setName(`${starter.id.replace(/-/g, "_")}_${stamp}`);
+    }
+
     setCategory(t.category);
     setHeaderType(t.header.type);
     setHeaderText(t.header.type === "text" ? t.header.text : "");
@@ -182,23 +193,54 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
           </Button>
         }
       />
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      {/*
+        sm:max-w-3xl, not max-w-3xl. The base component's classes end with
+        sm:max-w-sm, and a plain max-w-3xl does not override it — different
+        breakpoints, so tailwind-merge keeps both and the sm: rule wins above
+        640px. This dialog was rendering 384px wide with a two-column grid
+        inside it, which is why the form and the preview were both squeezed
+        into a sliver with a horizontal scrollbar under them.
+
+        flex column with the body as the only scroller, so the submit button
+        stays put instead of scrolling away — the same fix the campaign
+        composer needed.
+      */}
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl lg:max-w-4xl">
+        <DialogHeader className="shrink-0 border-b border-border/60 p-4 pb-3">
           <DialogTitle>Create a Meta-approved template</DialogTitle>
           <DialogDescription>
             Submitted directly to Meta for review — once approved, it can message guests outside the 24-hour window.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto pr-1">
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-4 md:grid-cols-[1fr_18rem]">
+          <div className="flex min-w-0 flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Start from</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {WA_META_TEMPLATE_STARTERS.map((s) => (
-                  <Button key={s.id} type="button" variant="outline" size="sm" onClick={() => applyStarter(s.id)}>
-                    <Sparkles className="size-3" /> {s.title}
-                  </Button>
+              <Label>Start from</Label>
+              <p className="-mt-1 text-[11px] text-muted-foreground">
+                Pick one and it fills in everything below. The ready-to-send ones need no numbers from you.
+              </p>
+              {/* Cards rather than a row of chips: the blurb is what tells an
+                  owner which one to pick, and it had nowhere to go before. */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                {WA_META_TEMPLATE_STARTERS.map((starter) => (
+                  <button
+                    key={starter.id}
+                    type="button"
+                    onClick={() => applyStarter(starter.id)}
+                    className="flex flex-col items-start gap-1 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/50"
+                  >
+                    <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                      <Sparkles className="size-3.5 shrink-0 text-primary" />
+                      {starter.title}
+                      {starter.readyToUse && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Ready to send
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">{starter.blurb}</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -357,7 +399,9 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
+          {/* Sticky so the bubble stays in view while the form scrolls past
+              it — the whole point of a preview is watching it change. */}
+          <div className="flex min-w-0 flex-col gap-2 md:sticky md:top-0 md:self-start">
             <Label className="text-xs text-muted-foreground">Preview</Label>
             <WhatsAppBubblePreview
               headerText={headerType === "text" ? headerText : undefined}
@@ -373,7 +417,7 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t border-border/60 p-3">
           <Button disabled={!canSubmit || submitting} onClick={submit}>
             {submitting ? "Submitting…" : "Submit for Meta review"}
           </Button>
