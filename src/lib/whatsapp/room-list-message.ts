@@ -1,5 +1,5 @@
 import { truncateRowTitle } from "./row-title";
-import { describeTiers, lowestPrice, priceForGuests } from "@/lib/booking/occupancy-price";
+import { describeTiers, hasExactTier, lowestPrice, priceForGuests } from "@/lib/booking/occupancy-price";
 import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { GREET_QUESTION_BUTTON_ID } from "@/lib/ai/interactive-prompts";
 
@@ -45,7 +45,14 @@ function describeRoomPrice(
   s: ReturnType<typeof t>,
   guests?: number | null
 ): string {
-  if (guests && guests > 0) return s.roomPriceForParty(priceForGuests(room, guests), guests);
+  if (guests && guests > 0) {
+    const price = priceForGuests(room, guests);
+    // Only state a rate AS this party's rate when the hotel published one for
+    // exactly this size. Otherwise say it is a starting point and that a
+    // person will confirm — the room is still offered, the number is just not
+    // dressed up as a quote nobody made.
+    return hasExactTier(room, guests) ? s.roomPriceForParty(price, guests) : s.roomPriceForPartyApprox(price, guests);
+  }
   const tiers = describeTiers(room, ROW_DESCRIPTION_MAX);
   if (tiers) return tiers;
   return s.roomListDesc(lowestPrice(room), room.capacity);

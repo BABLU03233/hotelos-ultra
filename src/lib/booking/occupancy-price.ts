@@ -40,6 +40,20 @@ export function parseOccupancyPrices(raw: unknown): OccupancyPrice[] {
  * the closest real figure it has, never the cheaper 1-guest one — quoting low
  * and correcting at the desk is the failure this whole module exists to avoid.
  */
+/**
+ * Is there a rate for exactly this party size?
+ *
+ * Matters because the list now shows every room, including ones whose stated
+ * tiers stop below the party — a Classic with 1p and 2p rates offered to a
+ * party of three. priceForGuests falls up to the top tier, which is the right
+ * number to show, but presenting it as "₹1,299 for 3 guests" states a rate the
+ * hotel never quoted. They arrive expecting it, and the desk charges more.
+ */
+export function hasExactTier(room: { occupancyPrices?: unknown }, guests: number | null | undefined): boolean {
+  if (!guests) return false;
+  return parseOccupancyPrices(room.occupancyPrices).some((t) => t.guests === guests);
+}
+
 export function priceForGuests(room: { price: number; occupancyPrices?: unknown }, guests: number | null | undefined): number {
   const tiers = parseOccupancyPrices(room.occupancyPrices);
   if (!tiers.length || !guests || guests < 1) return room.price;

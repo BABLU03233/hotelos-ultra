@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeTiers, lowestPrice, parseOccupancyPrices, priceForGuests } from "./occupancy-price";
+import { describeTiers, hasExactTier, lowestPrice, parseOccupancyPrices, priceForGuests } from "./occupancy-price";
 
 const CLASSIC = { price: 999, occupancyPrices: [{ guests: 1, price: 999 }, { guests: 2, price: 1299 }] };
 const DELUXE = {
@@ -73,5 +73,18 @@ describe("lowestPrice", () => {
 
   it("falls back to the headline rate", () => {
     expect(lowestPrice(NO_TIERS)).toBe(2500);
+  });
+});
+
+describe("hasExactTier", () => {
+  it("is true only when the hotel published a rate for exactly that party", () => {
+    // Guards the case where a room is offered to a party bigger than its
+    // tiers: priceForGuests falls up to the top rate, which is the right
+    // number to show — but presenting it as "₹1,299 for 3 guests" states a
+    // quote nobody made, and the guest arrives expecting it.
+    expect(hasExactTier(CLASSIC, 2)).toBe(true);
+    expect(hasExactTier(CLASSIC, 3)).toBe(false);
+    expect(hasExactTier(NO_TIERS, 2)).toBe(false);
+    expect(hasExactTier(CLASSIC, null)).toBe(false);
   });
 });

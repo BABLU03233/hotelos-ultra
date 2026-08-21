@@ -155,6 +155,8 @@ interface Strings {
   roomListDesc: (price: number, capacity: number) => string;
   /** "₹1,299 for 2 guests" — the rate for THIS party, not a "from" price. */
   roomPriceForParty: (price: number, guests: number) => string;
+  /** Same, when the hotel has published no rate for a party this size. */
+  roomPriceForPartyApprox: (price: number, guests: number) => string;
   fullyBooked: string;
   pastDateRejected: string;
   mediaNoticed: string;
@@ -299,6 +301,7 @@ const EN: Strings = {
   roomListButton: "See rooms",
   roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} guest${capacity === 1 ? "" : "s"}`,
   roomPriceForParty: (price, guests) => `₹${price.toLocaleString("en-IN")}/night for ${guests} guest${guests === 1 ? "" : "s"}`,
+  roomPriceForPartyApprox: (price, guests) => `From ₹${price.toLocaleString("en-IN")}/night · rate for ${guests} confirmed by our team`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
   mediaNoticed: "Thanks for sending that! 😊 I can't open attachments here — could you tell me in a message what you need?",
@@ -404,6 +407,7 @@ const HI: Strings = {
   roomListButton: "कमरे देखें",
   roomListDesc: (price, capacity) => `₹${price}/रात से · ${capacity} लोग तक`,
   roomPriceForParty: (price, guests) => `${guests} लोगों के लिए ₹${price.toLocaleString("en-IN")}/रात`,
+  roomPriceForPartyApprox: (price, guests) => `₹${price.toLocaleString("en-IN")}/रात से · ${guests} लोगों का रेट टीम बताएगी`,
   fullyBooked: "अरे, उन तारीख़ों पर सब बुक है 😔 कोई और तारीख़ चलेगी?",
   pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
   mediaNoticed: "भेजने के लिए शुक्रिया! 😊 मैं यहाँ अटैचमेंट नहीं खोल पाती — मैसेज में बता दीजिए आपको क्या चाहिए?",
@@ -509,6 +513,7 @@ const TE: Strings = {
   roomListButton: "రూమ్‌లు చూడండి",
   roomListDesc: (price, capacity) => `₹${price}/రాత్రి నుండి · ${capacity} మంది వరకు`,
   roomPriceForParty: (price, guests) => `${guests} మందికి ₹${price.toLocaleString("en-IN")}/రాత్రి`,
+  roomPriceForPartyApprox: (price, guests) => `₹${price.toLocaleString("en-IN")}/రాత్రి నుండి · ${guests} మంది రేటు టీమ్ చెబుతుంది`,
   fullyBooked: "అయ్యో, ఆ తేదీలకు అన్నీ బుక్ అయ్యాయి 😔 వేరే తేదీ కుదురుతుందా?",
   pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
   mediaNoticed: "పంపినందుకు ధన్యవాదాలు! 😊 ఇక్కడ అటాచ్‌మెంట్‌లు తెరవలేను — మీకు ఏం కావాలో మెసేజ్‌లో చెప్పండి?",

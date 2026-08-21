@@ -8,34 +8,32 @@ const ROOMS = [
 ];
 
 describe("roomsFittingParty", () => {
-  it("drops a room that cannot hold the party", () => {
-    // Probed live: tapping "3+ people" offered the 2-person Classic Room, and
-    // nothing downstream re-checks — the guest would have reached a booking
-    // reference for a room that cannot hold them.
-    expect(roomsFittingParty(ROOMS, 3).map((r) => r.id)).toEqual(["deluxe", "premium"]);
-  });
-
-  it("keeps every room for a party that fits anywhere", () => {
-    expect(roomsFittingParty(ROOMS, 2)).toHaveLength(3);
-    expect(roomsFittingParty(ROOMS, 1)).toHaveLength(3);
-  });
-
-  it("returns everything when the party size is unknown", () => {
-    expect(roomsFittingParty(ROOMS, null)).toHaveLength(3);
-    expect(roomsFittingParty(ROOMS, undefined)).toHaveLength(3);
-    expect(roomsFittingParty(ROOMS, 0)).toHaveLength(3);
-  });
-
-  it("falls back to the full list rather than returning nothing", () => {
-    // A family of nine needs several rooms — a real situation that needs a
-    // person, not an empty screen. Both callers read an empty list as "no
-    // availability on these dates", which would be untrue and unhelpful.
+  it("never hides a room from the guest", () => {
+    // It used to drop rooms below the party size. A party of three then saw
+    // two rooms and was told "we have 2 rooms free" — a hotel that looks
+    // nearly full. Losing the booking costs more than a conversation about an
+    // extra mattress.
+    expect(roomsFittingParty(ROOMS, 3)).toHaveLength(3);
     expect(roomsFittingParty(ROOMS, 9)).toHaveLength(3);
+  });
+
+  it("puts the rooms that comfortably fit first", () => {
+    expect(roomsFittingParty(ROOMS, 3).map((r) => r.id)).toEqual(["deluxe", "premium", "classic"]);
+  });
+
+  it("keeps the caller's order within each group, so the cheapest suitable room leads", () => {
+    // Rooms arrive sorted by price; that must survive the reordering.
+    expect(roomsFittingParty(ROOMS, 2).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
+  });
+
+  it("leaves the list untouched when the party size is unknown", () => {
+    expect(roomsFittingParty(ROOMS, null).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
+    expect(roomsFittingParty(ROOMS, 0).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
   });
 
   it("does not mutate the input", () => {
     const input = [...ROOMS];
     roomsFittingParty(input, 3);
-    expect(input).toHaveLength(3);
+    expect(input.map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
   });
 });
