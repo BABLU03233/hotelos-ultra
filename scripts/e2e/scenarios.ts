@@ -47,6 +47,12 @@ const offersButtons = (label: string, ids: string[]): Check => ({
   test: (s) => ids.every((id) => idsOf(s).some((got) => got === id || got.startsWith(id))),
 });
 
+/** No button whose id is (or starts with) any of these appears anywhere. */
+const lacksButtons = (label: string, ids: string[]): Check => ({
+  label,
+  test: (s) => !ids.some((id) => idsOf(s).some((got) => got === id || got.startsWith(id))),
+});
+
 /** The canned line the safety guards fall back to — a non-sequitur when it fires wrongly. */
 const NOT_CANNED: Check = {
   label: "not replaced by the canned safe-reply",
@@ -454,6 +460,118 @@ export const SCENARIOS: Scenario[] = [
             label: "sends plain text, not an interactive room list",
             test: (s) => idsOf(s).length === 0,
           },
+        ],
+      },
+    ],
+  },
+
+  /* ===== BUTTON RELEVANCE — the "irrelevant buttons" class ===== */
+  {
+    id: "intent-then-question-answered-not-swallowed",
+    area: "Listening",
+    title: "A real question after stating intent is answered, not replaced by a bare guest-count form",
+    because:
+      "The funnel doesn't just pick buttons — it can REPLACE the reply. The guard against that is that a genuine question reaches the AI: a guest who said 'I want to book' then asked 'do you have parking?' must get the parking answer, not have it swapped for 'How many guests?'. Keeping the count picker alongside the answer is intended — the funnel continuing, not an irrelevant button.",
+    turns: [
+      { say: "hi i want to book a room", ai: "Hi! Happy to help you book. When are you thinking of staying?" },
+      {
+        say: "do you have parking?",
+        ai: "Yes, free covered parking on-site for all guests.",
+        checks: [
+          matches("the parking answer actually reaches the guest", /parking/i),
+          notMatches("not swapped for a bare guest-count prompt", /how many (people|guests)/i),
+          NOT_ESCALATED,
+          NOT_CANNED,
+        ],
+      },
+    ],
+  },
+  {
+    id: "factual-question-after-reco-no-confirm-button",
+    area: "Listening",
+    title: "A factual question after a room is recommended is answered without a Confirm button",
+    because:
+      "A Confirm booking button under 'check-out is 11 AM' is the clearest 'irrelevant button' there is — the guest asked a fact, not to book. The router must hand a genuine question to the AI and not re-attach the confirm/room buttons.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      {
+        say: "what time is check out?",
+        ai: "Check-out is by 11:00 AM.",
+        checks: [
+          matches("answers with the checkout time", /11.*AM/i),
+          lacksButtons("no Confirm booking button under a factual answer", ["confirm_booking"]),
+          NOT_ESCALATED,
+        ],
+      },
+    ],
+  },
+  {
+    id: "goodbye-gets-no-funnel-buttons",
+    area: "Listening",
+    title: "A goodbye is not answered with booking buttons",
+    because:
+      "Pushing room/confirm buttons under 'thanks, bye' reads as not listening. A courteous sign-off should get a courteous reply and nothing to tap.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      {
+        say: "thanks, I'll think about it and get back to you",
+        ai: "Of course, take your time! I'm here whenever you're ready. 😊",
+        checks: [
+          lacksButtons("no confirm/room buttons under a sign-off", ["confirm_booking", "ROOM_"]),
+          NOT_ESCALATED,
+        ],
+      },
+    ],
+  },
+  {
+    id: "two-questions-one-message-answered",
+    area: "Listening",
+    title: "Several questions in one message are answered, not funnelled",
+    because:
+      "A guest who front-loads 'do you have parking and wifi, and whats checkout' is the opposite of someone who needs a form — answering with a slot prompt ignores three questions at once.",
+    turns: [
+      { say: "hi", ai: "Hi! I'm Anushka from the hotel. How can I help?" },
+      {
+        say: "do you have parking and wifi and whats the checkout time",
+        ai: "Yes to both — free covered parking and free Wi-Fi. Check-out is by 11 AM.",
+        checks: [
+          matches("answers parking", /parking/i),
+          matches("answers wifi", /wi-?fi/i),
+          lacksButtons("not funnelled to the guest-count form", ["guests_"]),
+          NOT_ESCALATED,
+          NOT_CANNED,
+        ],
+      },
+    ],
+  },
+
+  {
+    id: "photos-only-reply-never-silent",
+    area: "Safety",
+    title: "An AI reply that is only image markers still reaches the guest with text",
+    because:
+      "Observed live: a free-text 'Send me premium room photos' received NO reply at all. The model answered with only IMAGE: lines, extraction left the text empty, and WhatsApp rejects an empty body — so the send threw and the whole turn was lost. Silence is the worst outcome the flow can produce; a body must never be empty.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      {
+        say: "send me photos of the room",
+        ai: "IMAGE: https://example.com/room-a.jpg",
+        checks: [
+          sentSomething,
+          NO_RAW_MARKER,
+          { label: "the guest is not left in silence", test: (s2) => s2.some((m) => Boolean(m.body?.trim()) || m.type === "image") },
         ],
       },
     ],

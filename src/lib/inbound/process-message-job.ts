@@ -422,6 +422,22 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   }
   const { reply, imageUrls, interactive, shouldEscalate, escalationReason, agentName, pendingDates } = generated;
 
+  // A reply can come back with no text at all: most often the model answered a
+  // photo request with only "IMAGE:" lines, which extractImageUrls then strips
+  // to an empty string. WhatsApp rejects an empty text/interactive body, so the
+  // send below throws, the whole turn is lost in the catch, and the guest gets
+  // nothing back. Observed live: "Send me premium room photos" received no
+  // reply whatsoever — the single worst outcome the flow can produce, silence.
+  //
+  // Guarantee a non-empty body: when photos are on their way, lead them with a
+  // short line; otherwise fall back to a safe generic reply rather than sending
+  // emptiness.
+  const safeReply = reply.trim()
+    ? reply
+    : imageUrls.length > 0
+      ? "Here you go! 😊"
+      : "Thanks for your message! How can I help? 😊";
+
   const creds = await getWhatsAppCredentials(tenantId);
   if (!creds) {
     console.warn(`Tenant ${tenantId} has no WhatsApp credentials configured — cannot send AI reply.`);
@@ -439,15 +455,15 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     // adds to it. GUEST_COUNT/DATE_QUICK_PICK render as a List Message
     // (no reply-arrow icon, one extra tap to open) — see interactive-prompts.ts.
     whatsappMessageId = !interactive
-      ? await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: reply })
+      ? await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text: safeReply })
       : interactive.type === "list"
         ? await sendWhatsAppMessage(creds, contact.whatsappNumber, {
             type: "list",
-            body: reply,
+            body: safeReply,
             buttonText: interactive.buttonText,
             sections: [{ rows: interactive.rows }],
           })
-        : await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "interactive", body: reply, buttons: interactive.buttons });
+        : await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "interactive", body: safeReply, buttons: interactive.buttons });
   } catch (err) {
     console.error(`sendWhatsAppMessage failed for tenant ${tenantId}, contact ${contactId}:`, err);
     await prisma.staffNotification.create({
@@ -470,7 +486,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
         contactId,
         direction: "OUT",
         type: interactive ? "INTERACTIVE" : "TEXT",
-        content: reply,
+        content: safeReply,
         whatsappMessageId,
         status: "SENT",
       },
