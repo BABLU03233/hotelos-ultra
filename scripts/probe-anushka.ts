@@ -276,6 +276,18 @@ const PROBES: Probe[] = [
     ],
   },
   {
+    id: "this-weekend-full-path",
+    watch: "This weekend must ask which day, then nights, then confirm dates + times, THEN rooms.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_3plus", label: "3 people" } },
+      { tap: { id: "dates_weekend", label: "This weekend" } },
+      { tap: { id: "checkin_2026-08-22", label: "Sat, 22 Aug" } },
+      { tap: { id: "nights_2", label: "2 nights" } },
+    ],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

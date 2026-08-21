@@ -367,6 +367,27 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
 
+  {
+    id: "this-weekend-asks-instead-of-guessing",
+    area: "Dates",
+    title: "This weekend asks which day, and says the dates back before any room",
+    because:
+      "Reported live: This weekend picked Sat-Sun silently and the very next message was a room list, so the first time the guest saw their own dates they were already inside a booking.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      {
+        tap: { id: "dates_weekend", label: "This weekend" },
+        checks: [
+          sentSomething,
+          matches("asks which day to check in", /check in/i),
+          notMatches("does not jump to rooms", /Book (Classic|Deluxe|Premium)/i),
+        ],
+      },
+    ],
+  },
+
   /* ===== GROUP SIZE ===== */
   {
     id: "oversized-party-hands-to-reception",

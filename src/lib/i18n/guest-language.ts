@@ -207,6 +207,16 @@ interface Strings {
   /** Caption sent alongside the hotel's map pin. */
   locationCaption: string;
   /**
+   * Said back once both dates are settled, before any room is shown.
+   *
+   * Reported live: a guest tapped "This weekend" and the very next message was
+   * a room list — so the first time their actual dates appeared was already
+   * inside a booking. Repeating the range, with the hotel's own check-in and
+   * check-out times, gives them one clear chance to say "no, Friday" before
+   * choosing a room.
+   */
+  stayConfirmed: (stay: string, checkInTime: string | null, checkOutTime: string | null) => string;
+  /**
    * A corporate or group enquiry — several rooms at once.
    *
    * Kept as its own branch rather than a bigger number in the party-size
@@ -329,6 +339,12 @@ const EN: Strings = {
   roomChoiceBodyNoDates: () => `Here are our rooms 😊 Tell me your dates and I'll get one ready — or pick one to start.`,
   postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
   locationCaption: `Here's our exact location 📍 Tap it for directions.`,
+  stayConfirmed: (stay, checkInTime, checkOutTime) =>
+    `Perfect — ${stay}.` +
+    (checkInTime || checkOutTime
+      ? `
+Check-in ${checkInTime ? `from ${checkInTime}` : "as usual"}, check-out ${checkOutTime ? `by ${checkOutTime}` : "as usual"}.`
+      : ""),
   guestGroup: "Group / corporate",
   groupRoomsBody: "Happy to help with a group booking 😊 Roughly how many rooms do you need?",
   rooms3to5: "3–5 rooms",
@@ -436,6 +452,12 @@ const HI: Strings = {
   roomChoiceBodyNoDates: () => `ये रहे हमारे कमरे 😊 अपनी तारीख़ें बताइए, मैं तैयार करवा दूँगी — या कोई एक चुन लीजिए.`,
   postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
   locationCaption: `ये रही हमारी लोकेशन 📍 रास्ते के लिए टैप कीजिए.`,
+  stayConfirmed: (stay, checkInTime, checkOutTime) =>
+    `बढ़िया — ${stay}.` +
+    (checkInTime || checkOutTime
+      ? `
+चेक-इन ${checkInTime ? `${checkInTime} से` : "सामान्य समय पर"}, चेक-आउट ${checkOutTime ? `${checkOutTime} तक` : "सामान्य समय पर"}.`
+      : ""),
   guestGroup: "ग्रुप / कॉर्पोरेट",
   groupRoomsBody: "ग्रुप बुकिंग में मदद करके खुशी होगी 😊 लगभग कितने कमरे चाहिए?",
   rooms3to5: "3–5 कमरे",
@@ -543,6 +565,12 @@ const TE: Strings = {
   roomChoiceBodyNoDates: () => `ఇవి మా రూమ్‌లు 😊 మీ తేదీలు చెప్పండి, సిద్ధం చేస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
   postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
   locationCaption: `ఇదే మా లొకేషన్ 📍 దారి కోసం ట్యాప్ చేయండి.`,
+  stayConfirmed: (stay, checkInTime, checkOutTime) =>
+    `సరే — ${stay}.` +
+    (checkInTime || checkOutTime
+      ? `
+చెక్-ఇన్ ${checkInTime ? `${checkInTime} నుండి` : "సాధారణ సమయం"}, చెక్-అవుట్ ${checkOutTime ? `${checkOutTime} లోపు` : "సాధారణ సమయం"}.`
+      : ""),
   guestGroup: "గ్రూప్ / కార్పొరేట్",
   groupRoomsBody: "గ్రూప్ బుకింగ్‌కి సాయం చేస్తాను 😊 సుమారు ఎన్ని రూమ్‌లు కావాలి?",
   rooms3to5: "3–5 రూమ్‌లు",

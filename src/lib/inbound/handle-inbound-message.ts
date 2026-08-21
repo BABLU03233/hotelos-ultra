@@ -909,28 +909,29 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // human-readable resolved label before falling through to the normal AI
   // queue below — so Anushka's reply is grounded in the real date, not the
   // vague phrase.
-  // "Next week" opens the date picker instead of resolving to a guess.
+  // The vague rows open the date picker instead of resolving to a guess.
   //
-  // Reported live: a guest tapped "Next week" and was told their stay was
-  // 24-25 Aug — a specific night nobody had chosen. "Next week" spans seven
-  // days, so silently collapsing it to one is a booking the guest never made,
-  // and they only find out at the confirmation step (or at the hotel).
+  // Reported live twice. First "Next week" set a stay of 24-25 Aug — a
+  // specific night nobody chose, out of seven possible days. Then "This
+  // weekend" did the same thing one step faster: it picked Sat-Sun on the
+  // guest's behalf and went straight to the room list, so the first time
+  // dates were ever mentioned back to them was inside a booking.
   //
-  // The picker then asks arrival day and number of nights, so both check-in
-  // AND check-out come from the guest rather than from an assumption. Today
-  // and Tomorrow still resolve directly — those name exactly one day, so
-  // there is nothing to ask.
-  if (msg.interactiveId === "dates_nextweek") {
+  // "This weekend" looks more precise than it is. It assumes which weekend,
+  // that the stay is Saturday to Sunday, and that it is one night — a guest
+  // arriving Friday for two nights would have all three wrong and no chance
+  // to say so.
+  //
+  // The picker asks the arrival day and then the number of nights, so
+  // check-in AND check-out both come from the guest. Today and Tomorrow still
+  // resolve directly: those name exactly one day, so there is nothing to ask.
+  if (msg.interactiveId === "dates_weekend" || msg.interactiveId === "dates_nextweek") {
     if (contact.aiPaused) return;
     await sendAndPersist(tenant, contact, buildCheckInPickerMessage(new Date(), lang), "Failed to send date picker");
     return;
   }
 
-  if (
-    msg.interactiveId === "dates_today" ||
-    msg.interactiveId === "dates_tomorrow" ||
-    msg.interactiveId === "dates_weekend"
-  ) {
+  if (msg.interactiveId === "dates_today" || msg.interactiveId === "dates_tomorrow") {
     const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
     await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
     await prisma.message.update({ where: { id: messageRow.id }, data: { content: label } });
@@ -1099,6 +1100,30 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     if (pickerAction.kind === "setCheckOut" && contact.pendingCheckIn) {
       await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckOut: pickerAction.checkOut } });
+
+      // Say the dates back before any room appears.
+      //
+      // Reported live: the message straight after a date choice was the room
+      // list, so the first time a guest saw their actual stay it was already
+      // inside a booking. One line naming the range and the hotel's own
+      // check-in/check-out times gives them a chance to correct it first.
+      const stayProfile = await prisma.hotelProfile.findUnique({
+        where: { tenantId: tenant.id },
+        select: { checkInTime: true, checkOutTime: true },
+      });
+      await sendAndPersist(
+        tenant,
+        contact,
+        {
+          type: "text",
+          text: t(lang).stayConfirmed(
+            describeStay(contact.pendingCheckIn, pickerAction.checkOut),
+            stayProfile?.checkInTime ?? null,
+            stayProfile?.checkOutTime ?? null
+          ),
+        },
+        "Failed to send stay confirmation"
+      );
       // Rewritten to the resolved range for the same reason the quick-pick
       // rows are: Anushka's next reply is then grounded in real dates rather
       // than the phrase "3 nights". Falls through to the AI queue, which now
