@@ -77,10 +77,13 @@ export async function storeImage(
   tenantId: string,
   buffer: Buffer,
   contentType: string,
-  filename?: string
+  filename?: string,
+  /** Groups uploads in object storage; ignored on the disk backend, where the
+   * key is already tenant-namespaced and randomly named. */
+  folder = "campaigns"
 ): Promise<string> {
   if (objectStorageConfigured()) {
-    return uploadObject(tenantId, "campaigns", buffer, contentType, filename);
+    return uploadObject(tenantId, folder, buffer, contentType, filename);
   }
 
   // Tenant-namespaced, random name, and an extension derived from the content

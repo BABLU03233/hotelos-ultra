@@ -5,7 +5,7 @@ import { requireOwner, requireTenantDb } from "@/lib/auth/require-session";
 import { metaTemplateSchema } from "@/lib/validation/meta-template";
 import { buildCreateComponents, createMetaTemplate, uploadHeaderImage } from "@/lib/whatsapp/meta-templates";
 import { getWhatsAppCredentials } from "@/lib/whatsapp/tenant-credentials";
-import { uploadObject } from "@/lib/storage/s3";
+import { storeImage } from "@/lib/storage/media-store";
 
 export const GET = apiRoute(async (req: NextRequest) => {
   const { db } = requireTenantDb(req);
@@ -40,8 +40,14 @@ export const POST = apiRoute(async (req: NextRequest) => {
     const buffer = Buffer.from(await file.arrayBuffer());
     const mimeType = file.type || "image/jpeg";
     headerHandle = await uploadHeaderImage(creds, buffer, mimeType);
-    headerMediaUrl = await uploadObject(session.tenantId, "wa-templates", buffer, mimeType, file.name).catch((err) => {
-      console.error("Header image S3 copy failed (non-fatal, template still submitted to Meta):", err);
+    // storeImage, not uploadObject: this deployment has no object storage
+    // configured, so the S3 call always failed and every template built here
+    // ended up with no header preview at all. The media store falls back to
+    // the mounted uploads volume, which is also what the campaign composer
+    // uses. Still non-fatal — Meta already has the image via the asset
+    // handle above, so a failed preview copy must not lose the template.
+    headerMediaUrl = await storeImage(session.tenantId, buffer, mimeType, file.name, "wa-templates").catch((err) => {
+      console.error("Header image preview copy failed (non-fatal, template still submitted to Meta):", err);
       return null;
     });
   }

@@ -181,7 +181,9 @@ export default function CampaignDetailPage() {
             <CardContent className="flex flex-col gap-2">
               <p className="flex items-center gap-1.5 text-sm font-medium text-destructive">
                 <AlertTriangle className="size-4 shrink-0" />
-                {report.failed} {report.failed === 1 ? "message" : "messages"} couldn&apos;t be delivered
+                <span>
+                  {report.failed} {report.failed === 1 ? "message" : "messages"} couldn&apos;t be delivered
+                </span>
               </p>
               <ul className="flex flex-col gap-1.5">
                 {report.failures.map((fail) => (
