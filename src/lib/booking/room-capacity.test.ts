@@ -8,26 +8,30 @@ const ROOMS = [
 ];
 
 describe("roomsFittingParty", () => {
-  it("never hides a room from the guest", () => {
-    // It used to drop rooms below the party size. A party of three then saw
-    // two rooms and was told "we have 2 rooms free" — a hotel that looks
-    // nearly full. Losing the booking costs more than a conversation about an
-    // extra mattress.
-    expect(roomsFittingParty(ROOMS, 3)).toHaveLength(3);
-    expect(roomsFittingParty(ROOMS, 9)).toHaveLength(3);
+  it("excludes a room that genuinely cannot hold the party", () => {
+    // Reported live, with a screenshot: a party of 3 was shown the Classic
+    // Room (capacity 2) as bookable, priced "rate for 3 confirmed by our
+    // team". The hotel has no extra mattresses — "3 people cannot adjust" —
+    // so that was a promise the room could not keep, made by name.
+    expect(roomsFittingParty(ROOMS, 3).map((r) => r.id)).toEqual(["deluxe", "premium"]);
   });
 
-  it("puts the rooms that comfortably fit first", () => {
-    expect(roomsFittingParty(ROOMS, 3).map((r) => r.id)).toEqual(["deluxe", "premium", "classic"]);
-  });
-
-  it("keeps the caller's order within each group, so the cheapest suitable room leads", () => {
-    // Rooms arrive sorted by price; that must survive the reordering.
+  it("keeps every room that fits, in the caller's existing order", () => {
+    // Rooms arrive sorted by price; filtering must not disturb that.
     expect(roomsFittingParty(ROOMS, 2).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
+    expect(roomsFittingParty(ROOMS, 1).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
   });
 
-  it("leaves the list untouched when the party size is unknown", () => {
+  it("returns nothing when no room fits, rather than showing a room that cannot hold the guest", () => {
+    // The caller decides what to say when this is empty — see the
+    // oversized-party handover in process-message-job.ts, which normally
+    // intercepts this case earlier and never lets it reach here at all.
+    expect(roomsFittingParty(ROOMS, 4)).toEqual([]);
+  });
+
+  it("returns everything when the party size is unknown — nothing to filter on yet", () => {
     expect(roomsFittingParty(ROOMS, null).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
+    expect(roomsFittingParty(ROOMS, undefined).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
     expect(roomsFittingParty(ROOMS, 0).map((r) => r.id)).toEqual(["classic", "deluxe", "premium"]);
   });
 
