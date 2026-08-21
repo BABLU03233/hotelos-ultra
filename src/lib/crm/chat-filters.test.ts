@@ -15,6 +15,7 @@ const base = (over: Partial<Contact> = {}): Contact =>
     bookingStatus: "NONE",
     aiSummary: null,
     aiPaused: false,
+    groupRooms: null,
     handoverAt: null,
     handoverByName: null,
     handoverReason: null,
@@ -79,6 +80,22 @@ describe("chat filters", () => {
     const needs = applyChatFilter(contacts, "HUMAN").length;
     const ai = applyChatFilter(contacts, "AI").length;
     expect(needs + ai).toBe(contacts.length);
+  });
+
+  it("GROUP matches only corporate enquiries", () => {
+    const contacts = [base({ groupRooms: "6-10 rooms" }), base(), base({ groupRooms: "3-5 rooms" })];
+    expect(applyChatFilter(contacts, "GROUP")).toHaveLength(2);
+  });
+
+  it("matches a group enquiry whatever language the room count is in", () => {
+    // The count is stored in the guest's own words — a Telugu enquiry stores
+    // "3-5 రూమ్‌లు". This is exactly why the filter reads a dedicated column
+    // rather than parsing the handover sentence.
+    expect(applyChatFilter([base({ groupRooms: "3–5 రూమ్‌లు" })], "GROUP")).toHaveLength(1);
+  });
+
+  it("counts group enquiries on the chip", () => {
+    expect(chatFilterCounts([base({ groupRooms: "6-10 rooms" }), base()]).GROUP).toBe(1);
   });
 
   it("HOT matches leads at or above the threshold, hottest first", () => {

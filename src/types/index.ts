@@ -18,6 +18,8 @@ export interface Contact {
   bookingStatus: BookingStatus;
   aiSummary: string | null;
   aiPaused: boolean;
+  /** Rooms asked for by a corporate/group enquiry, e.g. "3-5 rooms". Null for an ordinary guest. */
+  groupRooms: string | null;
   /** Set while a person explicitly holds the conversation — see lib/crm/handover.ts. */
   handoverAt: string | null;
   handoverByName: string | null;

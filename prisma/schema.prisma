@@ -380,6 +380,16 @@ model Contact {
   // receptionist mid-booking must NOT have her wake up overnight and start
   // talking over them. While this is set the pause never goes stale — it ends
   // only when someone taps "Return to Anushka".
+  /**
+   * How many rooms a corporate/group enquiry asked for, e.g. "3-5 rooms".
+   *
+   * Its own column rather than being read back out of handoverReason: that
+   * field is a sentence written for a human to read, and it carries the room
+   * count in the GUEST's language — a Telugu enquiry stores "3-5 రూమ్‌లు". A
+   * filter matching on prose is a filter that breaks the first time the copy
+   * is reworded or a fourth language is added.
+   */
+  groupRooms      String?
   handoverAt      DateTime?
   // Who took it, and why. A plain string, not a relation: this is the record a
   // receptionist reads on the next shift, and it has to survive the staff

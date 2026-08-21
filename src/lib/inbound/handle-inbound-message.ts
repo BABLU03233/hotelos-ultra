@@ -722,6 +722,9 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       where: { id: contact.id },
       data: {
         leadStatus: "INTERESTED",
+        // Stored as its own field so the CRM can filter on it without parsing
+        // the handover sentence, which is written in the guest's language.
+        groupRooms: rooms,
         ...takeOverFields(`Group booking — ${rooms}`),
         aiBriefing: `Corporate/group enquiry: ${rooms}. Dates and company name not yet captured.`,
       },

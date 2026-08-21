@@ -29,6 +29,7 @@ export type ChatFilterKey =
   | "UNREAD"
   | "HUMAN"
   | "HOT"
+  | "GROUP"
   | "AI"
   | "NEW"
   | "INTERESTED"
@@ -68,6 +69,15 @@ export const isHot = (c: Contact) => (c.hotScore ?? 0) >= HOT_THRESHOLD;
  */
 export const needsHuman = (c: Contact) => conversationMode(c) !== "ai";
 
+/**
+ * A corporate or group enquiry — several rooms at once.
+ *
+ * Its own list because it is a different sale and a different owner. These are
+ * the largest bookings a hotel takes, they always need a person, and they are
+ * easy to lose in a chat list sorted by whoever messaged last.
+ */
+export const isGroupBooking = (c: Contact) => Boolean(c.groupRooms);
+
 export const CHAT_FILTERS: ChatFilter[] = [
   {
     key: "ALL",
@@ -104,6 +114,17 @@ export const CHAT_FILTERS: ChatFilter[] = [
     emptyTitle: "No hot leads",
     emptyBody: "Guests who picked a room or gave dates and then went quiet show up here, closest to booking first.",
     match: isHot,
+  },
+  {
+    key: "GROUP",
+    label: "Group",
+    group: "attention",
+    // Counted: these are the biggest bookings on the desk, and a hotel wants
+    // to know at a glance whether any are sitting unanswered.
+    counted: true,
+    emptyTitle: "No group enquiries",
+    emptyBody: "Corporate and multi-room requests land here, with the number of rooms they asked for.",
+    match: isGroupBooking,
   },
   {
     key: "AI",

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Flame, MailOpen, Search, UserRound, Users } from "lucide-react";
+import { Bot, Building2, Flame, MailOpen, Search, UserRound, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -40,6 +40,7 @@ const FILTER_ICON: Partial<Record<ChatFilterKey, typeof Users>> = {
   UNREAD: MailOpen,
   HUMAN: UserRound,
   HOT: Flame,
+  GROUP: Building2,
   AI: Bot,
 };
 

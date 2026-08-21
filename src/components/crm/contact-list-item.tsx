@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Flame, History, Pin, Target, UserRound } from "lucide-react";
+import { Bot, Building2, Flame, History, Pin, Target, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { conversationMode } from "@/lib/crm/handover";
@@ -137,6 +137,15 @@ export function ContactListItem({
           ) : (
             <Chip className="bg-primary/10 text-primary">
               <Bot className="size-2.5" /> Anushka
+            </Chip>
+          )}
+
+          {/* The size of the request, not just that there is one. "Group"
+              alone would still make reception open the chat to find out
+              whether it is three rooms or thirty. */}
+          {contact.groupRooms && (
+            <Chip className="bg-blue-500/10 font-semibold text-blue-600 dark:text-blue-400">
+              <Building2 className="size-2.5" /> {contact.groupRooms}
             </Chip>
           )}
 
