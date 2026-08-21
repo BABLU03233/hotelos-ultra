@@ -28,6 +28,7 @@ export function Sidebar({ hotelName }: { hotelName: string }) {
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.href.slice(1)}
               className={cn(
                 "relative flex items-center gap-2.5 rounded-md border-l-2 border-transparent px-2.5 py-1.5 text-sm tracking-wide transition-all duration-200",
                 active
