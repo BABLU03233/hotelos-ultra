@@ -5,57 +5,85 @@ import type { PrismaClient } from "@/generated/prisma/client";
 const CHECK_IN = new Date("2026-09-10T00:00:00Z");
 const CHECK_OUT = new Date("2026-09-12T00:00:00Z");
 
-function fakePrisma(bookings: { roomId: string | null }[], capture?: (args: unknown) => void) {
+/**
+ * `rooms` is the hotel's stated inventory; `taken` is how many overlapping
+ * bookings each room already has.
+ */
+function fakePrisma(
+  rooms: { id: string; unitCount: number | null }[],
+  taken: Record<string, number> = {},
+  capture?: (args: unknown) => void
+) {
   return {
+    room: {
+      findMany: vi.fn(async () => rooms.filter((r) => r.unitCount !== null)),
+      findFirst: vi.fn(async (args: { where: { id: string } }) => rooms.find((r) => r.id === args.where.id) ?? null),
+    },
     booking: {
-      findMany: vi.fn(async (args: unknown) => {
+      count: vi.fn(async (args: { where: { roomId: string } }) => taken[args.where.roomId] ?? 0),
+      groupBy: vi.fn(async (args: unknown) => {
         capture?.(args);
-        return bookings;
+        return Object.entries(taken).map(([roomId, n]) => ({ roomId, _count: { roomId: n } }));
       }),
-      findFirst: vi.fn(async () => bookings[0] ?? null),
     },
   } as unknown as PrismaClient;
 }
 
 describe("findUnavailableRoomIds", () => {
-  it("returns the ids of rooms already booked across the range", async () => {
-    const prisma = fakePrisma([{ roomId: "r1" }, { roomId: "r3" }]);
-    const taken = await findUnavailableRoomIds(prisma, "t1", CHECK_IN, CHECK_OUT);
-    expect([...taken].sort()).toEqual(["r1", "r3"]);
+  it("returns nothing when no room states an inventory", async () => {
+    // The bug this exists for. Availability assumed one physical room per
+    // type, so a single booking of "Classic Room" removed Classic from every
+    // other guest for those dates — a hotel with ten Classic rooms looked sold
+    // out after one, and the guest was told September was full.
+    const prisma = fakePrisma([{ id: "r1", unitCount: null }], { r1: 5 });
+    expect((await findUnavailableRoomIds(prisma, "t1", CHECK_IN, CHECK_OUT)).size).toBe(0);
   });
 
-  it("returns an empty set when nothing overlaps", async () => {
-    const taken = await findUnavailableRoomIds(fakePrisma([]), "t1", CHECK_IN, CHECK_OUT);
-    expect(taken.size).toBe(0);
+  it("only excludes a room once every unit of it is taken", async () => {
+    const prisma = fakePrisma(
+      [
+        { id: "full", unitCount: 2 },
+        { id: "spare", unitCount: 5 },
+      ],
+      { full: 2, spare: 2 }
+    );
+    const out = await findUnavailableRoomIds(prisma, "t1", CHECK_IN, CHECK_OUT);
+    expect([...out]).toEqual(["full"]);
   });
 
-  it("drops null roomIds rather than putting null in the set", async () => {
-    // Legacy bookings predate the roomId column; they must not poison the set.
-    const taken = await findUnavailableRoomIds(fakePrisma([{ roomId: null }, { roomId: "r2" }]), "t1", CHECK_IN, CHECK_OUT);
-    expect([...taken]).toEqual(["r2"]);
+  it("treats over-booking as full rather than wrapping around", async () => {
+    const prisma = fakePrisma([{ id: "r1", unitCount: 1 }], { r1: 3 });
+    expect([...(await findUnavailableRoomIds(prisma, "t1", CHECK_IN, CHECK_OUT))]).toEqual(["r1"]);
   });
 
-  it("asks for the same overlap window isRoomAvailable uses, and excludes cancelled bookings", async () => {
+  it("asks for a genuine range overlap and ignores cancelled bookings", async () => {
     let seen: Record<string, unknown> = {};
-    const prisma = fakePrisma([], (args) => {
+    const prisma = fakePrisma([{ id: "r1", unitCount: 1 }], {}, (args) => {
       seen = (args as { where: Record<string, unknown> }).where;
     });
     await findUnavailableRoomIds(prisma, "t1", CHECK_IN, CHECK_OUT);
-    // A stay blocks another only if the ranges genuinely intersect: an
-    // existing booking starting exactly on this check-out date does not.
+    // A booking starting exactly on this check-out date does not overlap.
     expect(seen.checkIn).toEqual({ lt: CHECK_OUT });
     expect(seen.checkOut).toEqual({ gt: CHECK_IN });
     expect(seen.status).toEqual({ not: "CANCELLED" });
-    expect(seen.tenantId).toBe("t1");
   });
 });
 
 describe("isRoomAvailable", () => {
-  it("is false when a conflicting booking exists", async () => {
-    expect(await isRoomAvailable(fakePrisma([{ roomId: "r1" }]), "t1", "r1", CHECK_IN, CHECK_OUT)).toBe(false);
+  it("is always true when the hotel has not stated an inventory", async () => {
+    expect(await isRoomAvailable(fakePrisma([{ id: "r1", unitCount: null }], { r1: 9 }), "t1", "r1", CHECK_IN, CHECK_OUT)).toBe(true);
   });
 
-  it("is true when nothing conflicts", async () => {
-    expect(await isRoomAvailable(fakePrisma([]), "t1", "r1", CHECK_IN, CHECK_OUT)).toBe(true);
+  it("is true while a unit is still free", async () => {
+    expect(await isRoomAvailable(fakePrisma([{ id: "r1", unitCount: 3 }], { r1: 2 }), "t1", "r1", CHECK_IN, CHECK_OUT)).toBe(true);
+  });
+
+  it("is false once every unit is taken", async () => {
+    expect(await isRoomAvailable(fakePrisma([{ id: "r1", unitCount: 3 }], { r1: 3 }), "t1", "r1", CHECK_IN, CHECK_OUT)).toBe(false);
+  });
+
+  it("is true for a room this tenant does not have", async () => {
+    // A stale or cross-tenant id must not read as "sold out".
+    expect(await isRoomAvailable(fakePrisma([]), "t1", "gone", CHECK_IN, CHECK_OUT)).toBe(true);
   });
 });

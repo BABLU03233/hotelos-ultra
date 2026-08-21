@@ -169,7 +169,20 @@ interface Strings {
   noBookingFound: string;
   continueAnyway: string;
   farewell: string;
-  roomChoiceBody: (n: number) => string;
+  /**
+   * Takes no count, deliberately.
+   *
+   * It used to read "We have 2 rooms free for your dates". That number was
+   * never inventory — it is how many room TYPES survived the capacity and
+   * availability filters, so a party of three saw "2 rooms free" purely
+   * because the third room sleeps two. A guest reads that as a hotel one
+   * booking from full, which either invents scarcity or makes the property
+   * look tiny. Reported as losing customers, and it would.
+   *
+   * The list itself already shows exactly what is on offer. Counting it out
+   * loud adds nothing true and takes away a sale.
+   */
+  roomChoiceBody: () => string;
   /**
    * Same list, but for a guest who has NOT given dates yet.
    *
@@ -178,7 +191,7 @@ interface Strings {
    * simply untrue, and it is the kind of untrue that costs a booking: the
    * guest reasonably reads it as confirmed for the days they had in mind.
    */
-  roomChoiceBodyNoDates: (n: number) => string;
+  roomChoiceBodyNoDates: () => string;
   /**
    * Reply to the post-booking "I have a question" tap.
    *
@@ -300,8 +313,8 @@ const EN: Strings = {
   noBookingFound: "I can't find an active booking for this number. If you booked under a different number, our team can help — shall I pass this on?",
   continueAnyway: "Perfect — shall I lock this room in for you?",
   farewell: "Lovely — see you soon! 😊 Message me anytime if anything comes up.",
-  roomChoiceBody: (n) => `We have ${n} room${n === 1 ? "" : "s"} free for your dates 😊 Which one would you like?`,
-  roomChoiceBodyNoDates: (n) => `Here ${n === 1 ? "is our room" : `are our ${n} rooms`} 😊 Tell me your dates and I'll check what's free — or pick one to start.`,
+  roomChoiceBody: () => `Here's what we have for your dates 😊 Which one would you like?`,
+  roomChoiceBodyNoDates: () => `Here are our rooms 😊 Tell me your dates and I'll get one ready — or pick one to start.`,
   postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
   locationCaption: `Here's our exact location 📍 Tap it for directions.`,
   guestGroup: "Group / corporate",
@@ -405,8 +418,8 @@ const HI: Strings = {
   noBookingFound: "इस नंबर पर कोई चालू बुकिंग नहीं मिली। अगर किसी और नंबर से बुक की थी, तो हमारी टीम मदद कर देगी — भेज दूँ?",
   continueAnyway: "बढ़िया — यही कमरा बुक कर दूँ?",
   farewell: "बहुत बढ़िया — जल्दी मिलते हैं! 😊 कुछ भी हो तो मैसेज कीजिए।",
-  roomChoiceBody: (n) => `आपकी तारीख़ों पर ${n} कमरे खाली हैं 😊 कौन सा पसंद करेंगे?`,
-  roomChoiceBodyNoDates: (n) => `हमारे ${n} कमरे ये रहे 😊 अपनी तारीख़ें बताइए, मैं उपलब्धता देख लूँगी — या कोई एक चुन लीजिए.`,
+  roomChoiceBody: () => `आपकी तारीख़ों के लिए ये रहे हमारे कमरे 😊 कौन सा पसंद करेंगे?`,
+  roomChoiceBodyNoDates: () => `ये रहे हमारे कमरे 😊 अपनी तारीख़ें बताइए, मैं तैयार करवा दूँगी — या कोई एक चुन लीजिए.`,
   postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
   locationCaption: `ये रही हमारी लोकेशन 📍 रास्ते के लिए टैप कीजिए.`,
   guestGroup: "ग्रुप / कॉर्पोरेट",
@@ -510,8 +523,8 @@ const TE: Strings = {
   noBookingFound: "ఈ నంబర్‌కి యాక్టివ్ బుకింగ్ కనిపించలేదు. వేరే నంబర్‌తో బుక్ చేసి ఉంటే మా టీమ్ సహాయం చేస్తుంది — పంపమంటారా?",
   continueAnyway: "చాలా బాగుంది — ఈ రూమ్ ఖరారు చేయనా?",
   farewell: "చాలా బాగుంది — త్వరలో కలుద్దాం! 😊 ఏదైనా ఉంటే మెసేజ్ చేయండి.",
-  roomChoiceBody: (n) => `మీ తేదీలకు ${n} రూమ్‌లు ఖాళీగా ఉన్నాయి 😊 ఏది కావాలి?`,
-  roomChoiceBodyNoDates: (n) => `మా ${n} రూమ్‌లు ఇవి 😊 మీ తేదీలు చెప్పండి, ఖాళీ ఉందా చూస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
+  roomChoiceBody: () => `మీ తేదీలకు మా రూమ్‌లు ఇవి 😊 ఏది కావాలి?`,
+  roomChoiceBodyNoDates: () => `ఇవి మా రూమ్‌లు 😊 మీ తేదీలు చెప్పండి, సిద్ధం చేస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
   postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
   locationCaption: `ఇదే మా లొకేషన్ 📍 దారి కోసం ట్యాప్ చేయండి.`,
   guestGroup: "గ్రూప్ / కార్పొరేట్",

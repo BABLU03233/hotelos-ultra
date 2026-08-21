@@ -198,6 +198,8 @@ export interface Room {
   description: string | null;
   price: number;
   capacity: number;
+  /** How many of this type the hotel has. Null means availability is never limited. */
+  unitCount: number | null;
   /** Per-party-size rates — see lib/booking/occupancy-price.ts. Null when unset. */
   occupancyPrices: { guests: number; price: number }[] | null;
   amenities: string[];

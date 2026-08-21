@@ -267,6 +267,21 @@ model Room {
   description String?
   price       Int
   /**
+   * How many of THIS room type the hotel actually has.
+   *
+   * Null means "do not treat inventory as a constraint", and that is the
+   * default on purpose. Availability used to assume exactly one physical room
+   * per type, so a single booking of "Classic Room" for a date range removed
+   * Classic from every other guest asking about those dates — a hotel with ten
+   * Classic rooms looked sold out after one. Reported as losing customers, and
+   * it would: the cost of a wrong "sold out" is the whole booking, while the
+   * cost of a wrong "available" is a conversation at the desk, which is where
+   * these bookings are confirmed anyway.
+   *
+   * A hotel that genuinely wants the guard can set a real number.
+   */
+  unitCount   Int?
+  /**
    * What the room costs at each party size, e.g.
    * [{ "guests": 1, "price": 999 }, { "guests": 2, "price": 1299 }].
    *

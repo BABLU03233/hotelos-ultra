@@ -39,6 +39,9 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
             description: form.description,
             price: Number(form.price),
             capacity: Number(form.capacity),
+            // Blank means "no limit" — the default, and what stops one booking
+            // making a whole room type look sold out.
+            unitCount: form.unitCount ? Number(form.unitCount) : null,
             // Empty means "no tiers" — sent as null so clearing them actually
             // clears them rather than leaving the last saved set in place.
             occupancyPrices: form.occupancyPrices?.length ? form.occupancyPrices : null,
@@ -77,6 +80,17 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
           <div className="flex flex-col gap-1.5">
             <Label>Price / night (₹)</Label>
             <Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} onBlur={save} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>How many of these</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Any"
+              value={form.unitCount ?? ""}
+              onChange={(e) => setForm({ ...form, unitCount: e.target.value ? Number(e.target.value) : null })}
+              onBlur={save}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Sleeps</Label>

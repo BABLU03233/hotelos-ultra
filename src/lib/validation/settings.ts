@@ -32,6 +32,8 @@ export const roomSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   price: z.number().int().min(0),
   capacity: z.number().int().min(1),
+  /** How many of this room type exist. Null = inventory is not a constraint. */
+  unitCount: z.number().int().min(1).max(1000).nullable().optional(),
   /**
    * Per-party-size rates, e.g. [{ guests: 1, price: 999 }].
    *

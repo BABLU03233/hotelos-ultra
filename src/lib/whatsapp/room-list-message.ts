@@ -94,7 +94,7 @@ export function buildRoomListMessage(
 
   return {
     type: "list",
-    body: datesKnown ? s.roomChoiceBody(rooms.length) : s.roomChoiceBodyNoDates(rooms.length),
+    body: datesKnown ? s.roomChoiceBody() : s.roomChoiceBodyNoDates(),
     buttonText: s.roomListButton,
     sections: [{ rows }],
   };
