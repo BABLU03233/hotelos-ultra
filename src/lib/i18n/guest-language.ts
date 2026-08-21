@@ -225,6 +225,12 @@ interface Strings {
    * quoted their real rate, which made the two disagree on the same screen.
    */
   roomPicked: (roomName: string, priceLine: string) => string;
+  /** Caption sent with a room's photos. */
+  photosCaption: (roomName: string) => string;
+  /** When the hotel has not uploaded photos of the room they asked about. */
+  photosNone: (roomName: string) => string;
+  /** When "View photos" is tapped with no room settled yet. */
+  photosNoRoom: string;
   /**
    * A corporate or group enquiry — several rooms at once.
    *
@@ -349,6 +355,9 @@ const EN: Strings = {
   postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
   locationCaption: `Here's our exact location 📍 Tap it for directions.`,
   roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. Want to go ahead with this one?`,
+  photosCaption: (roomName) => `Here's the ${roomName} 📸`,
+  photosNone: (roomName) => `I don't have photos of the ${roomName} to hand — our team can send some over, or ask me anything about it 😊`,
+  photosNoRoom: `Which room would you like to see? Pick one and I'll send photos 😊`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `Perfect — ${stay}.` +
     (checkInTime || checkOutTime
@@ -463,6 +472,9 @@ const HI: Strings = {
   postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
   locationCaption: `ये रही हमारी लोकेशन 📍 रास्ते के लिए टैप कीजिए.`,
   roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. क्या इसी को आगे बढ़ाएँ?`,
+  photosCaption: (roomName) => `ये रहा ${roomName} 📸`,
+  photosNone: (roomName) => `${roomName} की तस्वीरें अभी मेरे पास नहीं हैं — हमारी टीम भेज देगी, या इसके बारे में मुझसे कुछ भी पूछिए 😊`,
+  photosNoRoom: `कौन सा कमरा देखना चाहेंगे? चुनिए, मैं तस्वीरें भेजती हूँ 😊`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `बढ़िया — ${stay}.` +
     (checkInTime || checkOutTime
@@ -577,6 +589,9 @@ const TE: Strings = {
   postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
   locationCaption: `ఇదే మా లొకేషన్ 📍 దారి కోసం ట్యాప్ చేయండి.`,
   roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. దీన్నే కొనసాగించాలా?`,
+  photosCaption: (roomName) => `ఇదిగో ${roomName} 📸`,
+  photosNone: (roomName) => `${roomName} ఫోటోలు నా దగ్గర లేవు — మా టీమ్ పంపుతుంది, లేదా దాని గురించి నన్ను ఏదైనా అడగండి 😊`,
+  photosNoRoom: `ఏ రూమ్ చూడాలనుకుంటున్నారు? ఒకటి ఎంచుకోండి, ఫోటోలు పంపుతాను 😊`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `సరే — ${stay}.` +
     (checkInTime || checkOutTime

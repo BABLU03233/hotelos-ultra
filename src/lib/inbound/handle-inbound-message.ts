@@ -2,6 +2,7 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  VIEW_PHOTOS_BUTTON_ID,
   CALL_US_BUTTON_ID,
   GROUP_BOOKING_BUTTON_ID,
   GROUP_ROOM_BUTTON_IDS,
@@ -145,6 +146,28 @@ type ShortCircuitMessage =
  * short-circuit's send failing shouldn't crash webhook processing, same
  * principle process-message-job.ts follows for the AI-driven path.
  */
+/** How many photos to send at once — enough to show the room, few enough not
+ *  to bury the conversation under a wall of images. */
+const MAX_ROOM_PHOTOS = 4;
+
+/**
+ * The rate line for a room, for THIS guest.
+ *
+ * Shared by the room-pick reply and the post-photo reply so the same room
+ * cannot be quoted two different ways in one conversation.
+ */
+function roomPriceLine(
+  room: { price: number; capacity: number; occupancyPrices?: unknown },
+  guests: number | null | undefined,
+  s: ReturnType<typeof t>
+): string {
+  if (guests && guests > 0) {
+    const price = priceForGuests(room, guests);
+    return hasExactTier(room, guests) ? s.roomPriceForParty(price, guests) : s.roomPriceForPartyApprox(price, guests);
+  }
+  return describeTiers(room) ?? s.roomListDesc(lowestPrice(room), room.capacity);
+}
+
 async function sendAndPersist(
   tenant: { id: string },
   contact: { id: string; whatsappNumber: string },
@@ -867,18 +890,92 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       // list one message earlier already quotes the guest's real price, so
       // using room.price here made two messages on the same screen disagree —
       // and the lower of the two is the one they would hold us to.
-      const s = t(lang);
-      const priceLine =
-        contact.pendingGuestCount && contact.pendingGuestCount > 0
-          ? hasExactTier(room, contact.pendingGuestCount)
-            ? s.roomPriceForParty(priceForGuests(room, contact.pendingGuestCount), contact.pendingGuestCount)
-            : s.roomPriceForPartyApprox(priceForGuests(room, contact.pendingGuestCount), contact.pendingGuestCount)
-          : (describeTiers(room) ?? s.roomListDesc(lowestPrice(room), room.capacity));
-      const body = s.roomPicked(room.name, priceLine);
+      const body = t(lang).roomPicked(room.name, roomPriceLine(room, contact.pendingGuestCount, t(lang)));
       await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt(lang)), "Failed to send room-pick response");
       return;
     }
     // Not found (stale/cross-tenant id) — fall through to the AI queue.
+  }
+
+  // "View photos" — the hotel's real room images, straight from the database.
+  //
+  // Reported live: tapping it sent nothing at all. There was no handler, so it
+  // fell through to the AI and depended on a free-tier model choosing to emit
+  // an "IMAGE:" line in exactly the right format, from URLs buried in its
+  // prompt. It mostly did not — and a button that silently does nothing is
+  // worse than no button, because the guest taps it, waits, and concludes the
+  // hotel is broken.
+  //
+  // Deterministic for the same reason room lists and offers are: which photos
+  // exist is a database fact, and a model has no business deciding it.
+  if (msg.interactiveId === VIEW_PHOTOS_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    const room = contact.pendingRoomId
+      ? await prisma.room.findFirst({ where: { id: contact.pendingRoomId, tenantId: tenant.id } })
+      : null;
+
+    if (!room) {
+      // Tapped from a stale list before any room was settled — ask which one,
+      // rather than guessing or going quiet.
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).photosNoRoom }, "Failed to send photo prompt");
+      return;
+    }
+
+    const images = room.imageUrls.slice(0, MAX_ROOM_PHOTOS);
+    if (!images.length) {
+      // Says so plainly instead of going quiet, and keeps the room's own
+      // buttons attached so the guest can still book it.
+      await sendAndPersist(
+        tenant,
+        contact,
+        toShortCircuitInteractive(t(lang).photosNone(room.name), roomResponsePrompt(lang)),
+        "Failed to send no-photos message"
+      );
+      return;
+    }
+
+    const photoCreds = await getWhatsAppCredentials(tenant.id);
+    if (photoCreds) {
+      for (const [i, url] of images.entries()) {
+        try {
+          const photoMessageId = await sendWhatsAppMessage(photoCreds, contact.whatsappNumber, {
+            type: "image",
+            link: url,
+            // Caption on the first image only — repeating it under every photo
+            // reads as spam in a WhatsApp thread.
+            caption: i === 0 ? t(lang).photosCaption(room.name) : undefined,
+          });
+          await prisma.message.create({
+            data: {
+              tenantId: tenant.id,
+              contactId: contact.id,
+              direction: "OUT",
+              type: "IMAGE",
+              mediaUrl: url,
+              whatsappMessageId: photoMessageId,
+              status: "SENT",
+            },
+          });
+        } catch (err) {
+          // One dead URL must not stop the rest: a hotel with a broken link on
+          // photo 2 should still get photos 1, 3 and 4 through.
+          console.error(`Room photo send failed for tenant ${tenant.id}, contact ${contact.id}, url ${url}:`, err);
+        }
+      }
+    }
+
+    // Booking buttons follow the photos, so looking is never a dead end.
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(
+        t(lang).roomPicked(room.name, roomPriceLine(room, contact.pendingGuestCount, t(lang))),
+        roomResponsePrompt(lang)
+      ),
+      "Failed to send post-photo prompt"
+    );
+    return;
   }
 
   // "Book this room" is deterministic too — zero ambiguity in what it means

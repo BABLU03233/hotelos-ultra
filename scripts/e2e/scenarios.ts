@@ -388,6 +388,53 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
 
+  {
+    id: "photos-actually-send",
+    area: "Funnel",
+    title: "View photos sends the hotel's real room images",
+    because:
+      "Reported live: the button sent nothing. There was no handler, so it fell through to the AI and relied on a model emitting an IMAGE: line. A button that silently does nothing reads as a broken hotel.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_tomorrow", label: "Tomorrow" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      {
+        tap: { id: "view_photos", label: "View photos" },
+        checks: [
+          { label: "sends at least one real image", test: (s) => s.some((m) => m.type === "image") },
+          matches("keeps the booking buttons under the photos", /Classic Room/i),
+        ],
+      },
+    ],
+  },
+  {
+    id: "agreeing-without-dates-asks-dates",
+    area: "Dates",
+    title: "Agreeing to a room with no dates asks for dates, not a Confirm that bounces",
+    because:
+      "Reported live: the guest agreed, was offered Confirm booking, tapped it, and got 'Just need your dates to lock this in' — confirmed, then sent back to the start.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "room_other", label: "Availability & price" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      {
+        say: "yes please",
+        checks: [
+          sentSomething,
+          matches("asks when they want to stay", /when are you looking to stay/i),
+          {
+            label: "does not offer a Confirm button it cannot honour",
+            test: (s) => !idsOf(s).includes("confirm_booking"),
+          },
+        ],
+      },
+    ],
+  },
+
   /* ===== GROUP SIZE ===== */
   {
     id: "oversized-party-hands-to-reception",

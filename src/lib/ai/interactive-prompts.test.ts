@@ -717,6 +717,7 @@ describe("selectDeterministicInteractive", () => {
       ...base,
       guestMessage: "sounds good",
       replyText: "Great, glad you like it!",
+      datesKnown: true,
       history: [
         { role: "user", content: "2 guests" },
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
@@ -752,10 +753,16 @@ describe("selectDeterministicInteractive", () => {
     expect(result).toEqual(dateQuickPickPrompt());
   });
 
-  it("does not regress to DATE_QUICK_PICK once a room has already been discussed, even if dates were never stated", () => {
-    // Guards the exact scenario that motivated reordering the waterfall:
-    // guest count known, room already recommended, but hasStatedDates would
-    // still be false -- must not block a guest who's ready to book.
+  it("asks for dates rather than offering a Confirm that cannot confirm", () => {
+    // This test previously asserted the opposite — that a guest agreeing to a
+    // room should get Confirm even with no dates, so as not to "block a guest
+    // who's ready to book". Reported live as a bug: the guest tapped Confirm
+    // and was answered "Just need your dates to lock this in", which reads as
+    // having confirmed and been sent back to the start.
+    //
+    // The handler behind that button genuinely cannot complete a booking
+    // without dates, so offering it is the lie. Asking first costs the same
+    // one extra tap and never shows a button that fails.
     const result = selectDeterministicInteractive({
       ...base,
       guestMessage: "yes",
@@ -765,7 +772,21 @@ describe("selectDeterministicInteractive", () => {
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
       ],
     });
-    expect(result).toEqual(confirmBookingPrompt());
+    expect(result).toEqual(dateQuickPickPrompt());
+
+    // With dates known it still closes, unchanged.
+    expect(
+      selectDeterministicInteractive({
+        ...base,
+        guestMessage: "yes",
+        replyText: "Awesome, you're all set to go!",
+        datesKnown: true,
+        history: [
+          { role: "user", content: "2 guests" },
+          { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
+        ],
+      })
+    ).toEqual(confirmBookingPrompt());
   });
 
   it("falls back to the AI's own marker when no deterministic condition applies", () => {
@@ -1014,6 +1035,7 @@ describe("predictedStageInstruction", () => {
     const result = predictedStageInstruction({
       ...base,
       guestMessage: "sounds good",
+      datesKnown: true,
       history: [
         { role: "user", content: "2 guests" },
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
@@ -1222,6 +1244,7 @@ describe("resolveDeterministicReply", () => {
       history: [{ role: "assistant", content: "Our Classic Room is ₹999/night." }],
       guestMessage: "sounds good",
       knownGuestCount: 2,
+      datesKnown: true,
     });
     expect(result?.text ?? "").toMatch(/Confirm booking/i);
   });
@@ -1261,6 +1284,7 @@ describe("resolveDeterministicReply", () => {
     const result = resolveDeterministicReply({
       ...base,
       guestMessage: "sounds good",
+      datesKnown: true,
       history: [
         { role: "user", content: "2 guests" },
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
@@ -1278,6 +1302,9 @@ describe("resolveDeterministicReply", () => {
         { role: "user", content: "2 guests" },
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },
       ],
+      // A booking summary with real dates means dates ARE known — this test is
+      // about restating them at the confirm step, not about reaching it.
+      datesKnown: true,
       bookingSummary: { roomName: "Deluxe Room", checkIn: new Date("2026-09-15T00:00:00"), checkOut: new Date("2026-09-17T00:00:00") },
     });
     expect(result?.text).toContain("Deluxe Room");
@@ -1290,6 +1317,7 @@ describe("resolveDeterministicReply", () => {
     const result = resolveDeterministicReply({
       ...base,
       guestMessage: "sounds good",
+      datesKnown: true,
       history: [
         { role: "user", content: "2 guests" },
         { role: "assistant", content: "Our Deluxe Room starts from ₹1,299/night" },

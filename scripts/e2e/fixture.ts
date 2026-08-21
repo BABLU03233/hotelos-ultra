@@ -36,6 +36,9 @@ export const ROOMS = [
     price: 999,
     capacity: 2,
     occupancyPrices: [{ guests: 1, price: 999 }, { guests: 2, price: 1299 }],
+    // Two real-shaped URLs so the View photos path actually sends something —
+    // with an empty array the only branch ever exercised is "no photos".
+    imageUrls: ["https://example.test/classic-1.jpg", "https://example.test/classic-2.jpg"],
     description: "Queen comfort with city-view elegance. From ₹999/night for 1 person, ₹1,299/night for 2 persons.",
   },
   {
@@ -88,7 +91,9 @@ export async function createFixture(prisma: any): Promise<Fixture> {
 
   const roomIds: Record<string, string> = {};
   for (const room of ROOMS) {
-    const created = await prisma.room.create({ data: { ...room, tenantId: tenant.id, imageUrls: [] } });
+    const created = await prisma.room.create({
+      data: { ...room, tenantId: tenant.id, imageUrls: (room as { imageUrls?: string[] }).imageUrls ?? [] },
+    });
     roomIds[room.name] = created.id;
   }
 

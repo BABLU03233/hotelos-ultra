@@ -288,6 +288,18 @@ const PROBES: Probe[] = [
     ],
   },
   {
+    id: "agree-without-dates",
+    watch: "Agreeing to a room with NO dates must ask for dates, not offer a Confirm that cannot confirm.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "room_other", label: "Availability & price" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { say: "yes please" },
+    ],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

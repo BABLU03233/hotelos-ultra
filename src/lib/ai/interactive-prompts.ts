@@ -1174,6 +1174,23 @@ function resolveStageKey(params: {
     // resolveDeterministicReply). Dropping it here would hand a declining
     // guest to the AI and lose that.
     if (roomMentionedEver && (looksLikeAgreement(guestMessage) || DECLINED_CONFIRM_PATTERN.test(guestMessage.trim()))) {
+      // Never offer a Confirm button that cannot confirm.
+      //
+      // Reported live: a guest agreed to a room, was given "Confirm booking",
+      // tapped it — and was answered "Just need your dates to lock this in".
+      // From their side they had confirmed and been asked to start again. The
+      // handler behind that button genuinely cannot complete a booking with no
+      // dates, so the fix belongs here: ask for the dates first, and offer
+      // Confirm once it can actually mean something.
+      //
+      // A decline ("Not yet") still goes to CONFIRM_BOOKING even without
+      // dates: that stage owns a soft, no-pressure reply for exactly that tap,
+      // and asking a declining guest for dates would be pushier than the
+      // button they just declined.
+      const declining = DECLINED_CONFIRM_PATTERN.test(guestMessage.trim());
+      if (!declining && !hasStatedDates(history, guestMessage, datesKnown)) {
+        return "DATE_QUICK_PICK";
+      }
       return "CONFIRM_BOOKING";
     }
     if (
