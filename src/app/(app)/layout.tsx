@@ -4,6 +4,7 @@ import { AuthHydrator } from "@/components/app-shell/auth-hydrator";
 import { BookingAlert } from "@/components/app-shell/booking-alert";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { WhatsAppBanner } from "@/components/app-shell/whatsapp-banner";
+import { WelcomeTour } from "@/components/onboarding/welcome-tour";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         tenant={{ id: tenant.id, name: tenant.name, slug: tenant.slug, aiAgentName: agentName }}
       />
       <BookingAlert />
+      <WelcomeTour tenantId={tenant.id} agentName={agentName} />
       <Sidebar hotelName={tenant.name} />
       <div className="flex min-w-0 min-h-0 flex-1 flex-col">
         <AppHeader hotelName={tenant.name} userName={user.name} userEmail={user.email} />

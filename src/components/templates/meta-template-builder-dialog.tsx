@@ -43,6 +43,38 @@ function countPlaceholders(text: string): number {
   return new Set(Array.from(text.matchAll(/\{\{(\d+)\}\}/g)).map((m) => m[1])).size;
 }
 
+/**
+ * Readable names for the trigger of each dropdown.
+ *
+ * <SelectValue /> renders the raw VALUE, not the chosen item's label — so the
+ * SelectItems here have read "Quick reply" and "Marketing" all along while the
+ * closed dropdown showed a hotel owner "QUICK_REPLY", "guest_name",
+ * "MARKETING" and "none" straight off the enum.
+ */
+const CATEGORY_LABELS: Record<string, string> = {
+  MARKETING: "Marketing — offers and promotions",
+  UTILITY: "Utility — booking updates and reminders",
+  AUTHENTICATION: "Authentication — one-time codes",
+};
+
+const HEADER_LABELS: Record<string, string> = {
+  none: "No title",
+  text: "Text title",
+  image: "Image",
+};
+
+const SLOT_LABELS: Record<string, string> = {
+  guest_name: "The guest's name",
+  hotel_name: "Your hotel's name",
+  custom: "Something I type per send…",
+};
+
+const BUTTON_LABELS: Record<string, string> = {
+  QUICK_REPLY: "Quick reply",
+  URL: "Opens a link",
+  PHONE_NUMBER: "Calls you",
+};
+
 export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -55,9 +87,13 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
   const [bodyVariableSlots, setBodyVariableSlots] = React.useState<BodyVariableSlot[]>([]);
   const [footerText, setFooterText] = React.useState("");
   const [buttons, setButtons] = React.useState<ButtonDraft[]>([]);
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
   function applyStarter(id: string) {
+    // Picking a starter re-folds the advanced fields: whatever was opened for
+    // the previous choice is not relevant to this one.
+    setAdvancedOpen(false);
     const starter = WA_META_TEMPLATE_STARTERS.find((s) => s.id === id);
     if (!starter) return;
     const t = starter.template;
@@ -89,6 +125,20 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
     );
     if (!name) setName(id.replace(/-/g, "_"));
   }
+
+  /**
+   * Everything below the message is folded away by default.
+   *
+   * A ready-to-send starter fills in category, title, footer and buttons
+   * correctly, and an owner who picked "20% off" should see the offer and a
+   * submit button — not a category dropdown, a variable mapping table and a
+   * button list. It all stays one click away.
+   *
+   * Forced open when a blank needs a value the owner has to type, because
+   * leaving THAT hidden would submit a template with an empty slot in it.
+   */
+  const needsAttention = bodyVariableSlots.some((slot) => slot.source === "custom" && !slot.label.trim());
+  const showAdvanced = advancedOpen || needsAttention;
 
   function syncSlotCount() {
     const needed = countPlaceholders(bodyText);
@@ -255,11 +305,13 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
               <p className="text-[11px] text-muted-foreground">Lowercase letters, numbers, and underscores only.</p>
             </div>
 
+            {showAdvanced && (
+              <>
             <div className="flex flex-col gap-1.5">
-              <Label>Category</Label>
+              <Label>What kind of message is this?</Label>
               <Select value={category} onValueChange={(v) => v && setCategory(v as MetaTemplateInput["category"])}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => CATEGORY_LABELS[v] ?? v}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MARKETING">Marketing</SelectItem>
@@ -270,10 +322,10 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Header (optional)</Label>
+              <Label>Title above the message (optional)</Label>
               <Select value={headerType} onValueChange={(v) => v && setHeaderType(v as HeaderType)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => HEADER_LABELS[v] ?? v}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
@@ -288,6 +340,8 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
                 <Input type="file" accept="image/*" onChange={(e) => setHeaderImage(e.target.files?.[0] ?? null)} />
               )}
             </div>
+              </>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label>Message</Label>
@@ -305,15 +359,15 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
               </p>
             </div>
 
-            {bodyVariableSlots.length > 0 && (
+            {bodyVariableSlots.length > 0 && showAdvanced && (
               <div className="flex flex-col gap-1.5 rounded-lg border border-border p-2.5">
-                <Label className="text-xs text-muted-foreground">Variables in your message</Label>
+                <Label className="text-xs text-muted-foreground">What goes in each blank</Label>
                 {bodyVariableSlots.map((slot, i) => (
                   <div key={i} className="flex items-center gap-1.5">
                     <span className="w-8 shrink-0 text-xs text-muted-foreground">{`{{${i + 1}}}`}</span>
                     <Select value={slot.source} onValueChange={(v) => v && updateSlot(i, { source: v as VariableSource })}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
+                      <SelectTrigger className="min-w-0 flex-1">
+                        <SelectValue>{(v: string) => SLOT_LABELS[v] ?? v}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="guest_name">{KNOWN_AUTO_VARIABLES.guest_name.label}</SelectItem>
@@ -334,14 +388,16 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
               </div>
             )}
 
+            {showAdvanced && (
+              <>
             <div className="flex flex-col gap-1.5">
-              <Label>Footer (optional)</Label>
+              <Label>Small print at the bottom (optional)</Label>
               <Input value={footerText} onChange={(e) => setFooterText(e.target.value)} placeholder="Reply STOP anytime to opt out" maxLength={60} />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <Label>Buttons (optional)</Label>
+                <Label>Buttons guests can tap (optional)</Label>
                 {buttons.length < 10 && (
                   <Button type="button" variant="ghost" size="sm" onClick={addButton}>
                     <Plus className="size-3" /> Add button
@@ -352,7 +408,7 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
                 <div key={i} className="flex items-center gap-1.5">
                   <Select value={b.type} onValueChange={(v) => v && setButtons((prev) => prev.map((x, j) => (j === i ? { ...x, type: v as ButtonType } : x)))}>
                     <SelectTrigger className="w-36 shrink-0">
-                      <SelectValue />
+                      <SelectValue>{(v: string) => BUTTON_LABELS[v] ?? v}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="QUICK_REPLY">Quick reply</SelectItem>
@@ -397,6 +453,22 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
                 </div>
               ))}
             </div>
+              </>
+            )}
+
+            {/* One click to the machinery, and never in the way of an owner
+                who just wants to send the offer they picked. */}
+            {!needsAttention && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="self-start text-muted-foreground"
+                onClick={() => setAdvancedOpen((v) => !v)}
+              >
+                {advancedOpen ? "Hide extra options" : "Change the title, buttons or small print"}
+              </Button>
+            )}
           </div>
 
           {/* Sticky so the bubble stays in view while the form scrolls past
