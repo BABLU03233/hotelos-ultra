@@ -22,7 +22,7 @@ export default function CampaignsPage() {
   const agentName = useAuthStore((s) => s.tenant?.aiAgentName ?? "Anushka");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <Reveal>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

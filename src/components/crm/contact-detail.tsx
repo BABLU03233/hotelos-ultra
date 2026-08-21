@@ -611,7 +611,7 @@ function ContactDetailPane({
 
       {!isDesktop && (
         <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">
+          <SheetContent className="flex flex-col gap-0 p-0 data-[side=right]:sm:max-w-lg">
             <SheetHeader className="border-b border-border">
               <SheetTitle>Contact details</SheetTitle>
               <SheetDescription className="sr-only">

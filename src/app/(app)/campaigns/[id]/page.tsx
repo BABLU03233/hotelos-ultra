@@ -103,7 +103,7 @@ export default function CampaignDetailPage() {
 
   if (loading || !data) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <div className="mx-auto flex max-w-5xl flex-col gap-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -277,7 +277,7 @@ export default function CampaignDetailPage() {
         </Reveal>
       )}
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
           [
             { label: "Total contacts", value: report.totalContacts },
