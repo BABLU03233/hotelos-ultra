@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EditCampaignDialog } from "@/components/campaigns/edit-campaign-dialog";
 import { RecipientTable } from "@/components/campaigns/recipient-table";
 import { Reveal } from "@/components/motion/reveal";
 import { formatDateTime } from "@/lib/format";
@@ -124,42 +125,50 @@ export default function CampaignDetailPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <Reveal>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="font-heading text-xl font-semibold">{campaign.name}</h1>
             <p className="text-sm text-muted-foreground">
               {campaign.type} · {campaign.messageType.toLowerCase()}
             </p>
           </div>
-          {/* The button is disabled rather than hidden while a campaign waits
-              for review. A vanished button reads as a bug; a disabled one next
-              to the status card below explains itself. The server refuses
-              unapproved sends regardless — this is the courtesy, not the
-              guard. */}
-          {!campaign.sentAt && (
-            <Button onClick={send} disabled={report.totalContacts === 0 || campaign.approval !== "APPROVED"}>
-              Send now
-            </Button>
-          )}
-          {campaign.sentAt && campaign.sendPacing === "SPACED" && report.pending > 0 && (
-            <Button variant="outline" onClick={cancelRemaining}>
-              Cancel remaining sends
-            </Button>
-          )}
-          {/* Running the same promotion again is a normal thing to want, and
-              until now the only route was retyping the whole campaign. */}
-          {campaign.sentAt && (
-            <div className="flex flex-wrap items-center gap-2">
-              {report.failed > 0 && (
-                <Button variant="outline" onClick={() => duplicate("failed")}>
-                  Retry the {report.failed} that failed
-                </Button>
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Edit sits next to Send for anything not yet sent and not yet
+                approved. It is the other half of "send back for changes": the
+                reviewer could ask for one, and until now the owner had nowhere
+                on this screen to make it. Not offered once APPROVED, because
+                that copy was reviewed as written — the server refuses it too. */}
+            {!campaign.sentAt && campaign.approval !== "APPROVED" && (
+              <EditCampaignDialog campaign={campaign} onSaved={reload} />
+            )}
+            {/* Disabled rather than hidden while a campaign waits for review.
+                A vanished button reads as a bug; a disabled one next to the
+                status card below explains itself. The server refuses
+                unapproved sends regardless — this is the courtesy, not the
+                guard. */}
+            {!campaign.sentAt && (
+              <Button onClick={send} disabled={report.totalContacts === 0 || campaign.approval !== "APPROVED"}>
+                Send now
+              </Button>
+            )}
+            {campaign.sentAt && campaign.sendPacing === "SPACED" && report.pending > 0 && (
+              <Button variant="outline" onClick={cancelRemaining}>
+                Cancel remaining sends
+              </Button>
+            )}
+            {/* Running the same promotion again is a normal thing to want, and
+                until now the only route was retyping the whole campaign. */}
+            {campaign.sentAt && report.failed > 0 && (
+              <Button variant="outline" onClick={() => duplicate("failed")}>
+                Retry the {report.failed} that failed
+              </Button>
+            )}
+            {campaign.sentAt && (
               <Button variant="outline" onClick={() => duplicate("same")}>
                 <Copy className="size-4" /> Send again
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </Reveal>
 

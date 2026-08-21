@@ -106,6 +106,31 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     );
   }
 
+  // The shape this campaign will have AFTER the patch — each field either
+  // changes or keeps what it had.
+  const nextMessageType = body.messageType ?? existing.messageType;
+  const nextMediaUrl = body.mediaUrl !== undefined ? body.mediaUrl : existing.mediaUrl;
+  const nextTemplateId = body.metaTemplateId !== undefined ? body.metaTemplateId : existing.metaTemplateId;
+  const nextBody = body.body !== undefined ? body.body : existing.body;
+
+  if (nextMessageType === "IMAGE" && !nextMediaUrl) {
+    throw new ApiError(400, "An image broadcast needs an image.");
+  }
+  if (nextMessageType === "TEMPLATE" && !nextTemplateId && !existing.templateName) {
+    throw new ApiError(400, "A template broadcast needs an approved template.");
+  }
+  if (nextMessageType === "TEXT" && !nextBody?.trim()) {
+    throw new ApiError(400, "A text broadcast needs a message.");
+  }
+
+  // Ownership check on a client-supplied id, exactly as the create route
+  // does: db is tenant-scoped, so another hotel's template returns null here
+  // rather than quietly linking across tenants.
+  if (body.metaTemplateId) {
+    const template = await db.metaTemplate.findUnique({ where: { id: body.metaTemplateId } });
+    if (!template) throw new ApiError(400, "That template wasn't found for this hotel.");
+  }
+
   const campaign = await db.campaign.update({
     where: { id },
     data: {
