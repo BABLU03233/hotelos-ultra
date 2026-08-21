@@ -25,10 +25,13 @@ export function DeskStatus({
   contacts,
   onFilter,
   className,
+  agentName,
 }: {
   contacts: Contact[];
   onFilter: (key: ChatFilterKey) => void;
   className?: string;
+  /** The hotel's own name for its assistant; falls back to Anushka. */
+  agentName?: string | null;
 }) {
   const status = deskStatus(contacts);
 
@@ -44,7 +47,7 @@ export function DeskStatus({
       >
         <Bot className="size-3 shrink-0 text-primary" />
         <span className="font-semibold tabular-nums text-foreground">{status.withAi}</span>
-        <span className="truncate">with Anushka</span>
+        <span className="truncate">with {agentName?.trim() || "Anushka"}</span>
       </button>
 
       <span className="text-muted-foreground/40" aria-hidden>

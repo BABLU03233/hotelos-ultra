@@ -153,6 +153,8 @@ interface Strings {
   roomListBody: string;
   roomListButton: string;
   roomListDesc: (price: number, capacity: number) => string;
+  /** "₹1,299 for 2 guests" — the rate for THIS party, not a "from" price. */
+  roomPriceForParty: (price: number, guests: number) => string;
   fullyBooked: string;
   pastDateRejected: string;
   mediaNoticed: string;
@@ -206,6 +208,10 @@ interface Strings {
   groupHandover: (rooms: string) => string;
   /** Row label offering directions. */
   locationRow: string;
+  /** Row offering a phone call, and the message carrying the number. */
+  callRow: string;
+  callRowDesc: string;
+  callBody: (phone: string) => string;
   locationRowDesc: string;
   bookRoom: (name: string) => string;
   knowMore: string;
@@ -279,6 +285,7 @@ const EN: Strings = {
   roomListBody: "Here's everything we've got — tap a room to hear more about it:",
   roomListButton: "See rooms",
   roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} guest${capacity === 1 ? "" : "s"}`,
+  roomPriceForParty: (price, guests) => `₹${price.toLocaleString("en-IN")}/night for ${guests} guest${guests === 1 ? "" : "s"}`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
   mediaNoticed: "Thanks for sending that! 😊 I can't open attachments here — could you tell me in a message what you need?",
@@ -304,6 +311,11 @@ const EN: Strings = {
   rooms10plus: "More than 10",
   groupHandover: (rooms) => `Thanks! For ${rooms}, our team handles the rates and blocks the rooms personally — they'll message you here shortly. If you can share your dates and company name meanwhile, that speeds things up 😊`,
   locationRow: "Where are you?",
+  callRow: "Call us",
+  callRowDesc: "Speak to reception directly",
+  callBody: (phone) => `Of course — tap to call us: ${phone}
+
+We're happy to help over the phone 😊`,
   locationRowDesc: "Get our exact location and directions",
   bookRoom: (name) => `Book ${name}`,
   knowMore: "Know more",
@@ -378,6 +390,7 @@ const HI: Strings = {
   roomListBody: "ये हैं हमारे सारे कमरे — किसी पर टैप करके और जानिए:",
   roomListButton: "कमरे देखें",
   roomListDesc: (price, capacity) => `₹${price}/रात से · ${capacity} लोग तक`,
+  roomPriceForParty: (price, guests) => `${guests} लोगों के लिए ₹${price.toLocaleString("en-IN")}/रात`,
   fullyBooked: "अरे, उन तारीख़ों पर सब बुक है 😔 कोई और तारीख़ चलेगी?",
   pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
   mediaNoticed: "भेजने के लिए शुक्रिया! 😊 मैं यहाँ अटैचमेंट नहीं खोल पाती — मैसेज में बता दीजिए आपको क्या चाहिए?",
@@ -403,6 +416,11 @@ const HI: Strings = {
   rooms10plus: "10 से ज़्यादा",
   groupHandover: (rooms) => `धन्यवाद! ${rooms} के लिए हमारी टीम खुद रेट तय करके कमरे ब्लॉक करती है — वे जल्द ही यहीं मैसेज करेंगे. इस बीच अपनी तारीख़ें और कंपनी का नाम बता दें तो और तेज़ी होगी 😊`,
   locationRow: "हम कहाँ हैं?",
+  callRow: "हमें कॉल करें",
+  callRowDesc: "सीधे रिसेप्शन से बात करें",
+  callBody: (phone) => `ज़रूर — कॉल करने के लिए टैप कीजिए: ${phone}
+
+फ़ोन पर बात करके भी मदद कर सकते हैं 😊`,
   locationRowDesc: "हमारी सटीक लोकेशन और रास्ता",
   bookRoom: (name) => `${name} बुक करें`,
   knowMore: "और जानकारी",
@@ -477,6 +495,7 @@ const TE: Strings = {
   roomListBody: "ఇవే మా రూమ్‌లు — వివరాలకు ఏదైనా నొక్కండి:",
   roomListButton: "రూమ్‌లు చూడండి",
   roomListDesc: (price, capacity) => `₹${price}/రాత్రి నుండి · ${capacity} మంది వరకు`,
+  roomPriceForParty: (price, guests) => `${guests} మందికి ₹${price.toLocaleString("en-IN")}/రాత్రి`,
   fullyBooked: "అయ్యో, ఆ తేదీలకు అన్నీ బుక్ అయ్యాయి 😔 వేరే తేదీ కుదురుతుందా?",
   pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
   mediaNoticed: "పంపినందుకు ధన్యవాదాలు! 😊 ఇక్కడ అటాచ్‌మెంట్‌లు తెరవలేను — మీకు ఏం కావాలో మెసేజ్‌లో చెప్పండి?",
@@ -502,6 +521,11 @@ const TE: Strings = {
   rooms10plus: "10 కంటే ఎక్కువ",
   groupHandover: (rooms) => `ధన్యవాదాలు! ${rooms} కోసం మా టీమ్ స్వయంగా రేట్లు నిర్ణయించి రూమ్‌లు బ్లాక్ చేస్తుంది — వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు. ఈలోపు మీ తేదీలు, కంపెనీ పేరు చెబితే వేగంగా ఉంటుంది 😊`,
   locationRow: "మీరు ఎక్కడ ఉన్నారు?",
+  callRow: "మాకు కాల్ చేయండి",
+  callRowDesc: "నేరుగా రిసెప్షన్‌తో మాట్లాడండి",
+  callBody: (phone) => `తప్పకుండా — కాల్ చేయడానికి ట్యాప్ చేయండి: ${phone}
+
+ఫోన్‌లో కూడా సాయం చేస్తాం 😊`,
   locationRowDesc: "మా కచ్చితమైన లొకేషన్ మరియు దారి",
   bookRoom: (name) => `${name} బుక్ చేయండి`,
   knowMore: "మరిన్ని వివరాలు",

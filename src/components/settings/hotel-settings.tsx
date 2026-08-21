@@ -16,6 +16,7 @@ import { HotelProfile } from "@/types";
 const FIELDS: { key: keyof HotelProfile; label: string; textarea?: boolean; placeholder?: string }[] = [
   { key: "name", label: "Hotel name" },
   { key: "address", label: "Address" },
+  { key: "contactPhone", label: "Phone for guests to call", placeholder: "e.g. +91 98765 43210 — shown as a tappable Call us option" },
   { key: "checkInTime", label: "Check-in time (e.g. 14:00)" },
   { key: "checkOutTime", label: "Check-out time (e.g. 11:00)" },
   { key: "businessHours", label: "Business hours", placeholder: "e.g. 24/7 front desk, restaurant 7am–11pm" },

@@ -1,4 +1,5 @@
 import { truncateRowTitle } from "./row-title";
+import { describeTiers, lowestPrice, priceForGuests } from "@/lib/booking/occupancy-price";
 import { GuestLanguage, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { GREET_QUESTION_BUTTON_ID } from "@/lib/ai/interactive-prompts";
 
@@ -31,8 +32,27 @@ export interface RoomListMessage {
  * A List Message rather than reply buttons, per the product's standing rule:
  * no reply-arrow icons anywhere in the flow.
  */
+/**
+ * The rate line under a room's name.
+ *
+ * Three cases, in order of how much we know:
+ *   party size known  -> the exact rate for that many people
+ *   tiers configured  -> the whole table ("1p ₹999 · 2p ₹1,299")
+ *   neither           -> the old "from" line, unchanged
+ */
+function describeRoomPrice(
+  room: { price: number; capacity: number; occupancyPrices?: unknown },
+  s: ReturnType<typeof t>,
+  guests?: number | null
+): string {
+  if (guests && guests > 0) return s.roomPriceForParty(priceForGuests(room, guests), guests);
+  const tiers = describeTiers(room, ROW_DESCRIPTION_MAX);
+  if (tiers) return tiers;
+  return s.roomListDesc(lowestPrice(room), room.capacity);
+}
+
 export function buildRoomListMessage(
-  rooms: { id: string; name: string; price: number; capacity: number }[],
+  rooms: { id: string; name: string; price: number; capacity: number; occupancyPrices?: unknown }[],
   lang?: GuestLanguage | null,
   /**
    * Whether real dates are known for this guest.
@@ -44,14 +64,23 @@ export function buildRoomListMessage(
    *
    * Defaults to true so existing callers that DO have dates are unchanged.
    */
-  datesKnown: boolean = true
+  datesKnown: boolean = true,
+  /**
+   * The party size, when known.
+   *
+   * With it, each row quotes what THIS guest will actually pay. Without it the
+   * row shows the whole tier table, so they can see where they land rather
+   * than being given a "from" price they will never be charged — the reason
+   * this parameter exists at all.
+   */
+  guests?: number | null
 ): RoomListMessage {
   const s = t(resolveLanguage(lang));
   // One slot is reserved for "Know more", so rooms take at most 9 of the 10.
   const rows = rooms.slice(0, MAX_ROWS - 1).map((r) => ({
     id: `room_pick_${r.id}`,
     title: truncateRowTitle(s.bookRoom(r.name)),
-    description: s.roomListDesc(r.price, r.capacity).slice(0, ROW_DESCRIPTION_MAX),
+    description: describeRoomPrice(r, s, guests).slice(0, ROW_DESCRIPTION_MAX),
   }));
 
   // Reuses the existing FAQ-list handler rather than inventing a new id — a

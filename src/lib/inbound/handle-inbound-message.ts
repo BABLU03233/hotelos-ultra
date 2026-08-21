@@ -2,6 +2,7 @@ import { MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
+  CALL_US_BUTTON_ID,
   GROUP_BOOKING_BUTTON_ID,
   GROUP_ROOM_BUTTON_IDS,
   SHOW_LOCATION_BUTTON_ID,
@@ -460,7 +461,12 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // narrowed to what's actually free for those dates.
     const roomsForConfirm = await bookableRooms(tenant.id, contact);
     if (roomsForConfirm.length) {
-      await sendAndPersist(tenant, contact, buildRoomListMessage(roomsForConfirm), "Failed to send room list");
+      await sendAndPersist(
+        tenant,
+        contact,
+        buildRoomListMessage(roomsForConfirm, replyLanguage(contact), true, contact.pendingGuestCount),
+        "Failed to send room list"
+      );
       return;
     }
     // Dates are known here by definition, so an empty list means genuinely
@@ -639,7 +645,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
 
     const [faqs, locProfile] = await Promise.all([
       prisma.faq.findMany({ where: { tenantId: tenant.id }, orderBy: { createdAt: "asc" } }),
-      prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id }, select: { lat: true, lng: true } }),
+      prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id }, select: { lat: true, lng: true, contactPhone: true } }),
     ]);
     // Only offered when there is a pin to send — a row promising directions
     // that then sends nothing is worse than no row at all.
@@ -647,8 +653,13 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       locProfile?.lat != null && locProfile?.lng != null
         ? { row: t(lang).locationRow, description: t(lang).locationRowDesc }
         : null;
-    if (faqs.length || locationRow) {
-      await sendAndPersist(tenant, contact, buildFaqListMessage(faqs, locationRow), "Failed to send FAQ list");
+    // Only offered when there is a number to give. A "Call us" row that then
+    // has no number is worse than no row.
+    const callRow = locProfile?.contactPhone?.trim()
+      ? { row: t(lang).callRow, description: t(lang).callRowDesc }
+      : null;
+    if (faqs.length || locationRow || callRow) {
+      await sendAndPersist(tenant, contact, buildFaqListMessage(faqs, locationRow, callRow), "Failed to send FAQ list");
       return;
     }
     // No FAQs configured — fall through to the AI queue.
@@ -684,6 +695,24 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     }
     // No coordinates set for this hotel — fall through to the AI, which still
     // has the address and the maps link in its prompt.
+  }
+
+  // "Call us" — the number as plain text, which WhatsApp turns into a tappable
+  // link that opens the dialer. A cta_url button cannot do this: those only
+  // accept http(s), so a tel: link there is silently dropped.
+  if (msg.interactiveId === CALL_US_BUTTON_ID) {
+    if (contact.aiPaused) return;
+
+    const profile = await prisma.hotelProfile.findUnique({
+      where: { tenantId: tenant.id },
+      select: { contactPhone: true },
+    });
+    const phone = profile?.contactPhone?.trim();
+    if (phone) {
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).callBody(phone) }, "Failed to send phone number");
+      return;
+    }
+    // No number configured — fall through to the AI, which can still help.
   }
 
   // "Group / corporate" on the party-size question.
@@ -775,7 +804,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       await sendAndPersist(
         tenant,
         contact,
-        buildRoomListMessage(rooms, replyLanguage(contact), datesKnown),
+        buildRoomListMessage(rooms, replyLanguage(contact), datesKnown, contact.pendingGuestCount),
         "Failed to send room list"
       );
       return;
@@ -847,6 +876,24 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // reception instead of using the established button flow at all.
   if (msg.interactiveId === ROOM_BOOK_BUTTON_ID) {
     if (contact.aiPaused) return; // staff has taken over — stay fully silent, same rule the AI queue follows
+
+    // Ask for dates BEFORE offering to confirm.
+    //
+    // Seen in a real chat: a guest reached "Book this room" without ever
+    // giving dates, was asked "Ready to confirm your booking? 🎉", tapped
+    // Confirm — and got "Just need your dates to lock this in." Offering a
+    // confirmation that cannot be honoured, then walking it back, is worse
+    // than asking one turn earlier: the guest has already decided, and the
+    // reversal reads as the assistant not knowing its own state.
+    if (!contact.pendingCheckIn || !contact.pendingCheckOut) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        toShortCircuitInteractive(t(lang).datesBody, dateQuickPickPrompt(lang)),
+        "Failed to send dates prompt before confirm"
+      );
+      return;
+    }
 
     const body = "Great choice! Ready to confirm your booking? 🎉";
     await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, confirmBookingPrompt(lang)), "Failed to send confirm-booking prompt");

@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials, formatRelativeTime } from "@/lib/format";
 import { conversationMode } from "@/lib/crm/handover";
 import { HOT_THRESHOLD } from "@/lib/crm/hot-lead";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Contact } from "@/types";
 import { ContactRowMenu } from "./contact-row-menu";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,7 @@ export function ContactListItem({
   const unreadCount = contact.unreadCount ?? 0;
   const unread = unreadCount > 0;
   const mode = conversationMode(contact);
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName);
   const hot = (contact.hotScore ?? 0) >= HOT_THRESHOLD;
 
   return (
@@ -136,7 +138,7 @@ export function ContactListItem({
             </Chip>
           ) : (
             <Chip className="bg-primary/10 text-primary">
-              <Bot className="size-2.5" /> Anushka
+              <Bot className="size-2.5" /> {agentName?.trim() || "Anushka"}
             </Chip>
           )}
 

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { OccupancyPrices } from "@/components/settings/occupancy-prices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -38,6 +39,9 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
             description: form.description,
             price: Number(form.price),
             capacity: Number(form.capacity),
+            // Empty means "no tiers" — sent as null so clearing them actually
+            // clears them rather than leaving the last saved set in place.
+            occupancyPrices: form.occupancyPrices?.length ? form.occupancyPrices : null,
           }),
         }),
       "Couldn't save that room"
@@ -79,6 +83,24 @@ function RoomCard({ room, onChanged }: { room: Room; onChanged: () => void }) {
             <Input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} onBlur={save} />
           </div>
         </div>
+        <OccupancyPrices
+          value={form.occupancyPrices}
+          onChange={(next) => {
+            // Saved immediately rather than on blur: the editor's own controls
+            // (add / remove a rate) have no blur to hang a save on, and a rate
+            // that looks saved but is not is the worst outcome here.
+            setForm({ ...form, occupancyPrices: next });
+            void saveWithFeedback(
+              () =>
+                apiFetch(`/api/settings/rooms/${room.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ occupancyPrices: next?.length ? next : null }),
+                }),
+              "Couldn't save those rates"
+            ).then((ok) => ok && onChanged());
+          }}
+        />
+
         <Textarea
           value={form.description ?? ""}
           onChange={(e) => setForm({ ...form, description: e.target.value })}

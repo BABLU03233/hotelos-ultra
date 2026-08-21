@@ -239,6 +239,16 @@ const PROBES: Probe[] = [
     turns: [{ say: "hi" }, { say: "Hi" }],
   },
   {
+    id: "book-without-dates",
+    watch: "Reaching 'Book this room' with no dates must ASK for dates, not offer Confirm.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "room_other", label: "Availability & price" } },
+      { tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" } },
+      { tap: { id: "room_book", label: "Book this room" } },
+    ],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],
@@ -296,8 +306,10 @@ async function main() {
         if (!replies.length) console.log("  ANUSHKA: (nothing sent)");
         for (const r of replies) {
           console.log(`  ANUSHKA: ${r.body}`);
-          const opts = [...r.buttons, ...r.rows];
-          if (opts.length) console.log(`           [${opts.map((o) => o.title).join(" | ")}]`);
+          // Descriptions carry the prices, which is most of what there is to
+          // check about a room list.
+          for (const b of r.buttons) console.log(`           [${b.title}]`);
+          for (const row of r.rows) console.log(`           [${row.title}]${row.description ? `  ${row.description}` : ""}`);
         }
         console.log(`           (${ms}ms)`);
       }

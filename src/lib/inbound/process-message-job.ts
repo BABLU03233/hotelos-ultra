@@ -231,7 +231,8 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
       const list = buildRoomListMessage(
         offerable,
         resolveLanguage(contact.language),
-        Boolean(effectiveCheckIn && effectiveCheckOut)
+        Boolean(effectiveCheckIn && effectiveCheckOut),
+        knownGuestCount
       );
       try {
         const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, {

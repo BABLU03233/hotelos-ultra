@@ -27,15 +27,25 @@ export function buildFaqListMessage(
    * Only when the hotel has actually set coordinates — a row that promises
    * directions and then sends nothing is worse than no row.
    */
-  location?: { row: string; description: string } | null
+  location?: { row: string; description: string } | null,
+  /** Adds a "Call us" row. Only when the hotel has actually given a number. */
+  call?: { row: string; description: string } | null
 ): FaqListMessage {
   // One slot reserved for the location row when there is one.
-  const faqLimit = location ? MAX_ROWS - 1 : MAX_ROWS;
+  const faqLimit = MAX_ROWS - (location ? 1 : 0) - (call ? 1 : 0);
   const rows = faqs.slice(0, faqLimit).map((f) => ({
     id: `faq_pick_${f.id}`,
     title: truncateRowTitle(f.question),
     description: f.answer.slice(0, ROW_DESCRIPTION_MAX),
   }));
+  if (call) {
+    rows.unshift({
+      id: "call_us",
+      title: truncateRowTitle(call.row),
+      description: call.description.slice(0, ROW_DESCRIPTION_MAX),
+    });
+  }
+
   if (location) {
     rows.unshift({
       id: "show_location",

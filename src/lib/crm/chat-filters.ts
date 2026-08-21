@@ -128,6 +128,7 @@ export const CHAT_FILTERS: ChatFilter[] = [
   },
   {
     key: "AI",
+    // Replaced with the hotel's own agent name at render — see agentLabel.
     label: "Anushka",
     group: "stage",
     // Counted: this is the other half of the AI-vs-human split, and a hotel
@@ -175,6 +176,19 @@ export const CHAT_FILTERS: ChatFilter[] = [
     match: (c) => c.leadStatus === "BOOKED",
   },
 ];
+
+/**
+ * The label to actually show, with the hotel's own agent name substituted.
+ *
+ * A hotel that renamed its assistant to MAYA still saw a chip reading
+ * "Anushka" — the same bug as the WhatsApp greeting, in a second place. The
+ * default lives in the filter table so this module stays free of React and
+ * of the auth store; the caller supplies the real name.
+ */
+export function chatFilterLabel(filter: ChatFilter, agentName?: string | null): string {
+  if (filter.key !== "AI") return filter.label;
+  return agentName?.trim() || filter.label;
+}
 
 export function chatFilter(key: ChatFilterKey): ChatFilter {
   return CHAT_FILTERS.find((f) => f.key === key) ?? CHAT_FILTERS[0];

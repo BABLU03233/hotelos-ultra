@@ -55,6 +55,15 @@ export const SHOW_LOCATION_BUTTON_ID = "show_location";
 /** The party-size row for a corporate/group enquiry — see GROUP_ROOMS below. */
 export const GROUP_BOOKING_BUTTON_ID = "guests_group";
 
+/**
+ * "Call us" — replies with the hotel's number as plain text.
+ *
+ * WhatsApp linkifies a phone number in message text, so tapping it opens the
+ * dialer with the number already filled. Deliberately NOT a cta_url button:
+ * those only accept http(s), so a tel: link there is silently dropped.
+ */
+export const CALL_US_BUTTON_ID = "call_us";
+
 /** How many rooms a group needs. Answered, then handed to a person. */
 export const GROUP_ROOM_BUTTON_IDS = ["group_rooms_3_5", "group_rooms_6_10", "group_rooms_10plus"] as const;
 

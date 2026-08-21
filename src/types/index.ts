@@ -198,6 +198,8 @@ export interface Room {
   description: string | null;
   price: number;
   capacity: number;
+  /** Per-party-size rates — see lib/booking/occupancy-price.ts. Null when unset. */
+  occupancyPrices: { guests: number; price: number }[] | null;
   amenities: string[];
   imageUrls: string[];
 }
@@ -301,5 +303,6 @@ export interface HotelProfile {
   businessHours: string | null;
   aiSystemPrompt: string | null;
   aiAgentName: string;
+  contactPhone: string | null;
   bookingCodePrefix: string | null;
 }

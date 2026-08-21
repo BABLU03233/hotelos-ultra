@@ -11,10 +11,12 @@ import {
   applyChatFilter,
   chatFilter,
   chatFilterCounts,
+  chatFilterLabel,
   CHAT_FILTERS,
   type ChatFilterKey,
 } from "@/lib/crm/chat-filters";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/use-auth-store";
 import { Contact } from "@/types";
 import { ContactListItem } from "./contact-list-item";
 import { DeskStatus } from "./desk-status";
@@ -63,6 +65,10 @@ export function ContactList({
    */
   initialFilter?: ChatFilterKey;
 }) {
+  // The hotel's own name for its assistant. A chip reading "Anushka" in a
+  // hotel that renamed her to MAYA is the same bug as the WhatsApp greeting,
+  // in a second place.
+  const agentName = useAuthStore((s) => s.tenant?.aiAgentName);
   const [search, setSearch] = React.useState("");
   const [filter, setFilter] = React.useState<ChatFilterKey>(initialFilter ?? "ALL");
 
@@ -98,7 +104,7 @@ export function ContactList({
         )}
       >
         {Icon && <Icon className="size-3.5" />}
-        {f.label}
+        {chatFilterLabel(f, agentName)}
         {f.counted && count > 0 && <span className="tabular-nums">{count}</span>}
       </button>
     );
@@ -115,7 +121,7 @@ export function ContactList({
             did nothing — new conversations start when a guest messages the
             hotel, not from here — and this is the same pixels answering a
             question staff actually have. */}
-        <DeskStatus contacts={all} onFilter={setFilter} className="no-scrollbar min-w-0 overflow-x-auto" />
+        <DeskStatus contacts={all} agentName={agentName} onFilter={setFilter} className="no-scrollbar min-w-0 overflow-x-auto" />
       </div>
 
       <div className="px-3 pb-1.5">

@@ -17,6 +17,8 @@ export const hotelProfileSchema = z.object({
   businessHours: z.string().max(1000).nullable().optional(),
   aiSystemPrompt: z.string().max(4000).nullable().optional(),
   aiAgentName: z.string().trim().min(1).max(50).optional(),
+  /** The number guests should ring — often reception, not the WhatsApp line. */
+  contactPhone: z.string().trim().max(30).nullable().optional(),
   bookingCodePrefix: z.preprocess(
     (val) => (typeof val === "string" && val.trim() === "" ? null : val),
     z.string().trim().toUpperCase().regex(/^[A-Z]{2,6}$/).nullable().optional()
@@ -30,6 +32,18 @@ export const roomSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   price: z.number().int().min(0),
   capacity: z.number().int().min(1),
+  /**
+   * Per-party-size rates, e.g. [{ guests: 1, price: 999 }].
+   *
+   * Capped and bounded because this is operator-editable JSON that the
+   * assistant quotes to guests verbatim — a bad row here becomes a wrong price
+   * in a real conversation.
+   */
+  occupancyPrices: z
+    .array(z.object({ guests: z.number().int().min(1).max(20), price: z.number().int().min(0) }))
+    .max(20)
+    .nullable()
+    .optional(),
   amenities: z.array(z.string()).optional(),
   imageUrls: z.array(z.string()).optional(),
 });

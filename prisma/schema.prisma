@@ -236,6 +236,14 @@ model HotelProfile {
   businessHours         String?
   aiSystemPrompt        String?  @db.Text
   aiAgentName           String   @default("Anushka")
+  /**
+   * The number guests should ring, shown as a tappable "Call us" option.
+   *
+   * Separate from the WhatsApp line: hotels usually want calls going to
+   * reception's landline, and the WhatsApp number is often a virtual one that
+   * cannot take a voice call at all.
+   */
+  contactPhone          String?
   // Optional owner override for the "IVR-4821"-style booking reference code
   // prefix — auto-derived from the hotel name when unset (see
   // src/lib/booking/reference-code.ts).
@@ -258,6 +266,20 @@ model Room {
   type        String
   description String?
   price       Int
+  /**
+   * What the room costs at each party size, e.g.
+   * [{ "guests": 1, "price": 999 }, { "guests": 2, "price": 1299 }].
+   *
+   * Indian hotels price per occupancy, not per room, and until now the only
+   * place that lived was prose inside `description` — so the assistant could
+   * only ever quote "from ₹999", and a guest for two was shown a number that
+   * was not their number. Structured here so the room list can quote the
+   * right one, and so the price guard has something real to check against.
+   *
+   * Optional: `price` remains the headline rate and the fallback when a
+   * hotel has not filled these in.
+   */
+  occupancyPrices Json?
   capacity    Int
   amenities   String[]
   imageUrls   String[]
