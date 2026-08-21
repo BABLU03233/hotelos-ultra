@@ -217,6 +217,15 @@ interface Strings {
    */
   stayConfirmed: (stay: string, checkInTime: string | null, checkOutTime: string | null) => string;
   /**
+   * Said when the guest picks a room, quoting the rate for THEIR party.
+   *
+   * The old line read "Classic Room — from ₹999/night" no matter who was
+   * asking, so a couple picking that room saw the single-occupancy headline
+   * and would arrive expecting it. The room list one message earlier already
+   * quoted their real rate, which made the two disagree on the same screen.
+   */
+  roomPicked: (roomName: string, priceLine: string) => string;
+  /**
    * A corporate or group enquiry — several rooms at once.
    *
    * Kept as its own branch rather than a bigger number in the party-size
@@ -339,6 +348,7 @@ const EN: Strings = {
   roomChoiceBodyNoDates: () => `Here are our rooms 😊 Tell me your dates and I'll get one ready — or pick one to start.`,
   postBookingQuestionAck: `Of course — go ahead and type your question here. Our team has your booking and will reply personally, usually within a few minutes 😊`,
   locationCaption: `Here's our exact location 📍 Tap it for directions.`,
+  roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. Want to go ahead with this one?`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `Perfect — ${stay}.` +
     (checkInTime || checkOutTime
@@ -452,6 +462,7 @@ const HI: Strings = {
   roomChoiceBodyNoDates: () => `ये रहे हमारे कमरे 😊 अपनी तारीख़ें बताइए, मैं तैयार करवा दूँगी — या कोई एक चुन लीजिए.`,
   postBookingQuestionAck: `ज़रूर — अपना सवाल यहीं लिख दीजिए. आपकी बुकिंग हमारी टीम के पास है, वे कुछ ही मिनटों में खुद जवाब देंगे 😊`,
   locationCaption: `ये रही हमारी लोकेशन 📍 रास्ते के लिए टैप कीजिए.`,
+  roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. क्या इसी को आगे बढ़ाएँ?`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `बढ़िया — ${stay}.` +
     (checkInTime || checkOutTime
@@ -565,6 +576,7 @@ const TE: Strings = {
   roomChoiceBodyNoDates: () => `ఇవి మా రూమ్‌లు 😊 మీ తేదీలు చెప్పండి, సిద్ధం చేస్తాను — లేదా ఒకటి ఎంచుకోండి.`,
   postBookingQuestionAck: `తప్పకుండా — మీ ప్రశ్న ఇక్కడే టైప్ చేయండి. మీ బుకింగ్ మా టీమ్ దగ్గర ఉంది, వాళ్ళు కొద్ది నిమిషాల్లో స్వయంగా బదులిస్తారు 😊`,
   locationCaption: `ఇదే మా లొకేషన్ 📍 దారి కోసం ట్యాప్ చేయండి.`,
+  roomPicked: (roomName, priceLine) => `${roomName} — ${priceLine}. దీన్నే కొనసాగించాలా?`,
   stayConfirmed: (stay, checkInTime, checkOutTime) =>
     `సరే — ${stay}.` +
     (checkInTime || checkOutTime

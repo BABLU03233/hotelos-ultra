@@ -104,7 +104,7 @@ export const SCENARIOS: Scenario[] = [
       },
       {
         tap: { id: "ROOM_CHEAPEST", label: "Book Classic Room" },
-        checks: [matches("confirms the chosen room at its real price", /Classic Room[\s\S]*₹\s?999/)],
+        checks: [matches("confirms the chosen room at the price for THIS party, not the 1-person headline", /Classic Room[\s\S]*₹\s?1,?299/)],
       },
       {
         tap: { id: "confirm_booking", label: "Confirm booking" },

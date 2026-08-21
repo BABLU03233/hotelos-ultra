@@ -25,6 +25,7 @@ import { todayMidnightIST } from "@/lib/india-time";
 import { GuestLanguage, LANGUAGE_BUTTON_VALUES, resolveContactLanguageUpdate, resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { findUnavailableRoomIds, isRoomAvailable } from "@/lib/booking/availability";
 import { roomsFittingParty } from "@/lib/booking/room-capacity";
+import { describeTiers, hasExactTier, lowestPrice, priceForGuests } from "@/lib/booking/occupancy-price";
 import { takeOverFields } from "@/lib/crm/handover";
 import { completeBooking } from "@/lib/booking/complete-booking";
 import { matchOfferCode } from "@/lib/booking/offer-match";
@@ -862,7 +863,18 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
         return;
       }
       await prisma.contact.update({ where: { id: contact.id }, data: { pendingRoomId: room.id } });
-      const body = `${room.name} — from ₹${room.price}/night. Want to go ahead with this one?`;
+      // The rate for THIS party, not the single-occupancy headline. The room
+      // list one message earlier already quotes the guest's real price, so
+      // using room.price here made two messages on the same screen disagree —
+      // and the lower of the two is the one they would hold us to.
+      const s = t(lang);
+      const priceLine =
+        contact.pendingGuestCount && contact.pendingGuestCount > 0
+          ? hasExactTier(room, contact.pendingGuestCount)
+            ? s.roomPriceForParty(priceForGuests(room, contact.pendingGuestCount), contact.pendingGuestCount)
+            : s.roomPriceForPartyApprox(priceForGuests(room, contact.pendingGuestCount), contact.pendingGuestCount)
+          : (describeTiers(room) ?? s.roomListDesc(lowestPrice(room), room.capacity));
+      const body = s.roomPicked(room.name, priceLine);
       await sendAndPersist(tenant, contact, toShortCircuitInteractive(body, roomResponsePrompt(lang)), "Failed to send room-pick response");
       return;
     }
