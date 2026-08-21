@@ -8,6 +8,28 @@ const BATCH_SIZE = 50;
 const REPEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * The shortest gap allowed between two follow-ups to the same guest.
+ *
+ * Found in a real conversation: a hotel had several rules all set to "wait 1
+ * hour", so they came due in the same instant and the sweep sent every one of
+ * them. The guest said "hi" and received, back to back in the same minute:
+ *
+ *   "Hi! Just checking in — were you able to look at the room options…"
+ *   "Just checking in — still interested in booking with us?"
+ *
+ * then both again an hour later. Four nudges in two and a half hours, two of
+ * them duplicates, to someone who had said one word. That is how a WhatsApp
+ * number earns blocks — and the number is shared platform infrastructure, so
+ * it is every hotel's problem, not just this one's.
+ *
+ * A floor rather than a redefinition of the hotel's schedule: a sensibly
+ * spaced ladder never touches it. It exists so a misconfigured one cannot
+ * spam, which no hotel would choose on purpose and every hotel can do by
+ * accident.
+ */
+const MIN_GAP_BETWEEN_FOLLOW_UPS_MS = 45 * 60 * 1000;
+
+/**
  * Sends every ScheduledFollowUp that's come due and is still PENDING.
  * Called on a fixed interval by the worker process (src/worker/index.ts) —
  * a plain polling sweep rather than one BullMQ job per follow-up, so
@@ -26,8 +48,31 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
   let skipped = 0;
   let failed = 0;
 
+  // When we last said anything to each guest in this batch. Read once up
+  // front, then kept current as the loop sends — so two rules coming due
+  // together see each other, which is the whole point.
+  const contactIds = [...new Set(due.map((d) => d.contactId))];
+  const lastOutbound = new Map<string, number>();
+  if (contactIds.length) {
+    const recent = await prisma.message.findMany({
+      where: { contactId: { in: contactIds }, direction: "OUT" },
+      orderBy: { createdAt: "desc" },
+      distinct: ["contactId"],
+      select: { contactId: true, createdAt: true },
+    });
+    for (const m of recent) lastOutbound.set(m.contactId, m.createdAt.getTime());
+  }
+
   for (const scheduled of due) {
     const { contact, rule } = scheduled;
+
+    // Too soon after the last thing we sent this guest. Left PENDING rather
+    // than cancelled or skipped: the nudge is still wanted, just not on top of
+    // the previous one — a later sweep picks it up once the gap has passed.
+    const since = lastOutbound.get(contact.id);
+    if (since !== undefined && now.getTime() - since < MIN_GAP_BETWEEN_FOLLOW_UPS_MS) {
+      continue;
+    }
 
     // Required under WhatsApp's Business Messaging Policy — a guest who
     // opted out never gets another follow-up nudge. Cancel outright (not
@@ -104,6 +149,8 @@ export async function sweepDueFollowUps(now = new Date()): Promise<{ sent: numbe
           templateName: rule.templateName!,
         });
       }
+
+      lastOutbound.set(contact.id, now.getTime());
 
       await prisma.$transaction([
         prisma.message.create({

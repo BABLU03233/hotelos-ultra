@@ -234,6 +234,11 @@ const PROBES: Probe[] = [
     ],
   },
   {
+    id: "hi-then-hi-again",
+    watch: "The real chat: 'hi', follow-ups fire, then 'Hi' again. Must greet — not ask how many people.",
+    turns: [{ say: "hi" }, { say: "Hi" }],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

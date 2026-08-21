@@ -194,7 +194,16 @@ async function main() {
             delayMinutes: 60,
             action: "REMINDER",
             messageBody:
-              "Hi! Just checking in — were you able to look at the room options I shared? Happy to answer any questions.",
+              // Deliberately claims nothing about what was already said.
+      //
+      // The old wording — "were you able to look at the room options I
+      // shared?" — is the first message in the ladder, so it fires an hour
+      // after ANY conversation goes quiet, including one where the guest only
+      // said "hi" and no rooms were ever shared. Seen exactly that way in a
+      // real chat. A nudge that describes something that did not happen reads
+      // as a bot talking to itself, and it is the first thing the guest hears
+      // after silence.
+      "Hi! Just checking you got everything you needed 😊 Happy to help with rooms, dates or anything else — just say the word.",
           },
           {
             order: 2,

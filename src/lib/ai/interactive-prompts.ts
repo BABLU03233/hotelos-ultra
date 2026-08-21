@@ -903,14 +903,34 @@ export function looksLikeExistingBookingRequest(text: string): boolean {
 // here?" greeting doesn't contain any of these keywords either, so it still
 // doesn't trigger the funnel prematurely.
 export function hasExpressedBookingIntent(history: { role: string; content: string }[], latestGuestMessage: string): boolean {
-  const allTexts = [...history.map((m) => m.content), latestGuestMessage];
-  return (
-    allTexts.some(
-      (t) => BOOKING_INTENT_PATTERN.test(t) || TELUGU_BOOKING_INTENT_PATTERN.test(t) || DEVANAGARI_BOOKING_INTENT_PATTERN.test(t)
-    ) ||
-    hasStatedGuestCount(history, latestGuestMessage) ||
-    hasStatedDates(history, latestGuestMessage)
-  );
+  const saysSo = (t: string) =>
+    BOOKING_INTENT_PATTERN.test(t) || TELUGU_BOOKING_INTENT_PATTERN.test(t) || DEVANAGARI_BOOKING_INTENT_PATTERN.test(t);
+
+  // The GUEST saying it is intent, full stop.
+  const guestTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), latestGuestMessage];
+  if (guestTexts.some(saysSo)) return true;
+
+  // The assistant's own words may only CORROBORATE, never create.
+  //
+  // Scanning assistant text with the same keyword list was a real fix for a
+  // real bug (a guest deep in a funnel replies "ok"/"yeah" forever and never
+  // re-matches a keyword), but it took the phrasing too literally: the default
+  // follow-up nudge reads "still interested in booking with us?", so the
+  // assistant mentioning booking counted as the guest having asked for it.
+  //
+  // Caught in a live chat. The guest had said exactly one word — "hi" — got
+  // two follow-ups an hour later, said "Hi" again, and was answered "How many
+  // people will be staying?" for a booking nobody had ever mentioned.
+  //
+  // The honest marker is whether the GUEST ever engaged, not what the
+  // assistant said. A guest deep in a funnel replies "Delax", "S", "Yeah" —
+  // contentless, but they are clearly talking to us, so the assistant's side
+  // is fair context for what "yeah" means. A guest who has only ever said
+  // "hi" is not in a booking conversation no matter what we sent them.
+  const guestEngaged = guestTexts.some((t) => t.trim() && !looksLikeBareGreeting(t));
+  if (!guestEngaged) return false;
+
+  return hasStatedGuestCount(history, latestGuestMessage) || hasStatedDates(history, latestGuestMessage) || history.some((m) => m.role === "assistant" && saysSo(m.content));
 }
 
 // Devanagari (Hindi) and Telugu Unicode blocks — a guest typing in either

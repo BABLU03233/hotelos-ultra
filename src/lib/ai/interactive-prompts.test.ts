@@ -931,6 +931,22 @@ describe("hasExpressedBookingIntent", () => {
     expect(hasExpressedBookingIntent(history, "sure")).toBe(true);
   });
 
+  it("does NOT let our own follow-up nudge count as the guest's intent", () => {
+    // A real conversation. The guest said exactly one word, got two follow-ups
+    // an hour later, said "Hi" again — and was answered "How many people will
+    // be staying?" for a booking nobody had ever mentioned.
+    //
+    // The default nudge reads "still interested in booking with us?", so
+    // scanning assistant text with the guest's keyword list made the assistant
+    // mentioning booking count as the guest asking for it.
+    const history = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "Hello! This is MAYA from Hotel Ivory Towers — which language are you comfortable in?" },
+      { role: "assistant", content: "Just checking in — still interested in booking with us?" },
+    ];
+    expect(hasExpressedBookingIntent(history, "Hi")).toBe(false);
+  });
+
   it("finds intent from the assistant's own messages, not just the guest's", () => {
     // Real production conversation: the guest only ever replied with terse
     // acknowledgements ("Hi", "Photo s send", "S", "Yeah") that never match
