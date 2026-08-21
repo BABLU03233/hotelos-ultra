@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { CopyCheck } from "@/components/campaigns/copy-check";
+import { CampaignImageUpload } from "@/components/campaigns/image-upload";
 import { useFetch } from "@/hooks/use-fetch";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
@@ -138,6 +139,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setOpen(false);
       setName("");
       setBody("");
+      setMediaUrl("");
       setMetaTemplateId(null);
       setTemplateVariableValues({});
       setSendPacing("ALL_AT_ONCE");
@@ -166,6 +168,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
     name.trim() &&
     selectedIds.size > 0 &&
     (messageType !== "TEMPLATE" || !!metaTemplateId) &&
+    (messageType !== "IMAGE" || !!mediaUrl) &&
     (sendTiming !== "scheduled" || !!scheduledAt);
 
   return (
@@ -232,12 +235,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
             </div>
           )}
 
-          {messageType === "IMAGE" && (
-            <div className="flex flex-col gap-1.5">
-              <Label>Image URL</Label>
-              <Input value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="https://…" />
-            </div>
-          )}
+          {messageType === "IMAGE" && <CampaignImageUpload value={mediaUrl} onChange={setMediaUrl} />}
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">

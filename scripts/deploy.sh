@@ -22,10 +22,19 @@ docker run --rm --network hotelos-net --env-file /opt/hotelos/app.env hotelos-ul
 docker stop hotelos-web hotelos-worker
 docker rm hotelos-web hotelos-worker
 
+# /opt/hotelos/uploads is mounted, not baked into the image, because
+# containers are replaced wholesale on every deploy. Without the volume an
+# uploaded campaign image would 404 the next time we ship — and a campaign
+# scheduled for next week would go out pointing at nothing.
+mkdir -p /opt/hotelos/uploads
+
 docker run -d --name hotelos-web --restart unless-stopped --network hotelos-net \
+  -v /opt/hotelos/uploads:/app/uploads \
   --env-file /opt/hotelos/app.env -p 127.0.0.1:3000:3000 hotelos-ultra:latest
 
+# The worker sends campaigns, so it needs the same files the web tier wrote.
 docker run -d --name hotelos-worker --restart unless-stopped --network hotelos-net \
+  -v /opt/hotelos/uploads:/app/uploads \
   --env-file /opt/hotelos/app.env hotelos-ultra:latest npm run worker:start
 
 echo "DEPLOY_DONE"
