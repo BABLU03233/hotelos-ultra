@@ -6,7 +6,7 @@ const DELUXE = {
   price: 1299,
   occupancyPrices: [{ guests: 1, price: 1299 }, { guests: 2, price: 1599 }, { guests: 3, price: 1899 }],
 };
-const NO_TIERS = { price: 2500 };
+const NO_TIERS = { price: 2500, occupancyPrices: undefined as unknown };
 
 describe("priceForGuests", () => {
   it("quotes the rate for that exact party size", () => {

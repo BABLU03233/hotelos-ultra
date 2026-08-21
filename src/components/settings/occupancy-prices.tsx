@@ -38,7 +38,7 @@ export function OccupancyPrices({
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs text-muted-foreground">Price per party size</Label>
       <p className="-mt-1 text-[11px] text-muted-foreground">
-        What this room costs for 1 guest, 2 guests and so on. Leave empty to quote the single nightly rate above.
+        What this room costs for 1 person, 2 persons and so on. Leave empty to quote the single nightly rate above.
       </p>
 
       <div className="flex flex-col gap-1.5">
@@ -50,9 +50,9 @@ export function OccupancyPrices({
               value={tier.guests}
               onChange={(e) => update(i, { guests: Number(e.target.value) })}
               className="w-16"
-              aria-label="Guests"
+              aria-label="Persons"
             />
-            <span className="shrink-0 text-xs text-muted-foreground">{tier.guests === 1 ? "guest" : "guests"} · ₹</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{tier.guests === 1 ? "person" : "persons"} · ₹</span>
             <Input
               type="number"
               min={0}

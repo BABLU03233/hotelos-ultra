@@ -36,7 +36,7 @@ export const ROOMS = [
     price: 999,
     capacity: 2,
     occupancyPrices: [{ guests: 1, price: 999 }, { guests: 2, price: 1299 }],
-    description: "Queen comfort with city-view elegance. From ₹999/night for 1 guest, ₹1,299/night for 2 guests.",
+    description: "Queen comfort with city-view elegance. From ₹999/night for 1 person, ₹1,299/night for 2 persons.",
   },
   {
     name: "Deluxe Room",
@@ -44,7 +44,7 @@ export const ROOMS = [
     price: 1299,
     capacity: 3,
     occupancyPrices: [{ guests: 1, price: 1299 }, { guests: 2, price: 1599 }, { guests: 3, price: 1899 }],
-    description: "Signature luxury with city views. From ₹1,299/night for 1 guest, ₹1,599 for 2, ₹1,899 for 3.",
+    description: "Signature luxury with city views. From ₹1,299/night for 1 person, ₹1,599 for 2, ₹1,899 for 3.",
   },
   {
     name: "Premium Room",
@@ -52,7 +52,7 @@ export const ROOMS = [
     price: 1599,
     capacity: 3,
     occupancyPrices: [{ guests: 1, price: 1599 }, { guests: 2, price: 1899 }, { guests: 3, price: 2199 }],
-    description: "Larger, made for longer stays. From ₹1,599/night for 1 guest, ₹1,899 for 2, ₹2,199 for 3.",
+    description: "Larger, made for longer stays. From ₹1,599/night for 1 person, ₹1,899 for 2, ₹2,199 for 3.",
   },
 ];
 

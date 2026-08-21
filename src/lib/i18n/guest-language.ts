@@ -299,8 +299,8 @@ const EN: Strings = {
 
   roomListBody: "Here's everything we've got — tap a room to hear more about it:",
   roomListButton: "See rooms",
-  roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} guest${capacity === 1 ? "" : "s"}`,
-  roomPriceForParty: (price, guests) => `₹${price.toLocaleString("en-IN")}/night for ${guests} guest${guests === 1 ? "" : "s"}`,
+  roomListDesc: (price, capacity) => `From ₹${price}/night · up to ${capacity} person${capacity === 1 ? "" : "s"}`,
+  roomPriceForParty: (price, guests) => `₹${price.toLocaleString("en-IN")}/night for ${guests} person${guests === 1 ? "" : "s"}`,
   roomPriceForPartyApprox: (price, guests) => `From ₹${price.toLocaleString("en-IN")}/night · rate for ${guests} confirmed by our team`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",

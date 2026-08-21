@@ -76,7 +76,7 @@ async function main() {
             name: "Classic Room",
             type: "Classic",
             description:
-              "Queen comfort with city-view elegance. Calming comfort with strong city energy. From ₹999/night for 1 guest, ₹1,299/night for 2 guests.",
+              "Queen comfort with city-view elegance. Calming comfort with strong city energy. From ₹999/night for 1 person, ₹1,299/night for 2 persons.",
             price: 999,
             capacity: 2,
             amenities: [
@@ -100,7 +100,7 @@ async function main() {
             name: "Deluxe Room",
             type: "Deluxe",
             description:
-              "Signature luxury with floor-to-ceiling city views. Large, bright room for travellers who want space and light. From ₹1,299/night for 1 guest, ₹1,599 for 2, ₹1,899 for 3.",
+              "Signature luxury with floor-to-ceiling city views. Large, bright room for travellers who want space and light. From ₹1,299/night for 1 person, ₹1,599 for 2, ₹1,899 for 3.",
             price: 1299,
             capacity: 3,
             amenities: [
@@ -118,7 +118,7 @@ async function main() {
             name: "Premium Room",
             type: "Premium",
             description:
-              "Larger, more luxurious, made for longer stays. Crafted for families and guests who value privacy, style, and lounge space. From ₹1,599/night for 1 guest, ₹1,899 for 2, ₹2,199 for 3.",
+              "Larger, more luxurious, made for longer stays. Crafted for families and guests who value privacy, style, and lounge space. From ₹1,599/night for 1 person, ₹1,899 for 2, ₹2,199 for 3.",
             price: 1599,
             capacity: 3,
             amenities: [

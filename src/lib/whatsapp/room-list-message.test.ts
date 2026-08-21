@@ -16,9 +16,9 @@ describe("buildRoomListMessage", () => {
     // so a row is something the guest does, not a label. A trailing
     // "Know more" row is appended; see room-choice.test.ts.
     expect(msg.sections[0].rows.slice(0, 3)).toEqual([
-      { id: "room_pick_r1", title: "Book Classic Room", description: "From ₹999/night · up to 2 guests" },
-      { id: "room_pick_r2", title: "Book Deluxe Room", description: "From ₹1299/night · up to 3 guests" },
-      { id: "room_pick_r3", title: "Book Premium Room", description: "From ₹1599/night · up to 3 guests" },
+      { id: "room_pick_r1", title: "Book Classic Room", description: "From ₹999/night · up to 2 persons" },
+      { id: "room_pick_r2", title: "Book Deluxe Room", description: "From ₹1299/night · up to 3 persons" },
+      { id: "room_pick_r3", title: "Book Premium Room", description: "From ₹1599/night · up to 3 persons" },
     ]);
   });
 
@@ -33,10 +33,10 @@ describe("buildRoomListMessage", () => {
     expect(msg.sections[0].rows[0].title.length).toBeLessThanOrEqual(24);
   });
 
-  it("uses singular 'guest' for capacity 1", () => {
+  it("uses singular 'person' for capacity 1", () => {
     const msg = buildRoomListMessage([{ id: "r1", name: "Single Room", price: 799, capacity: 1 }]);
-    expect(msg.sections[0].rows[0].description).toContain("1 guest");
-    expect(msg.sections[0].rows[0].description).not.toContain("1 guests");
+    expect(msg.sections[0].rows[0].description).toContain("1 person");
+    expect(msg.sections[0].rows[0].description).not.toContain("1 persons");
   });
 
   it("handles an empty room list without throwing", () => {
