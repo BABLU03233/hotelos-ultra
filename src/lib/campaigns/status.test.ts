@@ -44,3 +44,58 @@ describe("campaignStatus", () => {
     expect(status.detail).toBeTruthy();
   });
 });
+
+describe("campaignStatus — telling the truth about a send", () => {
+  it("does NOT say 'Sent' when every message failed", () => {
+    // This is the bug, exactly as it happened live: a broadcast to two
+    // contacts showed a confident green "Sent" while both recipients had
+    // FAILED. It had reached nobody at all.
+    const status = campaignStatus(campaign({ sentAt: "2026-08-21T10:00:00Z", approval: "APPROVED" }), {
+      sent: 0,
+      failed: 2,
+    });
+    expect(status.label).toBe("Didn't reach anyone");
+    expect(status.tone).toBe("rejected");
+    expect(status.detail).toContain("All 2");
+  });
+
+  it("reports a partial send as a fraction rather than a flat 'Sent'", () => {
+    const status = campaignStatus(campaign({ sentAt: "2026-08-21T10:00:00Z" }), { sent: 8, failed: 2 });
+    expect(status.label).toBe("Sent to 8 of 10");
+    expect(status.tone).toBe("sent");
+    expect(status.detail).toContain("2 could not be delivered");
+  });
+
+  it("says plain 'Sent' when nothing failed", () => {
+    const status = campaignStatus(campaign({ sentAt: "2026-08-21T10:00:00Z" }), { sent: 10, failed: 0 });
+    expect(status.label).toBe("Sent");
+    expect(status.detail).toBeNull();
+  });
+
+  it("still says 'Sent' when the caller has no delivery counts to give", () => {
+    // The list may render before counts are loaded; it must not accuse a
+    // healthy campaign of failing just because it does not know yet.
+    expect(campaignStatus(campaign({ sentAt: "2026-08-21T10:00:00Z" })).label).toBe("Sent");
+  });
+});
+
+describe("campaignStatus — changes requested", () => {
+  it("shows the reviewer's note, because that is the thing to act on", () => {
+    const status = campaignStatus(
+      campaign({ approval: "CHANGES_REQUESTED", reviewNote: "Change 'ON ALL ROOMS' to 'ON ROOMS AT'." })
+    );
+    expect(status.label).toBe("Needs a change");
+    expect(status.detail).toBe("Change 'ON ALL ROOMS' to 'ON ROOMS AT'.");
+  });
+
+  it("still explains itself when the note is missing", () => {
+    const status = campaignStatus(campaign({ approval: "CHANGES_REQUESTED" }));
+    expect(status.detail).toContain("Edit it and submit it again");
+  });
+
+  it("is distinct from rejected — the two call for different next steps", () => {
+    expect(campaignStatus(campaign({ approval: "CHANGES_REQUESTED" })).label).not.toBe(
+      campaignStatus(campaign({ approval: "REJECTED" })).label
+    );
+  });
+});

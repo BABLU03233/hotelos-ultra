@@ -9,15 +9,28 @@ interface RouteParams {
 }
 
 const reviewSchema = z.object({
-  decision: z.enum(["APPROVE", "REJECT"]),
-  // Free text shown to the hotel. Required on rejection — a rejection with no
-  // reason gives the owner nothing to act on and just generates a support
-  // message asking what was wrong.
+  decision: z.enum(["APPROVE", "REQUEST_CHANGES", "REJECT"]),
+  // Free text shown to the hotel. Required on anything but an approval — a
+  // refusal with no reason gives the owner nothing to act on and just
+  // generates a support message asking what was wrong.
   note: z.string().trim().max(1000).optional(),
 });
 
+const APPROVAL_FOR_DECISION = {
+  APPROVE: "APPROVED",
+  REQUEST_CHANGES: "CHANGES_REQUESTED",
+  REJECT: "REJECTED",
+} as const;
+
 /**
  * The operator's decision on one campaign.
+ *
+ * Three outcomes, not two. REQUEST_CHANGES exists because a reviewer who
+ * wants one word changed previously had only Approve or Reject — and what
+ * happened live was an approval with "just change X" typed in the note box,
+ * so the broadcast went out unchanged and the requested edit became an audit
+ * note nobody would act on. Changes-requested hands it back to the hotel,
+ * which can edit and resubmit; rejection means it is not going out at all.
  *
  * Approving unlocks sending; it does NOT send. The owner picked the recipients
  * and owns the timing, and an approval that fired the broadcast immediately
@@ -31,7 +44,7 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const { id } = await ctx.params;
   const { decision, note } = reviewSchema.parse(await req.json());
 
-  if (decision === "REJECT" && !note) {
+  if (decision !== "APPROVE" && !note) {
     throw new ApiError(400, "Give a reason so the hotel knows what to change.");
   }
 
@@ -55,7 +68,7 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const updated = await prisma.campaign.update({
     where: { id },
     data: {
-      approval: decision === "APPROVE" ? "APPROVED" : "REJECTED",
+      approval: APPROVAL_FOR_DECISION[decision],
       reviewedAt: new Date(),
       // Stored as a name, not a relation: who approved a broadcast is an audit
       // record and must outlive the admin account being deleted.

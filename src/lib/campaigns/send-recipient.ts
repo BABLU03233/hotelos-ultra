@@ -26,13 +26,28 @@ export async function sendCampaignToRecipient(campaignRecipientId: string): Prom
   // window; template campaigns work regardless (that's what templates are
   // for) — this is exactly the "respecting... the template rule" guardrail.
   if (campaign.messageType !== "TEMPLATE" && !isWithin24HourWindow(contact.lastInboundAt)) {
-    await prisma.campaignRecipient.update({ where: { id: recipient.id }, data: { status: "FAILED" } });
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: {
+        status: "FAILED",
+        // Named precisely, because this is the failure the owner will actually
+        // hit and the fix is not obvious. Observed live: a broadcast reported
+        // "Sent" with both recipients silently failed here, because neither
+        // had ever messaged the hotel.
+        failureReason: contact.lastInboundAt
+          ? "Outside WhatsApp's 24-hour window — they last messaged you more than 24h ago. Use an approved template to reach them."
+          : "This contact has never messaged you, so WhatsApp only allows an approved template — not a free-text or image broadcast.",
+      },
+    });
     return;
   }
 
   const creds = await getWhatsAppCredentials(campaign.tenantId);
   if (!creds) {
-    await prisma.campaignRecipient.update({ where: { id: recipient.id }, data: { status: "FAILED" } });
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: { status: "FAILED", failureReason: "WhatsApp isn't connected for this hotel — reconnect it in Settings." },
+    });
     return;
   }
 
@@ -72,7 +87,16 @@ export async function sendCampaignToRecipient(campaignRecipientId: string): Prom
     ]);
   } catch (err) {
     console.error(`Campaign send failed for recipient ${recipient.id}:`, err);
-    await prisma.campaignRecipient.update({ where: { id: recipient.id }, data: { status: "FAILED" } });
+    await prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      // Meta's own message, kept verbatim and capped. It names the real
+      // problem ("template not approved", "re-engagement required") far more
+      // precisely than anything that could be guessed from the outside.
+      data: {
+        status: "FAILED",
+        failureReason: (err instanceof Error ? err.message : "The message could not be sent.").slice(0, 500),
+      },
+    });
   }
 }
 

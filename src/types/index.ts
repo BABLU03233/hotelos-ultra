@@ -128,7 +128,7 @@ export interface MetaTemplate {
 
 export type CampaignMessageType = "TEXT" | "IMAGE" | "TEMPLATE";
 export type CampaignSendPacing = "ALL_AT_ONCE" | "SPACED";
-export type CampaignApproval = "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+export type CampaignApproval = "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 
 /** One concern raised by the automated pre-review — see lib/campaigns/auto-review.ts. */
 export interface CampaignReviewConcern {
@@ -153,6 +153,8 @@ export interface Campaign {
   createdAt: string;
   sentAt: string | null;
   approval: CampaignApproval;
+  /** Present on the list endpoint, so a send that reached nobody cannot show "Sent". */
+  delivery?: { sent: number; failed: number };
   submittedAt: string | null;
   reviewedAt: string | null;
   reviewedByName: string | null;
@@ -171,6 +173,8 @@ export interface CampaignReport {
   interested: number;
   booked: number;
   failed: number;
+  /** Who failed and why — capped server-side; empty when nothing failed. */
+  failures: { name: string | null; phone: string; reason: string }[];
 }
 
 export type CampaignRecipientStatus =

@@ -1,8 +1,7 @@
 node_modules
 .next
 .git
-.env
-.env.local
+.env*
 src/generated
 *.tsbuildinfo
 npm-debug.log*

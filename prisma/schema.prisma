@@ -142,6 +142,12 @@ enum CampaignApproval {
   DRAFT
   PENDING_REVIEW
   APPROVED
+  // Sent back to the hotel to fix and resubmit. Distinct from REJECTED:
+  // rejected means "not going out", changes-requested means "this is fine
+  // once you fix the thing I noted". Without it a reviewer wanting one word
+  // changed had only Approve or Reject — and approving with a note in the box
+  // sent the broadcast unchanged, which is exactly what happened live.
+  CHANGES_REQUESTED
   REJECTED
 }
 
@@ -238,7 +244,6 @@ model HotelProfile {
   aiAgentName           String   @default("Anushka")
   /**
    * The number guests should ring, shown as a tappable "Call us" option.
-   *
    * Separate from the WhatsApp line: hotels usually want calls going to
    * reception's landline, and the WhatsApp number is often a virtual one that
    * cannot take a voice call at all.
@@ -260,15 +265,14 @@ model HotelProfile {
 }
 
 model Room {
-  id          String   @id @default(cuid())
-  tenantId    String
-  name        String
-  type        String
-  description String?
-  price       Int
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  type            String
+  description     String?
+  price           Int
   /**
    * How many of THIS room type the hotel actually has.
-   *
    * Null means "do not treat inventory as a constraint", and that is the
    * default on purpose. Availability used to assume exactly one physical room
    * per type, so a single booking of "Classic Room" for a date range removed
@@ -277,29 +281,26 @@ model Room {
    * it would: the cost of a wrong "sold out" is the whole booking, while the
    * cost of a wrong "available" is a conversation at the desk, which is where
    * these bookings are confirmed anyway.
-   *
    * A hotel that genuinely wants the guard can set a real number.
    */
-  unitCount   Int?
+  unitCount       Int?
   /**
    * What the room costs at each party size, e.g.
    * [{ "guests": 1, "price": 999 }, { "guests": 2, "price": 1299 }].
-   *
    * Indian hotels price per occupancy, not per room, and until now the only
    * place that lived was prose inside `description` — so the assistant could
    * only ever quote "from ₹999", and a guest for two was shown a number that
    * was not their number. Structured here so the room list can quote the
    * right one, and so the price guard has something real to check against.
-   *
    * Optional: `price` remains the headline rate and the fallback when a
    * hotel has not filled these in.
    */
   occupancyPrices Json?
-  capacity    Int
-  amenities   String[]
-  imageUrls   String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  capacity        Int
+  amenities       String[]
+  imageUrls       String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings Booking[]
@@ -379,20 +380,20 @@ model Offer {
 // ─── CRM ────────────────────────────────────────────────────────────────
 
 model Contact {
-  id              String        @id @default(cuid())
-  tenantId        String
-  name            String?
-  phone           String
-  whatsappNumber  String
-  createdAt       DateTime      @default(now())
-  lastMessage     String?
-  lastInboundAt   DateTime?
-  leadStatus      LeadStatus    @default(NEW)
-  bookingStatus   BookingStatus @default(NONE)
-  aiSummary       String?       @db.Text
+  id                String        @id @default(cuid())
+  tenantId          String
+  name              String?
+  phone             String
+  whatsappNumber    String
+  createdAt         DateTime      @default(now())
+  lastMessage       String?
+  lastInboundAt     DateTime?
+  leadStatus        LeadStatus    @default(NEW)
+  bookingStatus     BookingStatus @default(NONE)
+  aiSummary         String?       @db.Text
   // Set true the moment staff sends a manual reply — pauses the AI for this
   // contact until a staff member flips it back off (see M3 in the spec).
-  aiPaused        Boolean       @default(false)
+  aiPaused          Boolean       @default(false)
   // When the pause started, so a stale one can expire.
   //
   // Sending a manual reply sets aiPaused, which is right while a human is
@@ -404,7 +405,7 @@ model Contact {
   // A pause older than AI_PAUSE_EXPIRY_HOURS is treated as stale and lifted
   // on the guest's next message. Staff who genuinely want the bot off can
   // pause again from the CRM, and that tap re-stamps this.
-  aiPausedAt      DateTime?
+  aiPausedAt        DateTime?
   // A manually scheduled reminder (calendar date/time picker in the CRM) —
   // separate from the automated FollowUpRule ladder. When followUpDate
   // comes due, the worker's reminder sweep creates a REMINDER-type
@@ -418,61 +419,61 @@ model Contact {
   // talking over them. While this is set the pause never goes stale — it ends
   // only when someone taps "Return to Anushka".
   /**
+   * /**
    * How many rooms a corporate/group enquiry asked for, e.g. "3-5 rooms".
-   *
    * Its own column rather than being read back out of handoverReason: that
    * field is a sentence written for a human to read, and it carries the room
    * count in the GUEST's language — a Telugu enquiry stores "3-5 రూమ్‌లు". A
    * filter matching on prose is a filter that breaks the first time the copy
    * is reworded or a fourth language is added.
    */
-  groupRooms      String?
-  handoverAt      DateTime?
+  groupRooms        String?
+  handoverAt        DateTime?
   // Who took it, and why. A plain string, not a relation: this is the record a
   // receptionist reads on the next shift, and it has to survive the staff
   // account being deleted.
-  handoverByName  String?
-  handoverReason  String?
+  handoverByName    String?
+  handoverReason    String?
   // What the receptionist wants Anushka to know when she picks the
   // conversation back up — "quoted 2400 for the deluxe, guest is checking with
   // family". Fed into her prompt (see ABOUT THIS GUEST in pipeline.ts), NOT
   // just filed in the CRM: a handover note nobody reads is how the guest ends
   // up being asked the same question twice.
-  aiBriefing      String?       @db.Text
-  followUpDate    DateTime?
-  followUpNote    String?
-  notes           String?       @db.Text
+  aiBriefing        String?       @db.Text
+  followUpDate      DateTime?
+  followUpNote      String?
+  notes             String?       @db.Text
   // CRM tags (free-form labels, e.g. "VIP", "Corporate") and read-state /
   // ownership for the team inbox view.
-  tags            String[]      @default([])
-  lastReadAt      DateTime?
+  tags              String[]      @default([])
+  lastReadAt        DateTime?
   // Pinned to the top of the chat list, exactly like WhatsApp. A timestamp
   // rather than a boolean so several pinned chats keep a stable, meaningful
   // order (most recently pinned first) instead of shuffling on every refetch.
-  pinnedAt        DateTime?
-  assignedToId    String?
+  pinnedAt          DateTime?
+  assignedToId      String?
   // Where this contact came from — set once at creation, never overwritten
   // by later messages. sourceDetail is the ad headline (META_AD) or an
   // import note (COLD_IMPORT); ctwaClid is Meta's click id, kept for future
   // ad-platform reporting but not acted on yet.
-  leadSource      LeadSource    @default(DIRECT)
-  sourceDetail    String?
-  ctwaClid        String?
+  leadSource        LeadSource    @default(DIRECT)
+  sourceDetail      String?
+  ctwaClid          String?
   // Set when the guest clicks a "Stop promos" quick-reply button or texts
   // STOP/UNSUBSCRIBE — a required opt-out mechanism under WhatsApp's
   // Business Messaging Policy. Suppresses campaign broadcasts and follow-up
   // nudges, but not the core AI concierge — a guest who opts out of
   // promotions should still get help if they message in on their own.
-  optedOutAt      DateTime?
+  optedOutAt        DateTime?
   // The room/dates Anushka and the guest have converged on but not yet
   // confirmed — a denormalized "current negotiation state," same pattern as
   // aiSummary/bookingStatus above. Read at the "Confirm booking" tap to run
   // a real-time availability check and populate the Booking row; cleared on
   // a date conflict so the next answer is treated fresh. Not a booking
   // itself — see the Booking model for that.
-  pendingRoomId   String?
-  pendingCheckIn  DateTime?
-  pendingCheckOut DateTime?
+  pendingRoomId     String?
+  pendingCheckIn    DateTime?
+  pendingCheckOut   DateTime?
   // Party size, captured the turn the guest first states it (see
   // src/lib/booking/guest-count.ts). Stored rather than re-derived from the
   // transcript on every turn because the AI pipeline only ever loads the
@@ -489,8 +490,8 @@ model Contact {
   // also has to outlive the transcript entirely, because every button title
   // is rendered in this language — the choice governs the whole UI, not just
   // one reply.
-  language        String?
-  updatedAt       DateTime      @updatedAt
+  language          String?
+  updatedAt         DateTime      @updatedAt
 
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignedTo         User?               @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -730,12 +731,20 @@ model Campaign {
 }
 
 model CampaignRecipient {
-  id         String                  @id @default(cuid())
-  campaignId String
-  contactId  String
-  status     CampaignRecipientStatus @default(PENDING)
-  sentAt     DateTime?
-  updatedAt  DateTime                @updatedAt
+  id            String                  @id @default(cuid())
+  campaignId    String
+  contactId     String
+  status        CampaignRecipientStatus @default(PENDING)
+  sentAt        DateTime?
+  updatedAt     DateTime                @updatedAt
+  // Why this one failed, in words the owner can act on.
+  //
+  // Without it a FAILED row was a dead end: a live broadcast showed "Sent"
+  // while both recipients had silently failed the 24h-window rule, and
+  // nothing anywhere said so. The distinction matters because the fixes are
+  // completely different — "use an approved template" vs "connect WhatsApp"
+  // vs "Meta rejected this".
+  failureReason String?
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)

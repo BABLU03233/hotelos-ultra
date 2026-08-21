@@ -17,7 +17,7 @@ export const GET = apiRoute(async (req: NextRequest) => {
   requireAdminSession(req);
 
   const status = req.nextUrl.searchParams.get("status") ?? "PENDING_REVIEW";
-  const valid = ["PENDING_REVIEW", "APPROVED", "REJECTED", "DRAFT"] as const;
+  const valid = ["PENDING_REVIEW", "APPROVED", "CHANGES_REQUESTED", "REJECTED", "DRAFT"] as const;
   const approval = (valid as readonly string[]).includes(status)
     ? (status as (typeof valid)[number])
     : "PENDING_REVIEW";

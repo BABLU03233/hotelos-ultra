@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { ApiError, apiRoute, notFound } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
 import { prisma } from "@/lib/prisma";
@@ -8,10 +9,29 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * Rescheduling only — unchanged, and still the common case.
+ */
 const patchSchema = z.object({
   // null cancels the schedule (campaign goes back to manual "Send now"); a
   // future ISO datetime reschedules it.
-  scheduledAt: z.string().datetime().nullable(),
+  scheduledAt: z.string().datetime().nullable().optional(),
+
+  // Editing the content itself. Every one of these is optional so a plain
+  // reschedule still sends only scheduledAt and behaves exactly as before.
+  //
+  // This exists because the product already told owners to do it and could
+  // not: a refused send says "Edit it and submit it again", and until now
+  // PATCH accepted nothing but scheduledAt. There was no edit path at all.
+  name: z.string().trim().min(1).max(120).optional(),
+  body: z.string().trim().max(4000).nullable().optional(),
+  mediaUrl: z.string().url().nullable().optional(),
+  messageType: z.enum(["TEXT", "IMAGE", "TEMPLATE"]).optional(),
+  metaTemplateId: z.string().nullable().optional(),
+  templateVariableValues: z.record(z.string(), z.string()).nullable().optional(),
+
+  // Resubmitting for review after making the requested change.
+  resubmit: z.boolean().optional(),
 });
 
 export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
@@ -25,7 +45,7 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   // direct query (campaignRecipient has no tenantId of its own) is safe.
   const recipients = await prisma.campaignRecipient.findMany({
     where: { campaignId: id },
-    include: { contact: { select: { leadStatus: true } } },
+    include: { contact: { select: { leadStatus: true, name: true, phone: true } } },
   });
 
   const report = {
@@ -38,6 +58,18 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     interested: recipients.filter((r) => r.contact.leadStatus === "INTERESTED").length,
     booked: recipients.filter((r) => r.contact.leadStatus === "BOOKED").length,
     failed: recipients.filter((r) => r.status === "FAILED").length,
+    // Who failed and why, so a campaign that reached nobody can say so
+    // instead of showing a green "Sent". Capped: the point is to explain the
+    // problem, and the reasons repeat — thirty rows of the same sentence is
+    // not more informative than five.
+    failures: recipients
+      .filter((r) => r.status === "FAILED")
+      .slice(0, 20)
+      .map((r) => ({
+        name: r.contact.name,
+        phone: r.contact.phone,
+        reason: r.failureReason ?? "The message could not be sent.",
+      })),
   };
 
   return NextResponse.json({ campaign, report });
@@ -55,9 +87,55 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     throw new ApiError(400, "scheduledAt must be in the future");
   }
 
+  const editsContent =
+    body.name !== undefined ||
+    body.body !== undefined ||
+    body.mediaUrl !== undefined ||
+    body.messageType !== undefined ||
+    body.metaTemplateId !== undefined ||
+    body.templateVariableValues !== undefined;
+
+  // An APPROVED campaign was reviewed as a specific piece of copy. Letting it
+  // be edited afterwards would mean the text that goes to guests is not the
+  // text anyone approved — the whole point of the review. Rescheduling stays
+  // allowed, because the timing is the owner's alone.
+  if (editsContent && existing.approval === "APPROVED") {
+    throw new ApiError(
+      409,
+      "This campaign is already approved. Editing it now would send copy nobody reviewed — duplicate it instead and submit the new one."
+    );
+  }
+
   const campaign = await db.campaign.update({
     where: { id },
-    data: { scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null },
+    data: {
+      ...(body.scheduledAt !== undefined ? { scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null } : {}),
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.body !== undefined ? { body: body.body } : {}),
+      ...(body.mediaUrl !== undefined ? { mediaUrl: body.mediaUrl } : {}),
+      ...(body.messageType !== undefined ? { messageType: body.messageType } : {}),
+      ...(body.metaTemplateId !== undefined
+        ? { metaTemplate: body.metaTemplateId ? { connect: { id: body.metaTemplateId } } : { disconnect: true } }
+        : {}),
+      ...(body.templateVariableValues !== undefined
+        ? {
+            templateVariableValues:
+              body.templateVariableValues === null ? Prisma.DbNull : (body.templateVariableValues as Prisma.InputJsonValue),
+          }
+        : {}),
+      // Back into the queue, and the previous verdict is cleared with it —
+      // leaving "Rejected by Rakesh" attached to copy he never saw would
+      // misreport what was actually decided.
+      ...(body.resubmit
+        ? {
+            approval: "PENDING_REVIEW" as const,
+            submittedAt: new Date(),
+            reviewedAt: null,
+            reviewedByName: null,
+            reviewNote: null,
+          }
+        : {}),
+    },
   });
   return NextResponse.json({ campaign });
 });

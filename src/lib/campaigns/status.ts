@@ -37,9 +37,42 @@ export function campaignStatusClass(tone: CampaignStatusTone): string {
 }
 
 export function campaignStatus(
-  c: Pick<Campaign, "sentAt" | "scheduledAt" | "approval" | "reviewNote">
+  c: Pick<Campaign, "sentAt" | "scheduledAt" | "approval" | "reviewNote">,
+  /**
+   * Delivery counts, where the caller has them.
+   *
+   * Optional so the list can still call this with just the campaign, but
+   * passing them is what stops the worst version of this screen: a live
+   * broadcast displayed a confident green "Sent" while BOTH recipients had
+   * failed. It had reached nobody. "Sent" has to mean sent.
+   */
+  delivery?: { sent: number; failed: number }
 ): CampaignStatus {
-  if (c.sentAt) return { label: "Sent", tone: "sent", detail: null };
+  if (c.sentAt) {
+    if (delivery && delivery.sent === 0 && delivery.failed > 0) {
+      return {
+        label: "Didn't reach anyone",
+        tone: "rejected",
+        detail: `All ${delivery.failed} ${delivery.failed === 1 ? "message" : "messages"} failed. Open the campaign to see why.`,
+      };
+    }
+    if (delivery && delivery.failed > 0) {
+      return {
+        label: `Sent to ${delivery.sent} of ${delivery.sent + delivery.failed}`,
+        tone: "sent",
+        detail: `${delivery.failed} could not be delivered. Open the campaign to see why.`,
+      };
+    }
+    return { label: "Sent", tone: "sent", detail: null };
+  }
+
+  if (c.approval === "CHANGES_REQUESTED") {
+    return {
+      label: "Needs a change",
+      tone: "rejected",
+      detail: c.reviewNote ?? "We asked for a change before this goes out. Edit it and submit it again.",
+    };
+  }
 
   if (c.approval === "REJECTED") {
     return {

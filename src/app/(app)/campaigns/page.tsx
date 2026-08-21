@@ -64,7 +64,7 @@ export default function CampaignsPage() {
                         </p>
                       </div>
                       {(() => {
-                        const status = campaignStatus(c);
+                        const status = campaignStatus(c, c.delivery);
                         return (
                           <span className={cn("text-xs font-medium", campaignStatusClass(status.tone))}>
                             {status.label}

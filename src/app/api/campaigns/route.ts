@@ -9,9 +9,24 @@ export const GET = apiRoute(async (req: NextRequest) => {
   const { db } = requireTenantDb(req);
   const campaigns = await db.campaign.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { recipients: true } } },
+    include: {
+      _count: { select: { recipients: true } },
+      // Enough to tell the truth in the list. Without these the list can only
+      // say "Sent", which it did for a broadcast where every single message
+      // had failed — the owner's first and often only view of the campaign.
+      recipients: { select: { status: true } },
+    },
   });
-  return NextResponse.json({ campaigns });
+
+  const withDelivery = campaigns.map(({ recipients, ...c }) => ({
+    ...c,
+    delivery: {
+      sent: recipients.filter((r) => ["SENT", "DELIVERED", "READ", "REPLIED"].includes(r.status)).length,
+      failed: recipients.filter((r) => r.status === "FAILED").length,
+    },
+  }));
+
+  return NextResponse.json({ campaigns: withDelivery });
 });
 
 export const POST = apiRoute(async (req: NextRequest) => {

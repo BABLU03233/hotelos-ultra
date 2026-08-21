@@ -26,7 +26,9 @@ export const POST = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
         409,
         err.approval === "REJECTED"
           ? "This campaign was not approved. Edit it and submit it again."
-          : "This campaign is still waiting for approval. You'll be able to send it once it's reviewed."
+          : err.approval === "CHANGES_REQUESTED"
+            ? "This campaign needs a change before it can go out. Make the change and submit it again."
+            : "This campaign is still waiting for approval. You'll be able to send it once it's reviewed."
       );
     }
     throw err;

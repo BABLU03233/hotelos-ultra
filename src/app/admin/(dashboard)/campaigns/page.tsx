@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Info, Send, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, PenLine, Send, ShieldAlert, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +28,7 @@ interface AdminCampaign {
   messageType: string;
   previewText: string | null;
   mediaUrl: string | null;
-  approval: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  approval: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
   submittedAt: string | null;
   reviewedAt: string | null;
   reviewedByName: string | null;
@@ -44,6 +44,7 @@ interface AdminCampaign {
 const TABS = [
   { key: "PENDING_REVIEW", label: "Waiting for review" },
   { key: "APPROVED", label: "Approved" },
+  { key: "CHANGES_REQUESTED", label: "Sent back" },
   { key: "REJECTED", label: "Rejected" },
 ] as const;
 
@@ -67,9 +68,9 @@ export default function AdminCampaignReviewPage() {
 
   const campaigns = data?.campaigns ?? [];
 
-  async function decide(campaign: AdminCampaign, decision: "APPROVE" | "REJECT") {
+  async function decide(campaign: AdminCampaign, decision: "APPROVE" | "REQUEST_CHANGES" | "REJECT") {
     const note = notes[campaign.id]?.trim();
-    if (decision === "REJECT" && !note) {
+    if (decision !== "APPROVE" && !note) {
       toast.error("Add a note saying what needs to change — the hotel sees it.");
       return;
     }
@@ -89,7 +90,9 @@ export default function AdminCampaignReviewPage() {
       toast.success(
         decision === "APPROVE"
           ? `Approved — ${campaign.tenant.name} can now send to ${campaign.recipientCount} contacts.`
-          : `Rejected — ${campaign.tenant.name} will see your note.`
+          : decision === "REQUEST_CHANGES"
+            ? `Sent back to ${campaign.tenant.name} to fix and resubmit.`
+            : `Rejected — ${campaign.tenant.name} will see your note.`
       );
       setNotes((n) => ({ ...n, [campaign.id]: "" }));
       reload();
@@ -190,13 +193,28 @@ export default function AdminCampaignReviewPage() {
                       <Textarea
                         value={notes[c.id] ?? ""}
                         onChange={(e) => setNotes((n) => ({ ...n, [c.id]: e.target.value }))}
-                        placeholder="Note to the hotel — required when rejecting, optional when approving"
+                        placeholder="Note to the hotel — required unless you're approving"
                         rows={2}
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button size="sm" disabled={busyId === c.id} onClick={() => decide(c, "APPROVE")}>
                           <CheckCircle2 className="size-4" />
                           Approve
+                        </Button>
+                        {/* The missing middle option. Without it, a reviewer
+                            who wanted one word changed had only Approve or
+                            Reject — and what happened live was an approval
+                            with "just change X" typed in the note, so the
+                            broadcast went out unchanged and the requested
+                            edit became a note nobody would ever act on. */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === c.id}
+                          onClick={() => decide(c, "REQUEST_CHANGES")}
+                        >
+                          <PenLine className="size-4" />
+                          Send back for changes
                         </Button>
                         <Button
                           size="sm"
@@ -209,7 +227,8 @@ export default function AdminCampaignReviewPage() {
                         </Button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Approving unlocks sending — it doesn&apos;t send. The hotel keeps control of the timing.
+                        Approving unlocks sending — it doesn&apos;t send, and it sends the copy exactly as written above. If you want
+                        anything changed, send it back instead.
                       </p>
                     </div>
                   ) : (
@@ -217,10 +236,16 @@ export default function AdminCampaignReviewPage() {
                       <p className="flex items-center gap-1.5">
                         {c.approval === "APPROVED" ? (
                           <CheckCircle2 className="size-3.5 text-emerald-600" />
+                        ) : c.approval === "CHANGES_REQUESTED" ? (
+                          <PenLine className="size-3.5 text-amber-600" />
                         ) : (
                           <XCircle className="size-3.5 text-red-600" />
                         )}
-                        {c.approval === "APPROVED" ? "Approved" : "Rejected"}
+                        {c.approval === "APPROVED"
+                          ? "Approved"
+                          : c.approval === "CHANGES_REQUESTED"
+                            ? "Sent back for changes"
+                            : "Rejected"}
                         {c.reviewedByName ? ` by ${c.reviewedByName}` : ""}
                         {c.reviewedAt ? ` on ${formatDate(c.reviewedAt)}` : ""}
                         {c.sentAt && (
