@@ -221,6 +221,15 @@ interface Strings {
   rooms6to10: string;
   rooms10plus: string;
   groupHandover: (rooms: string) => string;
+  /**
+   * A stated party size bigger than any single room here holds.
+   *
+   * Distinct from groupHandover: that one is chosen by the guest tapping
+   * "Group / corporate". This fires when someone types a number no listed
+   * room can fit — offering rooms none of which genuinely hold them would
+   * waste their time and ours, so it goes straight to a person instead.
+   */
+  partyTooLargeHandover: (guests: number, maxCapacity: number) => string;
   /** Row label offering directions. */
   locationRow: string;
   /** Row offering a phone call, and the message carrying the number. */
@@ -249,7 +258,7 @@ const EN: Strings = {
   guestCountBody: "How many people will be staying? 😊",
   guestJustMe: "Just me",
   guest2: "2 people",
-  guest3Plus: "3+ people",
+  guest3Plus: "3 people",
 
   datesBody: "When are you looking to stay?",
   datesButton: "Choose dates",
@@ -326,6 +335,7 @@ const EN: Strings = {
   rooms6to10: "6–10 rooms",
   rooms10plus: "More than 10",
   groupHandover: (rooms) => `Thanks! For ${rooms}, our team handles the rates and blocks the rooms personally — they'll message you here shortly. If you can share your dates and company name meanwhile, that speeds things up 😊`,
+  partyTooLargeHandover: (guests, maxCapacity) => `For ${guests} of you our rooms (up to ${maxCapacity} each) won't all fit in one — let me get our team to work out the best combination for you, they'll message you here shortly 😊`,
   locationRow: "Where are you?",
   callRow: "Call us",
   callRowDesc: "Speak to reception directly",
@@ -355,7 +365,7 @@ const HI: Strings = {
   guestCountBody: "कितने लोग रुकेंगे? 😊",
   guestJustMe: "सिर्फ़ मैं",
   guest2: "2 लोग",
-  guest3Plus: "3+ लोग",
+  guest3Plus: "3 लोग",
 
   datesBody: "आप कब ठहरना चाहते हैं?",
   datesButton: "तारीख़ चुनें",
@@ -432,6 +442,7 @@ const HI: Strings = {
   rooms6to10: "6–10 कमरे",
   rooms10plus: "10 से ज़्यादा",
   groupHandover: (rooms) => `धन्यवाद! ${rooms} के लिए हमारी टीम खुद रेट तय करके कमरे ब्लॉक करती है — वे जल्द ही यहीं मैसेज करेंगे. इस बीच अपनी तारीख़ें और कंपनी का नाम बता दें तो और तेज़ी होगी 😊`,
+  partyTooLargeHandover: (guests, maxCapacity) => `आप ${guests} लोगों के लिए हमारे कमरे (हर एक में ${maxCapacity} तक) अकेले पूरे नहीं पड़ेंगे — हमारी टीम आपके लिए सही व्यवस्था कर देगी, वे जल्द ही यहीं मैसेज करेंगे 😊`,
   locationRow: "हम कहाँ हैं?",
   callRow: "हमें कॉल करें",
   callRowDesc: "सीधे रिसेप्शन से बात करें",
@@ -461,7 +472,7 @@ const TE: Strings = {
   guestCountBody: "ఎంత మంది ఉంటారు? 😊",
   guestJustMe: "నేను ఒక్కడినే",
   guest2: "2 మంది",
-  guest3Plus: "3+ మంది",
+  guest3Plus: "3 మంది",
 
   datesBody: "మీరు ఎప్పుడు ఉండాలనుకుంటున్నారు?",
   datesButton: "తేదీలు ఎంచుకోండి",
@@ -538,6 +549,7 @@ const TE: Strings = {
   rooms6to10: "6–10 రూమ్‌లు",
   rooms10plus: "10 కంటే ఎక్కువ",
   groupHandover: (rooms) => `ధన్యవాదాలు! ${rooms} కోసం మా టీమ్ స్వయంగా రేట్లు నిర్ణయించి రూమ్‌లు బ్లాక్ చేస్తుంది — వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు. ఈలోపు మీ తేదీలు, కంపెనీ పేరు చెబితే వేగంగా ఉంటుంది 😊`,
+  partyTooLargeHandover: (guests, maxCapacity) => `మీరు ${guests} మంది కోసం మా రూమ్‌లు (ఒక్కోటి ${maxCapacity} వరకు) సరిపోకపోవచ్చు — మా టీమ్ మీకు సరైన ఏర్పాటు చేస్తుంది, వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు 😊`,
   locationRow: "మీరు ఎక్కడ ఉన్నారు?",
   callRow: "మాకు కాల్ చేయండి",
   callRowDesc: "నేరుగా రిసెప్షన్‌తో మాట్లాడండి",

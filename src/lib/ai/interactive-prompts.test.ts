@@ -49,7 +49,7 @@ describe("extractInteractivePrompt", () => {
     expect(asRows(result.interactive)).toEqual([
       { id: "guests_1", title: "Just me" },
       { id: "guests_2", title: "2 people" },
-      { id: "guests_3plus", title: "3+ people" },
+      { id: "guests_3plus", title: "3 people" },
       { id: "guests_group", title: "Group / corporate" },
     ]);
   });

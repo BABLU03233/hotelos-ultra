@@ -4,6 +4,7 @@ import { ChatMessage } from "@/lib/ai/provider";
 import { findUnavailableRoomIds } from "@/lib/booking/availability";
 import { roomsFittingParty } from "@/lib/booking/room-capacity";
 import { captureGuestCount } from "@/lib/booking/guest-count";
+import { takeOverFields } from "@/lib/crm/handover";
 import { resolveLanguage, t } from "@/lib/i18n/guest-language";
 import { isPauseStale } from "./ai-pause";
 import { shouldRestartSession } from "./session-restart";
@@ -141,6 +142,64 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
     ? null
     : captureGuestCount(latestInbound.content, history, contact.pendingGuestCount);
   const knownGuestCount = restarting ? null : (capturedGuestCount ?? contact.pendingGuestCount ?? null);
+
+  // A party bigger than any single room here holds.
+  //
+  // The sibling of the "Group / corporate" tap, for a guest who just TYPES a
+  // number instead of tapping the button — "we are 6" gets no button to press.
+  //
+  // Gated on capturedGuestCount specifically — the value extracted from THIS
+  // turn's message — not knownGuestCount, which also includes whatever was
+  // already stored. Reacting to the stored value would re-fire this (and
+  // re-notify staff) on every later turn for as long as the oversized count
+  // sits on the contact; reacting only to a fresh statement makes it fire
+  // exactly once, same as the group-booking handover does via aiPaused.
+  //
+  // No room is ever hidden for this (see room-capacity.ts) — the guest can
+  // still be shown every room if they ask. But offering a room list when NONE
+  // of them fit would waste their time and read as not having listened, so
+  // this hands off before that list is ever built.
+  if (capturedGuestCount && !restarting) {
+    const maxCapacity = await prisma.room.aggregate({ where: { tenantId }, _max: { capacity: true } });
+    const cap = maxCapacity._max.capacity;
+    if (cap && capturedGuestCount > cap) {
+      const creds = await getWhatsAppCredentials(tenantId);
+      if (creds) {
+        const text = t(resolveLanguage(contact.language)).partyTooLargeHandover(capturedGuestCount, cap);
+        try {
+          const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text });
+          await prisma.message.create({
+            data: { tenantId, contactId, direction: "OUT", type: "TEXT", content: text, whatsappMessageId, status: "SENT" },
+          });
+        } catch (err) {
+          console.error(`Oversized-party handover failed for tenant ${tenantId}, contact ${contactId}:`, err);
+        }
+      }
+
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
+          pendingGuestCount: capturedGuestCount,
+          ...takeOverFields(`Party of ${capturedGuestCount} — no single room fits`),
+          aiBriefing: `Guest says ${capturedGuestCount} people. Biggest room here holds ${cap}. Needs multiple rooms arranged.`,
+        },
+      });
+
+      await prisma.staffNotification
+        .create({
+          data: {
+            tenantId,
+            contactId,
+            type: "ESCALATION",
+            reason: `${contact.name || contact.phone} — party of ${capturedGuestCount}, needs multiple rooms.`,
+          },
+        })
+        .catch((err) => console.error("Failed to flag oversized party:", err));
+
+      return;
+    }
+  }
 
   // Tier-1.5 date capture, between the tapped rows (fully deterministic) and
   // the AI's DATES: marker (best-effort): a guest who TYPES "this weekend"

@@ -310,7 +310,7 @@ export const SCENARIOS: Scenario[] = [
         checks: [
           {
             label: "buttons are not the English catalog",
-            test: (s) => (titlesOf(s) ? !/Just me|3\+ people/.test(titlesOf(s)) : true),
+            test: (s) => (titlesOf(s) ? !/Just me|3 people/.test(titlesOf(s)) : true),
           },
         ],
       },
@@ -339,5 +339,29 @@ export const SCENARIOS: Scenario[] = [
     title: "An attachment with no caption still gets a reply",
     because: "This was once the only path in the whole flow that could leave a guest with total silence.",
     turns: [{ say: "", checks: [sentSomething] }],
+  },
+
+  /* ===== GROUP SIZE ===== */
+  {
+    id: "oversized-party-hands-to-reception",
+    area: "Funnel",
+    title: "A typed party size bigger than any room hands off to reception, not a room list",
+    because:
+      "The fixture's biggest room sleeps 3. Offering a room list to a party of 6 when none of them fit would waste their time and read as not having listened -- and no button exists for this, since the guest just typed a number.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      {
+        say: "we are 6 people, need a room",
+        checks: [
+          sentSomething,
+          notMatches("no room is offered", /Book (Classic|Deluxe|Premium)/i),
+          matches("hands off to a person", /team/i),
+          {
+            label: "sends plain text, not an interactive room list",
+            test: (s) => idsOf(s).length === 0,
+          },
+        ],
+      },
+    ],
   },
 ];

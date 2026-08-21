@@ -249,6 +249,11 @@ const PROBES: Probe[] = [
     ],
   },
   {
+    id: "typed-four-people",
+    watch: "Typed 4 people, one more than any room here holds. Must hand off, not offer a room list.",
+    turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "4 people please" }],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

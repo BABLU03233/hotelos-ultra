@@ -349,7 +349,7 @@ describe("conversation soak", () => {
 
   it("captures a party size from every GUEST_COUNT row title, tapped in any order", () => {
     for (const [id, expected] of Object.entries(GUEST_COUNT_BUTTON_VALUES)) {
-      const titles: Record<string, string> = { guests_1: "Just me", guests_2: "2 people", guests_3plus: "3+ people" };
+      const titles: Record<string, string> = { guests_1: "Just me", guests_2: "2 people", guests_3plus: "3 people" };
       const captured = captureGuestCount(titles[id], [{ role: "assistant", content: GUEST_COUNT_ASK }], null);
       expect(captured, `row ${id} ("${titles[id]}") must capture ${expected}`).toBe(expected);
     }
