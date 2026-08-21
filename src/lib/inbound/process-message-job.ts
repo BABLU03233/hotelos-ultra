@@ -148,24 +148,28 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
   // The sibling of the "Group / corporate" tap, for a guest who just TYPES a
   // number instead of tapping the button — "we are 6" gets no button to press.
   //
-  // Gated on capturedGuestCount specifically — the value extracted from THIS
-  // turn's message — not knownGuestCount, which also includes whatever was
-  // already stored. Reacting to the stored value would re-fire this (and
-  // re-notify staff) on every later turn for as long as the oversized count
-  // sits on the contact; reacting only to a fresh statement makes it fire
-  // exactly once, same as the group-booking handover does via aiPaused.
+  // Uses knownGuestCount, NOT the count captured from this turn's text.
   //
-  // No room is ever hidden for this (see room-capacity.ts) — the guest can
-  // still be shown every room if they ask. But offering a room list when NONE
-  // of them fit would waste their time and read as not having listened, so
-  // this hands off before that list is ever built.
-  if (capturedGuestCount && !restarting) {
+  // The first version gated on capturedGuestCount, reasoning that reacting to
+  // the stored value would re-fire on every later turn. It could never fire at
+  // all: handleInboundMessage persists a TAPPED party size before this job
+  // runs, so by now the stored value already equals the tapped one and
+  // captureGuestCount correctly returns undefined for "nothing new here".
+  // Caught only by instrumenting a live-reported flow.
+  //
+  // Firing once is guaranteed by the handover instead: the branch below sets
+  // aiPaused via takeOverFields, and the aiPaused check at the top of this
+  // function returns early on every subsequent turn.
+  //
+  // Offering a room list where NOTHING fits would waste the guest's time and
+  // read as not having listened, so this hands off before that list is built.
+  if (knownGuestCount && !restarting) {
     const maxCapacity = await prisma.room.aggregate({ where: { tenantId }, _max: { capacity: true } });
     const cap = maxCapacity._max.capacity;
-    if (cap && capturedGuestCount > cap) {
+    if (cap && knownGuestCount > cap) {
       const creds = await getWhatsAppCredentials(tenantId);
       if (creds) {
-        const text = t(resolveLanguage(contact.language)).partyTooLargeHandover(capturedGuestCount, cap);
+        const text = t(resolveLanguage(contact.language)).partyTooLargeHandover(knownGuestCount, cap);
         try {
           const whatsappMessageId = await sendWhatsAppMessage(creds, contact.whatsappNumber, { type: "text", text });
           await prisma.message.create({
@@ -180,9 +184,9 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
         where: { id: contactId },
         data: {
           leadStatus: contact.leadStatus === "NEW" ? "INTERESTED" : contact.leadStatus,
-          pendingGuestCount: capturedGuestCount,
-          ...takeOverFields(`Party of ${capturedGuestCount} — no single room fits`),
-          aiBriefing: `Guest says ${capturedGuestCount} people. Biggest room here holds ${cap}. Needs multiple rooms arranged.`,
+          pendingGuestCount: knownGuestCount,
+          ...takeOverFields(`Party of ${knownGuestCount} — no single room fits`),
+          aiBriefing: `Guest says ${knownGuestCount} people. Biggest room here holds ${cap}. Needs multiple rooms arranged.`,
         },
       });
 
@@ -192,7 +196,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
             tenantId,
             contactId,
             type: "ESCALATION",
-            reason: `${contact.name || contact.phone} — party of ${capturedGuestCount}, needs multiple rooms.`,
+            reason: `${contact.name || contact.phone} — party of ${knownGuestCount}, needs multiple rooms.`,
           },
         })
         .catch((err) => console.error("Failed to flag oversized party:", err));

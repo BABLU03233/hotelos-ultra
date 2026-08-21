@@ -254,6 +254,28 @@ const PROBES: Probe[] = [
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "4 people please" }],
   },
   {
+    id: "next-week-flow",
+    watch: "Exact reported flow: book -> 3 people -> Next week. Must show the room LIST, not one AI-picked room.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_3plus", label: "3 people" } },
+      { tap: { id: "dates_nextweek", label: "Next week" } },
+    ],
+  },
+  {
+    id: "next-week-full-path",
+    watch: "Next week -> pick a day -> pick nights -> room list. Both check-in and check-out must come from the guest.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      { tap: { id: "dates_nextweek", label: "Next week" } },
+      { tap: { id: "checkin_2026-08-26", label: "Wed, 26 Aug" } },
+      { tap: { id: "nights_2", label: "2 nights" } },
+    ],
+  },
+  {
     id: "stop-opt-out",
     watch: "STOP must opt them out and say so.",
     turns: [{ tap: { id: "lang_en", label: "English" } }, { say: "STOP" }],

@@ -341,6 +341,32 @@ export const SCENARIOS: Scenario[] = [
     turns: [{ say: "", checks: [sentSomething] }],
   },
 
+  /* ===== VAGUE DATES ===== */
+  {
+    id: "next-week-asks-instead-of-guessing",
+    area: "Dates",
+    title: "Next week asks which day rather than picking one",
+    because:
+      "Reported live: tapping Next week silently set the stay to 24-25 Aug, a night nobody chose. Seven days cannot collapse to one without asking.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      { tap: { id: "greet_book", label: "I want to book a room" } },
+      { tap: { id: "guests_2", label: "2 people" } },
+      {
+        tap: { id: "dates_nextweek", label: "Next week" },
+        checks: [
+          sentSomething,
+          matches("asks which day to check in", /check in/i),
+          {
+            label: "offers real dates to choose from, not a decided range",
+            test: (s) => idsOf(s).filter((id) => id.startsWith("checkin_")).length >= 5,
+          },
+          notMatches("does not announce a room yet", /Book (Classic|Deluxe|Premium)/i),
+        ],
+      },
+    ],
+  },
+
   /* ===== GROUP SIZE ===== */
   {
     id: "oversized-party-hands-to-reception",

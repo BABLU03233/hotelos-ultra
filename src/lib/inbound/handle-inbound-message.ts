@@ -909,11 +909,27 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // human-readable resolved label before falling through to the normal AI
   // queue below — so Anushka's reply is grounded in the real date, not the
   // vague phrase.
+  // "Next week" opens the date picker instead of resolving to a guess.
+  //
+  // Reported live: a guest tapped "Next week" and was told their stay was
+  // 24-25 Aug — a specific night nobody had chosen. "Next week" spans seven
+  // days, so silently collapsing it to one is a booking the guest never made,
+  // and they only find out at the confirmation step (or at the hotel).
+  //
+  // The picker then asks arrival day and number of nights, so both check-in
+  // AND check-out come from the guest rather than from an assumption. Today
+  // and Tomorrow still resolve directly — those name exactly one day, so
+  // there is nothing to ask.
+  if (msg.interactiveId === "dates_nextweek") {
+    if (contact.aiPaused) return;
+    await sendAndPersist(tenant, contact, buildCheckInPickerMessage(new Date(), lang), "Failed to send date picker");
+    return;
+  }
+
   if (
     msg.interactiveId === "dates_today" ||
     msg.interactiveId === "dates_tomorrow" ||
-    msg.interactiveId === "dates_weekend" ||
-    msg.interactiveId === "dates_nextweek"
+    msg.interactiveId === "dates_weekend"
   ) {
     const { checkIn, checkOut, label } = resolveQuickPickDates(msg.interactiveId);
     await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: checkIn, pendingCheckOut: checkOut } });
