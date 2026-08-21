@@ -53,12 +53,20 @@ export const POST = apiRoute(async (req: NextRequest) => {
   }
 
   const components = buildCreateComponents(input, headerHandle);
-  const { id: metaTemplateId, status } = await createMetaTemplate(creds, {
-    name: input.name,
-    category: input.category,
-    language: input.language,
-    components,
-  });
+  let metaTemplateId: string;
+  let status: string;
+  try {
+    const created = await createMetaTemplate(creds, {
+      name: input.name,
+      category: input.category,
+      language: input.language,
+      components,
+    });
+    metaTemplateId = created.id;
+    status = created.status;
+  } catch (err) {
+    throw new ApiError(400, err instanceof Error ? err.message : "Meta rejected this template.");
+  }
 
   const template = await db.metaTemplate.create({
     data: {

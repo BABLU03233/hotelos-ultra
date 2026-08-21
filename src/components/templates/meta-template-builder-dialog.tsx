@@ -75,6 +75,10 @@ const BUTTON_LABELS: Record<string, string> = {
   PHONE_NUMBER: "Calls you",
 };
 
+// A TEXT header Meta will reject: an emoji, an asterisk, or a line break.
+// Built with RegExp (not a literal) so the emoji class is unambiguous.
+const HEADER_FORBIDDEN = /[\n\r*]|\p{Extended_Pictographic}/u;
+
 export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -222,11 +226,17 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
     }
   }
 
+  // Meta rejects a TEXT header outright if it carries an emoji, a newline or
+  // an asterisk — only the body may. Flag it here so the owner fixes it before
+  // submitting, rather than after a round-trip to Meta.
+  const headerHasForbiddenChars = headerType === "text" && HEADER_FORBIDDEN.test(headerText);
+
   const canSubmit =
     /^[a-z0-9_]+$/.test(name) &&
     bodyText.trim().length > 0 &&
     countPlaceholders(bodyText) === bodyVariableSlots.length &&
-    (headerType !== "image" || !!headerImage);
+    (headerType !== "image" || !!headerImage) &&
+    !headerHasForbiddenChars;
 
   return (
     <Dialog
@@ -334,7 +344,14 @@ export function MetaTemplateBuilderDialog({ onCreated }: { onCreated: () => void
                 </SelectContent>
               </Select>
               {headerType === "text" && (
-                <Input value={headerText} onChange={(e) => setHeaderText(e.target.value)} placeholder="A little something for you 🎁" maxLength={60} />
+                <>
+                  <Input value={headerText} onChange={(e) => setHeaderText(e.target.value)} placeholder="A little something for you" maxLength={60} />
+                  {headerHasForbiddenChars && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                      A title can&apos;t contain emojis, line breaks or *asterisks* — Meta won&apos;t approve it. Put those in the message instead.
+                    </p>
+                  )}
+                </>
               )}
               {headerType === "image" && (
                 <Input type="file" accept="image/*" onChange={(e) => setHeaderImage(e.target.files?.[0] ?? null)} />
