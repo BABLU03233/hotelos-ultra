@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Plus, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,6 +31,7 @@ import { CampaignImageUpload } from "@/components/campaigns/image-upload";
 import { useFetch } from "@/hooks/use-fetch";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
+import { matchesSearch } from "@/lib/contacts/search";
 import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
 import { CampaignMessageType, CampaignSendPacing, Contact, LeadSource, LeadStatus } from "@/types";
@@ -88,14 +89,26 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [segment, setSegment] = React.useState<LeadStatus | "ALL">("ALL");
   const [source, setSource] = React.useState<LeadSource | "ALL">("ALL");
+  const [search, setSearch] = React.useState("");
 
   const { data } = useFetch<{ contacts: Contact[] }>(open ? "/api/contacts" : null);
   const visibleContacts =
     data?.contacts.filter(
-      (c) => (segment === "ALL" || c.leadStatus === segment) && (source === "ALL" || c.leadSource === source)
+      (c) =>
+        (segment === "ALL" || c.leadStatus === segment) &&
+        (source === "ALL" || c.leadSource === source) &&
+        matchesSearch(c, search)
     ) ?? [];
 
   const selectableContacts = visibleContacts.filter((c) => !c.optedOutAt);
+
+  // Selections survive filtering — you can search, tick someone, search again
+  // and keep them. That makes it possible to have people selected who are not
+  // on screen, which on a broadcast that cannot be recalled is worth saying out
+  // loud rather than leaving to be discovered after sending.
+  const hiddenSelectedCount = data
+    ? [...selectedIds].filter((id) => !visibleContacts.some((c) => c.id === id)).length
+    : 0;
 
   function selectSegment() {
     setSelectedIds((prev) => {
@@ -148,6 +161,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       setSendTiming("now");
       setScheduledAt("");
       setSelectedIds(new Set());
+      setSearch("");
       // Creating no longer means sending, so the dialog has to say what
       // actually happened — otherwise the owner closes it believing the
       // broadcast is on its way and only finds out days later that it never
@@ -240,11 +254,27 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label>Recipients ({selectedIds.size} selected)</Label>
-              <button type="button" onClick={selectSegment} className="text-xs font-medium text-primary hover:underline">
-                Select all {segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase()} (
-                {selectableContacts.length})
+              <button
+                type="button"
+                onClick={selectSegment}
+                disabled={selectableContacts.length === 0}
+                className="text-xs font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+              >
+                {search.trim()
+                  ? `Select all ${selectableContacts.length} matching`
+                  : `Select all ${segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase() + " "}(${selectableContacts.length})`}
               </button>
             </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or number…"
+                className="h-9 pl-8"
+              />
+            </div>
+
             <div className="flex flex-wrap gap-1.5">
               {SEGMENT_FILTERS.map((f) => (
                 <button
@@ -290,15 +320,27 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                       onCheckedChange={() => toggle(c.id)}
                       disabled={!!c.optedOutAt}
                     />
-                    {c.name || c.phone}
+                    <span className="min-w-0 flex-1 truncate">
+                      {c.name || c.phone}
+                      {c.name && <span className="ml-1.5 text-xs text-muted-foreground">{c.phone}</span>}
+                    </span>
                     {c.optedOutAt && <span className="text-[10px] font-medium text-amber-600">Opted out</span>}
                   </label>
                 ))}
                 {data && visibleContacts.length === 0 && (
-                  <p className="p-2 text-xs text-muted-foreground">No contacts in this segment.</p>
+                  <p className="p-2 text-xs text-muted-foreground">
+                    {search.trim() ? `No contact matches "${search.trim()}".` : "No contacts in this segment."}
+                  </p>
                 )}
               </div>
             </ScrollArea>
+
+            {hiddenSelectedCount > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {hiddenSelectedCount} more selected {hiddenSelectedCount === 1 ? "contact is" : "contacts are"} hidden by the
+                current search or filter — {selectedIds.size} will be sent to in total.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

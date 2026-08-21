@@ -37,4 +37,18 @@ docker run -d --name hotelos-worker --restart unless-stopped --network hotelos-n
   -v /opt/hotelos/uploads:/app/uploads \
   --env-file /opt/hotelos/app.env hotelos-ultra:latest npm run worker:start
 
+# Bound the build cache. It is not optional housekeeping: each deploy adds
+# ~5.5GB and nothing here reclaimed it, so the box reached 24GB of cache and
+# 73% full — on the same 1-vCPU machine where an out-of-space or out-of-memory
+# build has already taken the site down once.
+#
+# A size cap rather than "prune everything": docker evicts least-recently-used
+# entries and keeps the rest, so the next build still starts warm. Nuking the
+# cache outright would make every deploy a cold build, which on this box means
+# a longer window in the state that caused the outage.
+#
+# Runs AFTER the containers are up, so it never delays the build or the
+# restart, and a failure here must not fail a deploy that already succeeded.
+docker builder prune -f --max-used-space=8GB || echo "cache prune failed (non-fatal)"
+
 echo "DEPLOY_DONE"
