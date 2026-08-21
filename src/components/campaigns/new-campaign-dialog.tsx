@@ -30,6 +30,7 @@ import { CampaignImageUpload } from "@/components/campaigns/image-upload";
 import { useFetch } from "@/hooks/use-fetch";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
+import { reachabilityWarning, unreachableForFreeForm } from "@/lib/campaigns/reachability";
 import { matchesSearch } from "@/lib/contacts/search";
 import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
@@ -152,6 +153,13 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
     if (sendTiming === "scheduled" && !scheduledAt) return "Pick the date and time it should go out.";
     return null;
   }
+
+  // Whether WhatsApp will actually deliver this, worked out at the moment the
+  // recipients are picked rather than discovered in a delivery report
+  // afterwards. See reachability.ts for why this exists.
+  const selectedContacts = (data?.contacts ?? []).filter((c) => selectedIds.has(c.id));
+  const unreachable = unreachableForFreeForm(selectedContacts, messageType);
+  const deliveryWarning = reachabilityWarning(unreachable.length, selectedContacts.length);
 
   const currentIssue = issueForStep(step);
   const blockingStep = STEPS.find((s) => issueForStep(s.n) !== null);
@@ -447,6 +455,25 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                 </div>
               </ScrollArea>
 
+              {deliveryWarning && (
+                <div className="flex flex-col items-start gap-1.5 rounded-md bg-amber-500/10 p-2.5 text-[11px] text-amber-600 dark:text-amber-400">
+                  <p className="flex items-start gap-1.5">
+                    <AlertCircle className="mt-px size-3.5 shrink-0" />
+                    {deliveryWarning}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessageType("TEMPLATE");
+                      setStep(1);
+                    }}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Switch to an approved template
+                  </button>
+                </div>
+              )}
+
               {hiddenSelectedCount > 0 && (
                 <p className="text-[11px] text-muted-foreground">
                   {hiddenSelectedCount} more selected {hiddenSelectedCount === 1 ? "contact is" : "contacts are"} hidden by the
@@ -595,6 +622,13 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                 {currentIssue}
               </p>
             )
+          )}
+
+          {step === 3 && deliveryWarning && (
+            <p className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-500/10 p-2 text-[11px] text-amber-600 dark:text-amber-400">
+              <AlertCircle className="mt-px size-3.5 shrink-0" />
+              {deliveryWarning}
+            </p>
           )}
 
           <div className="flex items-center justify-between gap-2">

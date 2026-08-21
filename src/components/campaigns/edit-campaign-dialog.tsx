@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PenLine } from "lucide-react";
+import { AlertCircle, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,9 @@ import { TemplatePicker } from "@/components/templates/template-picker";
 import { CopyCheck } from "@/components/campaigns/copy-check";
 import { CampaignImageUpload } from "@/components/campaigns/image-upload";
 import { apiFetch } from "@/lib/api-client";
-import { Campaign, CampaignMessageType } from "@/types";
+import { reachabilityWarning, unreachableForFreeForm } from "@/lib/campaigns/reachability";
+import { useFetch } from "@/hooks/use-fetch";
+import { Campaign, CampaignMessageType, CampaignRecipient } from "@/types";
 
 const MESSAGE_TYPE_LABELS: Record<CampaignMessageType, string> = {
   TEXT: "Text",
@@ -60,6 +62,21 @@ export function EditCampaignDialog({ campaign, onSaved }: { campaign: Campaign; 
     campaign.templateVariableValues ?? {}
   );
   const [saving, setSaving] = React.useState(false);
+
+  // The recipients are fixed on an existing campaign, so whether this can be
+  // delivered depends entirely on the message type chosen here — which makes
+  // this the exact screen where the warning belongs. A campaign that already
+  // failed the 24-hour rule is reopened here to fix it, and switching to a
+  // template is the fix.
+  const { data: recipientData } = useFetch<{ recipients: CampaignRecipient[] }>(
+    open ? `/api/campaigns/${campaign.id}/recipients` : null
+  );
+  const contacts = (recipientData?.recipients ?? []).map((r) => ({
+    id: r.contact.id,
+    phone: r.contact.phone,
+    lastInboundAt: r.contact.lastInboundAt,
+  }));
+  const deliveryWarning = reachabilityWarning(unreachableForFreeForm(contacts, messageType).length, contacts.length);
 
   /**
    * Reset the fields to whatever the campaign currently says whenever the
@@ -193,6 +210,13 @@ export function EditCampaignDialog({ campaign, onSaved }: { campaign: Campaign; 
             )}
 
             {messageType === "IMAGE" && <CampaignImageUpload value={mediaUrl} onChange={setMediaUrl} />}
+
+            {deliveryWarning && (
+              <p className="flex items-start gap-1.5 rounded-md bg-amber-500/10 p-2.5 text-[11px] text-amber-600 dark:text-amber-400">
+                <AlertCircle className="mt-px size-3.5 shrink-0" />
+                {deliveryWarning}
+              </p>
+            )}
 
             <p className="text-[11px] text-muted-foreground">
               Recipients and timing aren&apos;t changed here — they stay as you set them.

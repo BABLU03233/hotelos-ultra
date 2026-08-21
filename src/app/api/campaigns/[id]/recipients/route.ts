@@ -24,7 +24,7 @@ export const GET = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
   const recipients = await prisma.campaignRecipient.findMany({
     where: { campaignId: id, ...(status ? { status } : {}) },
     orderBy: { updatedAt: "desc" },
-    include: { contact: { select: { id: true, name: true, phone: true, leadStatus: true } } },
+    include: { contact: { select: { id: true, name: true, phone: true, leadStatus: true, lastInboundAt: true } } },
   });
 
   return NextResponse.json({ recipients });

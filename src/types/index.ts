@@ -192,7 +192,7 @@ export interface CampaignRecipient {
   id: string;
   status: CampaignRecipientStatus;
   sentAt: string | null;
-  contact: { id: string; name: string | null; phone: string; leadStatus: LeadStatus };
+  contact: { id: string; name: string | null; phone: string; leadStatus: LeadStatus; lastInboundAt: string | null };
 }
 
 export interface Room {
