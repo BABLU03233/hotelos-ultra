@@ -90,8 +90,32 @@ async function runSweeps() {
   await runReminderSweep();
 }
 
-runSweeps();
-const sweepInterval = setInterval(runSweeps, SWEEP_INTERVAL_MS);
+// Never let two sweeps overlap.
+//
+// setInterval fires every 60s regardless of whether the previous run has
+// finished. The follow-up sweep sends up to BATCH_SIZE (50) messages in-loop,
+// each a WhatsApp round-trip plus a DB write, so a full batch of template
+// sends can run past 60s — and then a second sweep would start while the first
+// is still going. Both begin by selecting the same PENDING rows before either
+// marks them SENT, so a guest gets the same follow-up twice. Sending a
+// broadcast or a nudge to someone's phone is not reversible, so this guard
+// closes the window at the source rather than hoping the batch stays quick.
+let sweepRunning = false;
+async function runSweepsGuarded() {
+  if (sweepRunning) {
+    console.warn("[sweep] previous run still in progress after 60s — skipping this tick to avoid overlapping sends.");
+    return;
+  }
+  sweepRunning = true;
+  try {
+    await runSweeps();
+  } finally {
+    sweepRunning = false;
+  }
+}
+
+runSweepsGuarded();
+const sweepInterval = setInterval(runSweepsGuarded, SWEEP_INTERVAL_MS);
 
 console.log("HotelOS Ultra worker started — message-processing, campaign-send, follow-up + campaign-schedule + reminder sweep (every 60s).");
 
