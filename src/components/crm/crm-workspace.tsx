@@ -9,7 +9,6 @@ import { ContactDetail } from "./contact-detail";
 import { ContactList } from "./contact-list";
 import { CrmPipelineView } from "./crm-pipeline-view";
 import { ExportContactsMenu } from "./export-contacts-menu";
-import { ImportContactsDialog } from "./import-contacts-dialog";
 
 type View = "list" | "pipeline";
 
@@ -74,7 +73,6 @@ export function CrmWorkspace({
         </div>
         <div className="flex items-center gap-1.5">
           <ExportContactsMenu />
-          <ImportContactsDialog onImported={onChanged} />
         </div>
       </div>
 

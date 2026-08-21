@@ -5,7 +5,9 @@ export const NAV_ITEMS = [
   { href: "/crm", label: "CRM", icon: MessagesSquare },
   { href: "/calendar", label: "Calendar", icon: CalendarRange },
   { href: "/follow-ups", label: "Follow-ups", icon: Clock },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  // Route stays /campaigns: renaming it would break every existing bookmark
+  // and the links in already-sent notifications, for no gain the owner can see.
+  { href: "/campaigns", label: "Bulk Sender", icon: Megaphone },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/knowledge", label: "Knowledge Base", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },

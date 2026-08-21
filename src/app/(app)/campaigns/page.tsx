@@ -5,6 +5,7 @@ import { Megaphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ImportContactsDialog } from "@/components/campaigns/import-contacts-dialog";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 import { Reveal } from "@/components/motion/reveal";
 import { SkeletonSwap } from "@/components/motion/skeleton-swap";
@@ -23,12 +24,19 @@ export default function CampaignsPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <Reveal>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">Campaigns</h1>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">Bulk Sender</h1>
             <p className="mt-1 text-sm text-muted-foreground">Broadcast offers to selected guests — {agentName} takes over if they reply.</p>
           </div>
-          <NewCampaignDialog onCreated={reload} />
+          {/* Import sits here rather than in the CRM because importing a list is
+              the first step of a bulk send, not something you do while working a
+              conversation — and this dialog can send to the imported list
+              straight away, which is this screen's job, not the CRM's. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <ImportContactsDialog onImported={reload} />
+            <NewCampaignDialog onCreated={reload} />
+          </div>
         </div>
       </Reveal>
 
@@ -73,7 +81,7 @@ export default function CampaignsPage() {
         {!loading && data?.campaigns.length === 0 && (
           <EmptyState
             icon={Megaphone}
-            title="No campaigns yet"
+            title="No bulk sends yet"
             description={`Broadcast an offer or update to a segment of your guests — ${agentName} handles any replies.`}
             className="py-16"
           />

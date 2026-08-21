@@ -167,7 +167,7 @@ export default async function DashboardPage() {
                 <EmptyState
                   icon={Megaphone}
                   title="No campaigns sent yet"
-                  description="Broadcast one from the Campaigns tab to see performance here."
+                  description="Broadcast one from the Bulk Sender tab to see performance here."
                 />
               ) : (
                 <CampaignPerformanceChart campaigns={metrics.campaignPerformance} />
