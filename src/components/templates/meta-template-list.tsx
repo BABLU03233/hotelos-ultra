@@ -103,7 +103,21 @@ export function MetaTemplateList() {
                     </Badge>
                   </div>
                   {body?.text && <p className="line-clamp-2 text-xs text-muted-foreground">{body.text}</p>}
-                  {t.rejectionReason && <p className="text-[11px] text-destructive">Rejected: {t.rejectionReason}</p>}
+                  {/* Meta returns rejected_reason = "NONE" for a template that
+                      is NOT rejected (pending or approved), so a bare truthy
+                      check showed "Rejected: NONE" in alarming red on a
+                      perfectly healthy pending template. Only a genuine
+                      rejection shows a rejection line now; a pending one gets a
+                      reassuring note instead. */}
+                  {t.status.toUpperCase().includes("REJECT") ? (
+                    <p className="text-[11px] text-destructive">
+                      {t.rejectionReason && t.rejectionReason.toUpperCase() !== "NONE"
+                        ? `Rejected: ${t.rejectionReason}`
+                        : "Rejected by Meta — edit the copy and resubmit."}
+                    </p>
+                  ) : t.status.toUpperCase().includes("PEND") ? (
+                    <p className="text-[11px] text-muted-foreground">Under review by Meta — usually approved within a few hours.</p>
+                  ) : null}
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => refresh(t.id)} disabled={refreshingId === t.id || !t.metaTemplateId}>
                       <RotateCw className={refreshingId === t.id ? "animate-spin" : ""} /> Refresh status
