@@ -4,7 +4,6 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
-  CalendarRange,
   Clock,
   LayoutDashboard,
   LayoutTemplate,
@@ -64,13 +63,6 @@ function steps(agentName: string): TourStep[] {
       icon: MessagesSquare,
       title: "CRM — your guest conversations",
       body: `Every WhatsApp chat in one place. ${agentName} handles most on its own; the ones needing you are marked "Human mode". Tap in and reply any time.`,
-    },
-    {
-      navKey: "calendar",
-      href: "/calendar",
-      icon: CalendarRange,
-      title: "Calendar",
-      body: "Your bookings laid out by date, so you can see at a glance which nights are filling up and which are still open.",
     },
     {
       navKey: "follow-ups",

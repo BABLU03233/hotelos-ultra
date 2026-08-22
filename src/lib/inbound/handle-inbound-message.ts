@@ -256,35 +256,26 @@ async function attemptBookingCompletion(
     return;
   }
 
-  const available = await isRoomAvailable(prisma, tenant.id, roomId, checkIn, checkOut);
-  if (available) {
-    const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
-    const booking = await completeBooking(prisma, tenant.id, contact.id, {
-      roomId,
-      checkIn,
-      checkOut,
-      offerId: matchedOffer?.id,
-      offerSnapshot: matchedOffer?.title,
-    });
-    const confirmationText = `You're all set! Your booking reference is ${booking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(confirmationText, postBookingPrompt(lang)), "Failed to send booking confirmation");
-    return;
-  }
-
-  // Conflict — do not book. Clear the pending dates so the next answer is
-  // treated fresh, and offer a real recovery path.
-  await prisma.contact.update({ where: { id: contact.id }, data: { pendingCheckIn: null, pendingCheckOut: null } });
-  const body = "Ah, sorry — that room's actually already booked for those exact dates. Want to try different dates, or see other rooms?";
+  // No availability gate. The hotel takes no payment through the bot, so a
+  // booking here is a REQUEST — the assistant takes it immediately and the
+  // receptionist confirms the actual room and availability with the guest
+  // (completeBooking already marks the booking PENDING and hands the chat to a
+  // person). Blocking on a live-availability check was the old model; the
+  // owner's instruction is to book first and let reception confirm, which also
+  // means the guest never hits a "sorry, that's taken" dead end from the bot.
+  const matchedOffer = await matchOfferForBooking(tenant.id, contact.id);
+  const booking = await completeBooking(prisma, tenant.id, contact.id, {
+    roomId,
+    checkIn,
+    checkOut,
+    offerId: matchedOffer?.id,
+    offerSnapshot: matchedOffer?.title,
+  });
   await sendAndPersist(
     tenant,
     contact,
-    {
-      type: "list",
-      body,
-      buttonText: "Choose",
-      sections: [{ rows: [{ id: "dates_retry", title: "Try different dates" }, { id: SEE_OTHER_ROOMS_BUTTON_ID, title: "See other rooms" }] }],
-    },
-    "Failed to send availability-conflict message"
+    toShortCircuitInteractive(t(lang).bookingRequestReceived(booking.referenceCode), postBookingPrompt(lang)),
+    "Failed to send booking confirmation"
   );
 }
 
@@ -508,8 +499,12 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // reaching CONFIRM_BOOKING requires a prior room recommendation) —
     // complete without room/date fields so the guest still gets a booking.
     const fallbackBooking = await completeBooking(prisma, tenant.id, contact.id);
-    const fallbackText = `You're all set! Your booking reference is ${fallbackBooking.referenceCode}. Please pay at the counter when you check in — see you soon! 🎉`;
-    await sendAndPersist(tenant, contact, toShortCircuitInteractive(fallbackText, postBookingPrompt(lang)), "Failed to send booking confirmation");
+    await sendAndPersist(
+      tenant,
+      contact,
+      toShortCircuitInteractive(t(lang).bookingRequestReceived(fallbackBooking.referenceCode), postBookingPrompt(lang)),
+      "Failed to send booking confirmation"
+    );
     return;
   }
 

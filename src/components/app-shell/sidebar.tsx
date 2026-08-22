@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { BrandMark } from "@/components/app-shell/brand-mark";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-config";
 
@@ -13,8 +13,8 @@ export function Sidebar({ hotelName }: { hotelName: string }) {
   return (
     <aside className="hidden w-56 shrink-0 flex-col rounded-none border-y-0 border-r border-l-0 border-sidebar-border bg-sidebar md:flex">
       <div className="flex h-14 items-center gap-2 border-b border-border/60 px-4">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-[0_2px_10px_-2px_var(--primary)]">
-          <Sparkles className="size-3.5" />
+        <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[color-mix(in_oklch,var(--primary),black_18%)] text-primary-foreground shadow-[0_4px_14px_-4px_var(--primary)] ring-1 ring-white/10">
+          <BrandMark className="size-5" />
         </span>
         <span className="truncate font-heading text-sm font-semibold">{hotelName}</span>
       </div>

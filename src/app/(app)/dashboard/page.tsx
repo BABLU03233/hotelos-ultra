@@ -85,8 +85,8 @@ export default async function DashboardPage() {
       </div>
 
       <Reveal delay={120}>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4">
+          <Card>
             <CardHeader>
               <CardTitle>Message volume — last 14 days</CardTitle>
               <CardDescription>Who&apos;s actually doing the talking: guests, {metrics.aiAgentName}, or your team.</CardDescription>

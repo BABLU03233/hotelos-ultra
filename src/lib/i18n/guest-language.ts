@@ -159,6 +159,15 @@ interface Strings {
   roomPriceForPartyApprox: (price: number, guests: number) => string;
   fullyBooked: string;
   pastDateRejected: string;
+  /**
+   * Booking confirmation, reframed as a request the receptionist confirms.
+   *
+   * The hotel takes no payment through the bot, so the assistant books
+   * immediately and a person confirms the room and availability — it does not
+   * promise a guaranteed, final reservation. Previously a hardcoded English
+   * string, so a Hindi or Telugu guest was told they were "all set" in English.
+   */
+  bookingRequestReceived: (code: string) => string;
   mediaNoticed: string;
   manageBookingBody: (ref: string, room: string, dates: string) => string;
   manageBookingButton: string;
@@ -352,6 +361,8 @@ const EN: Strings = {
   roomPriceForPartyApprox: (price, guests) => `From ₹${price.toLocaleString("en-IN")}/night · rate for ${guests} confirmed by our team`,
   fullyBooked: "Ah, we're fully booked for those dates 😔 Would another date work for you?",
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
+  bookingRequestReceived: (code) =>
+    `Done! 🎉 Your request is in — booking ref ${code}. Our receptionist will confirm your room shortly. Nothing to pay now — just settle at check-in 😊`,
   mediaNoticed: "Thanks for sending that! 😊 I can't open attachments here — could you tell me in a message what you need?",
   manageBookingBody: (ref, room, dates) => `You're booked: ${room} · ${dates} · ref ${ref}. What would you like to do?`,
   manageBookingButton: "Choose",
@@ -472,6 +483,8 @@ const HI: Strings = {
   roomPriceForPartyApprox: (price, guests) => `₹${price.toLocaleString("en-IN")}/रात से · ${guests} लोगों का रेट टीम बताएगी`,
   fullyBooked: "अरे, उन तारीख़ों पर सब बुक है 😔 कोई और तारीख़ चलेगी?",
   pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
+  bookingRequestReceived: (code) =>
+    `हो गया! 🎉 आपकी request आ गई — booking ref ${code}. हमारा receptionist आपका room जल्दी confirm करेगा. अभी कुछ pay नहीं करना — check-in पर settle कर देना 😊`,
   mediaNoticed: "भेजने के लिए शुक्रिया! 😊 मैं यहाँ अटैचमेंट नहीं खोल पाती — मैसेज में बता दीजिए आपको क्या चाहिए?",
   manageBookingBody: (ref, room, dates) => `आपकी बुकिंग: ${room} · ${dates} · रेफ़ ${ref}। आप क्या करना चाहेंगे?`,
   manageBookingButton: "चुनें",
@@ -592,6 +605,8 @@ const TE: Strings = {
   roomPriceForPartyApprox: (price, guests) => `₹${price.toLocaleString("en-IN")}/రాత్రి నుండి · ${guests} మంది రేటు టీమ్ చెబుతుంది`,
   fullyBooked: "అయ్యో, ఆ తేదీలకు అన్నీ బుక్ అయ్యాయి 😔 వేరే తేదీ కుదురుతుందా?",
   pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
+  bookingRequestReceived: (code) =>
+    `అయిపోయింది! 🎉 మీ request వచ్చింది — booking ref ${code}. మా receptionist మీ room త్వరలో confirm చేస్తరు. ఇప్పుడు ఏమీ pay చేయాల్సిన పని లేదు — check-in టైంలో settle చేయండి 😊`,
   mediaNoticed: "పంపినందుకు ధన్యవాదాలు! 😊 ఇక్కడ అటాచ్‌మెంట్‌లు తెరవలేను — మీకు ఏం కావాలో మెసేజ్‌లో చెప్పండి?",
   manageBookingBody: (ref, room, dates) => `మీ బుకింగ్: ${room} · ${dates} · రెఫ్ ${ref}. మీరు ఏం చేయాలనుకుంటున్నారు?`,
   manageBookingButton: "ఎంచుకోండి",

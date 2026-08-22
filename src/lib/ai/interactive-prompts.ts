@@ -1361,7 +1361,7 @@ export function predictedStageInstruction(params: {
     case "PRICE_OBJECTION":
       return "A See cheaper room / Show me offers / Continue anyway picker will automatically appear under your reply. If the hotel's own \"Additional instructions from the hotel\" section above mentions a real competitive edge, lead with that specific point now — it's usually the single most persuasive thing you can say at this exact moment, not generic reassurance.";
     case "CONFIRM_BOOKING":
-      return "A Confirm booking / Not yet picker will automatically appear under your reply. Write a short, warm closing line, not a new question — mention that tapping instantly gives them a real reference code to quote at check-in, with nothing to pay right now (pay at the counter when they arrive), so they know what tapping actually does. Never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
+      return "A Confirm booking / Not yet picker will automatically appear under your reply. Write a short, warm closing line, not a new question — mention that tapping sends their request to our receptionist, who confirms the room and shares a reference, with nothing to pay right now (settle at check-in), so they know what tapping actually does. Never claim the booking is confirmed or give out a reference number yourself, only the tap does that.";
     default:
       // Nothing predictable — either no booking interest shown yet (plain
       // open chat) or genuinely nothing else applies; write normally.

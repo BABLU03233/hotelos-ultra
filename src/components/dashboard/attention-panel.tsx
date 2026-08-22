@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarClock, CircleCheck, PartyPopper, TriangleAlert } from "lucide-react";
+import { CalendarClock, Check, CircleCheck, PartyPopper, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
 import { saveWithFeedback } from "@/lib/save-with-feedback";
 import { useFetch } from "@/hooks/use-fetch";
@@ -57,7 +58,7 @@ export function DashboardAttentionPanel({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-3">
       {visible.map((n) => {
         const style = NOTIFICATION_STYLE[n.type];
         const Icon = ICONS[style.icon];
@@ -66,36 +67,39 @@ export function DashboardAttentionPanel({
             key={n.id}
             className={
               n.type === "BOOKING"
-                ? "flex flex-col gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5"
-                : "flex flex-col gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5"
+                ? "flex flex-col gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"
+                : "flex flex-col gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4"
             }
           >
-            <div className="flex items-start gap-2.5">
-              <Icon className={`mt-0.5 size-3.5 shrink-0 ${style.className}`} />
+            <div className="flex items-start gap-3">
+              <span
+                className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg ${
+                  n.type === "BOOKING" ? "bg-emerald-500/15" : "bg-amber-500/15"
+                }`}
+              >
+                <Icon className={`size-5 ${style.className}`} />
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-medium">{n.contact.name || n.contact.phone}</span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
+                  <span className="truncate text-sm font-semibold">{n.contact.name || n.contact.phone}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatRelativeTime(n.createdAt)}</span>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">{n.reason}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{n.reason}</p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 pl-6">
-              <button onClick={() => resolve(n.id)} className="shrink-0 text-[10px] font-medium text-muted-foreground hover:underline">
-                Mark resolved
-              </button>
-              <Link
-                href={`/crm?contact=${n.contact.id}`}
-                className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-[10px] font-medium text-primary-foreground hover:opacity-90"
-              >
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => resolve(n.id)}>
+                <Check className="size-4" /> Mark resolved
+              </Button>
+              <Button size="sm" nativeButton={false} render={<Link href={`/crm?contact=${n.contact.id}`} />}>
                 {style.actionLabel} →
-              </Link>
+              </Button>
             </div>
           </div>
         );
       })}
       {count > visible.length && (
-        <p className="pt-1 text-center text-[11px] text-muted-foreground">+{count - visible.length} more</p>
+        <p className="pt-1 text-center text-xs text-muted-foreground">+{count - visible.length} more</p>
       )}
     </div>
   );
