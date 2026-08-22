@@ -15,6 +15,7 @@ import {
   dateQuickPickPrompt,
   greetMenuPrompt,
   looksLikeExistingBookingRequest,
+  looksLikeLocationRequest,
   looksLikeRoomObjection,
   postBookingPrompt,
   roomResponsePrompt,
@@ -753,6 +754,26 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     }
     // No coordinates set for this hotel — fall through to the AI, which still
     // has the address and the maps link in its prompt.
+  }
+
+  // A TYPED location request ("where are you", "send location", "కుళ్ళు ఎక్కడ")
+  // gets the same native pin the button sends — not the Google Maps link the
+  // AI would otherwise reply with. Reported live: tapping the button gave a
+  // tappable map, but typing the question gave a bare URL. Only fires when the
+  // hotel has coordinates; without them there is nothing to pin, so it falls
+  // through to the AI (which has the address and the link).
+  if (!msg.interactiveId && content && !contact.aiPaused && looksLikeLocationRequest(content)) {
+    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id } });
+    if (profile?.lat != null && profile?.lng != null) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        { type: "location", latitude: profile.lat, longitude: profile.lng, name: profile.name, address: profile.address ?? undefined },
+        "Failed to send hotel location"
+      );
+      await sendAndPersist(tenant, contact, { type: "text", text: t(lang).locationCaption }, "Failed to send location caption");
+      return;
+    }
   }
 
   // "Call us" — the number as plain text, which WhatsApp turns into a tappable

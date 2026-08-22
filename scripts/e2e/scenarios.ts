@@ -612,4 +612,22 @@ export const SCENARIOS: Scenario[] = [
       },
     ],
   },
+
+  {
+    id: "typed-location-gets-native-pin",
+    area: "Listening",
+    title: "Typing 'where are you' sends a tappable map pin, not a link",
+    because:
+      "Tapping 'Where are you?' sent a native location the guest could tap for directions, but TYPING the same question fell to the AI, which replies with a bare Google Maps URL. A guest should get the same tappable pin either way.",
+    turns: [
+      { tap: { id: "lang_en", label: "English" } },
+      {
+        say: "where are you located?",
+        checks: [
+          { label: "sends a native location message, not a link", test: (s2) => s2.some((m) => m.type === "location") },
+          notMatches("no bare maps URL in text", /http.*(maps|google)/i),
+        ],
+      },
+    ],
+  },
 ];

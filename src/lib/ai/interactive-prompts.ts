@@ -369,6 +369,28 @@ export function looksLikePriceOrOfferSignal(text: string): boolean {
 const PHOTO_REQUEST_PATTERN = /photo|pictur|\bpi?cs?\b|what (does|do) (it|the room) look like/i;
 
 /**
+ * A typed request for the hotel's location or directions.
+ *
+ * The AI, asked "where are you", replies with a Google Maps URL — a text
+ * link the guest has to tap through to a browser and a consent screen. A
+ * WhatsApp location message opens straight in their maps app with a
+ * Directions button and no link at all. Tapping the "Where are you?" button
+ * already sends that native pin; typing the same question should too. This
+ * detector lets the deterministic handler intercept a typed request and send
+ * the pin, so a guest never gets a bare link when coordinates exist.
+ *
+ * Covers English, Hinglish and Tenglish plus Devanagari/Telugu. Deliberately
+ * broad — the cost of a false positive is one extra map pin, the cost of a
+ * miss is the bare link this exists to remove.
+ */
+const LOCATION_REQUEST_PATTERN =
+  /\b(where('?s| is| are)|location|address|directions?|reach you|get there|find you|how (do i|to) (get|reach|find)|map|pin\b)|kah[aā]?n|कहाँ|कहां|पता|लोकेशन|ఎక్కడ|అడ్రస్|లొకేషన్|దారి/i;
+
+export function looksLikeLocationRequest(text: string): boolean {
+  return LOCATION_REQUEST_PATTERN.test(text.trim());
+}
+
+/**
  * True when `a` becomes `b` by swapping one adjacent pair of characters
  * ("hpotos" → "photos").
  *
