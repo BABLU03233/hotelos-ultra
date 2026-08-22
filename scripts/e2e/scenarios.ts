@@ -593,6 +593,7 @@ export const SCENARIOS: Scenario[] = [
           matches("mentions the receptionist / a person", /receptionist|team|reception/i),
           matches("promises a better group price", /discount|best price|better/i),
           matches("includes the number inline to tap-to-dial", /98765 ?43210/),
+          { label: "also sends a tappable location pin", test: (s2) => s2.some((m) => m.type === "location") },
           {
             label: "no reply-button — a live chat can't carry a call button, the number is inline",
             test: (s2) => !idsOf(s2).some((id) => id === "call_us"),

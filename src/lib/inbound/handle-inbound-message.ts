@@ -810,7 +810,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     const s = t(lang);
     const profile = await prisma.hotelProfile.findUnique({
       where: { tenantId: tenant.id },
-      select: { contactPhone: true },
+      select: { contactPhone: true, name: true, address: true, lat: true, lng: true },
     });
     const phone = profile?.contactPhone?.trim();
 
@@ -827,6 +827,19 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       { type: "text", text: phone ? `${s.groupHandoverDirect}\n\n${s.groupCallCta(phone)}` : s.groupHandoverDirect },
       "Failed to send group handover"
     );
+
+    // ...and the location, so a group can either call reception or just come
+    // in. Same native pin the "Where are you?" button sends — one tap to
+    // directions. Only when coordinates exist; otherwise there is nothing to
+    // pin and the number above still stands.
+    if (profile?.lat != null && profile?.lng != null) {
+      await sendAndPersist(
+        tenant,
+        contact,
+        { type: "location", latitude: profile.lat, longitude: profile.lng, name: profile.name, address: profile.address ?? undefined },
+        "Failed to send group-handover location"
+      );
+    }
 
     // Handed to reception for real, not just promised. takeOverFields sets
     // aiPaused too, so the assistant stops rather than negotiating underneath
