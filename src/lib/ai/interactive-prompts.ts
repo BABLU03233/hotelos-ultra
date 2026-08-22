@@ -68,6 +68,18 @@ export const CALL_US_BUTTON_ID = "call_us";
 export const GROUP_ROOM_BUTTON_IDS = ["group_rooms_3_5", "group_rooms_6_10", "group_rooms_10plus"] as const;
 
 /** The room-count question shown after "Group / corporate". */
+/**
+ * A single "Call now" reply-button.
+ *
+ * Attached to the group/corporate handover so the guest can reach reception
+ * in one tap while a person picks the conversation up. The button's own
+ * handler sends the number as tappable text (a reply-button can't carry a
+ * tel: link — see the CALL_US handler for why).
+ */
+export function callNowPrompt(lang?: GuestLanguage | null): InteractivePrompt {
+  return { type: "buttons", buttons: [{ id: CALL_US_BUTTON_ID, title: t(resolveLanguage(lang)).callNowButton }] };
+}
+
 export function groupRoomsPrompt(lang?: GuestLanguage | null): InteractivePrompt {
   const s = t(resolveLanguage(lang));
   return {

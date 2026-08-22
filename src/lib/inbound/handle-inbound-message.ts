@@ -5,9 +5,8 @@ import {
   VIEW_PHOTOS_BUTTON_ID,
   CALL_US_BUTTON_ID,
   GROUP_BOOKING_BUTTON_ID,
-  GROUP_ROOM_BUTTON_IDS,
   SHOW_LOCATION_BUTTON_ID,
-  groupRoomsPrompt,
+  callNowPrompt,
   GUEST_COUNT_BUTTON_VALUES,
   InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
@@ -725,8 +724,11 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // link that opens the dialer. A cta_url button cannot do this: those only
   // accept http(s), so a tel: link there is silently dropped.
   if (msg.interactiveId === CALL_US_BUTTON_ID) {
-    if (contact.aiPaused) return;
-
+    // Deliberately NOT gated on aiPaused. Handing a guest the hotel's own
+    // number is always safe — nothing is negotiated or decided — and it is
+    // exactly what the group/corporate handover offers as its "Call now"
+    // button, which fires AFTER the assistant has already paused for a
+    // person. Gating it there would make that button silently do nothing.
     const profile = await prisma.hotelProfile.findUnique({
       where: { tenantId: tenant.id },
       select: { contactPhone: true },
@@ -739,34 +741,34 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     // No number configured — fall through to the AI, which can still help.
   }
 
-  // "Group / corporate" on the party-size question.
+  // "Group / corporate" on the party-size question — hand straight to a person.
   //
-  // Deliberately does NOT continue the normal funnel. A block of rooms is a
-  // different sale: rates get negotiated, the rooms have to be held together,
-  // and there is usually an invoice — none of which the assistant may decide.
-  // So it asks the one question that shapes the request and then hands over.
+  // A block of rooms is a different sale: rates get negotiated, the rooms have
+  // to be held together, and there is usually an invoice — none of which the
+  // assistant may decide. It used to ask "how many rooms?" first; that step is
+  // gone. The receptionist gathers the details, and skipping it gets the guest
+  // to a real person — and a better-than-regular price — in one tap instead of
+  // three. A "Call now" button rides along when there's a number to give.
   if (msg.interactiveId === GROUP_BOOKING_BUTTON_ID) {
     if (contact.aiPaused) return;
+
+    const s = t(lang);
+    const profile = await prisma.hotelProfile.findUnique({
+      where: { tenantId: tenant.id },
+      select: { contactPhone: true },
+    });
+    const phone = profile?.contactPhone?.trim();
 
     await sendAndPersist(
       tenant,
       contact,
-      toShortCircuitInteractive(t(lang).groupRoomsBody, groupRoomsPrompt(lang)),
-      "Failed to send group room-count prompt"
+      // The Call now button only when there's a number behind it — a button
+      // that then has no number is worse than no button.
+      phone
+        ? toShortCircuitInteractive(s.groupHandoverDirect, callNowPrompt(lang))
+        : { type: "text", text: s.groupHandoverDirect },
+      "Failed to send group handover"
     );
-    return;
-  }
-
-  // How many rooms the group needs — the last thing the assistant asks before
-  // a person takes over.
-  if (msg.interactiveId && (GROUP_ROOM_BUTTON_IDS as readonly string[]).includes(msg.interactiveId)) {
-    if (contact.aiPaused) return;
-
-    const s = t(lang);
-    const rooms =
-      msg.interactiveId === "group_rooms_3_5" ? s.rooms3to5 : msg.interactiveId === "group_rooms_6_10" ? s.rooms6to10 : s.rooms10plus;
-
-    await sendAndPersist(tenant, contact, { type: "text", text: s.groupHandover(rooms) }, "Failed to send group handover");
 
     // Handed to reception for real, not just promised. takeOverFields sets
     // aiPaused too, so the assistant stops rather than negotiating underneath
@@ -775,11 +777,9 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       where: { id: contact.id },
       data: {
         leadStatus: "INTERESTED",
-        // Stored as its own field so the CRM can filter on it without parsing
-        // the handover sentence, which is written in the guest's language.
-        groupRooms: rooms,
-        ...takeOverFields(`Group booking — ${rooms}`),
-        aiBriefing: `Corporate/group enquiry: ${rooms}. Dates and company name not yet captured.`,
+        ...takeOverFields("Group / corporate enquiry"),
+        aiBriefing:
+          "Corporate/group enquiry — quote a better-than-regular group rate. Dates, room count and company name not yet captured.",
       },
     });
 
@@ -789,7 +789,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
           tenantId: tenant.id,
           contactId: contact.id,
           type: "ESCALATION",
-          reason: `Group booking enquiry from ${contact.name || contact.phone} — ${rooms}.`,
+          reason: `Group / corporate enquiry from ${contact.name || contact.phone}.`,
         },
       })
       .catch((err) => console.error("Failed to flag group booking:", err));
