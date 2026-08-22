@@ -168,6 +168,12 @@ interface Strings {
    * string, so a Hindi or Telugu guest was told they were "all set" in English.
    */
   bookingRequestReceived: (code: string) => string;
+  /**
+   * Sent right after a booking: how to reach the hotel, followed by a map pin.
+   * A guest who just booked wants to know where they're going — the address
+   * and check-in time in words, then the tappable location.
+   */
+  bookingHotelInfo: (address: string, checkIn: string) => string;
   mediaNoticed: string;
   manageBookingBody: (ref: string, room: string, dates: string) => string;
   manageBookingButton: string;
@@ -363,6 +369,10 @@ const EN: Strings = {
   pastDateRejected: "That date has already passed 😅 Which dates did you mean? Pick one below and I'll check availability.",
   bookingRequestReceived: (code) =>
     `Done! 🎉 Your request is in — booking ref ${code}. Our receptionist will confirm your room shortly. Nothing to pay now — just settle at check-in 😊`,
+  bookingHotelInfo: (address, checkIn) =>
+    `See you soon! 😊 Here's how to reach us:
+📍 ${address}${checkIn ? `
+🕐 Check-in from ${checkIn}` : ""}`,
   mediaNoticed: "Thanks for sending that! 😊 I can't open attachments here — could you tell me in a message what you need?",
   manageBookingBody: (ref, room, dates) => `You're booked: ${room} · ${dates} · ref ${ref}. What would you like to do?`,
   manageBookingButton: "Choose",
@@ -485,6 +495,10 @@ const HI: Strings = {
   pastDateRejected: "वह तारीख़ तो निकल चुकी है 😅 आपका मतलब किन तारीख़ों से था? नीचे से चुनिए, मैं उपलब्धता देख लेती हूँ।",
   bookingRequestReceived: (code) =>
     `हो गया! 🎉 आपकी request आ गई — booking ref ${code}. हमारा receptionist आपका room जल्दी confirm करेगा. अभी कुछ pay नहीं करना — check-in पर settle कर देना 😊`,
+  bookingHotelInfo: (address, checkIn) =>
+    `जल्दी मिलते हैं! 😊 यहाँ पहुँच सकते हैं:
+📍 ${address}${checkIn ? `
+🕐 Check-in ${checkIn} से` : ""}`,
   mediaNoticed: "भेजने के लिए शुक्रिया! 😊 मैं यहाँ अटैचमेंट नहीं खोल पाती — मैसेज में बता दीजिए आपको क्या चाहिए?",
   manageBookingBody: (ref, room, dates) => `आपकी बुकिंग: ${room} · ${dates} · रेफ़ ${ref}। आप क्या करना चाहेंगे?`,
   manageBookingButton: "चुनें",
@@ -607,6 +621,10 @@ const TE: Strings = {
   pastDateRejected: "ఆ తేదీ అప్పుడే గడిచిపోయింది 😅 మీరు ఏ తేదీలు అనుకున్నారు? కింద ఎంచుకోండి, అందుబాటు చూస్తాను.",
   bookingRequestReceived: (code) =>
     `అయిపోయింది! 🎉 మీ request వచ్చింది — booking ref ${code}. మా receptionist మీ room త్వరలో confirm చేస్తరు. ఇప్పుడు ఏమీ pay చేయాల్సిన పని లేదు — check-in టైంలో settle చేయండి 😊`,
+  bookingHotelInfo: (address, checkIn) =>
+    `త్వరలో కలుద్దాం! 😊 మమ్మల్ని ఇక్కడ రీచ్ అవ్వొచ్చు:
+📍 ${address}${checkIn ? `
+🕐 Check-in ${checkIn} నుంచి` : ""}`,
   mediaNoticed: "పంపినందుకు ధన్యవాదాలు! 😊 ఇక్కడ అటాచ్‌మెంట్‌లు తెరవలేను — మీకు ఏం కావాలో మెసేజ్‌లో చెప్పండి?",
   manageBookingBody: (ref, room, dates) => `మీ బుకింగ్: ${room} · ${dates} · రెఫ్ ${ref}. మీరు ఏం చేయాలనుకుంటున్నారు?`,
   manageBookingButton: "ఎంచుకోండి",

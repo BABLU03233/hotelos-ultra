@@ -277,6 +277,46 @@ async function attemptBookingCompletion(
     toShortCircuitInteractive(t(lang).bookingRequestReceived(booking.referenceCode), postBookingPrompt(lang)),
     "Failed to send booking confirmation"
   );
+  await sendPostBookingHotelInfo(tenant, contact, lang);
+}
+
+/**
+ * Right after a booking: how to reach the hotel, then a map pin.
+ *
+ * A guest who just booked wants to know where they're going. The address and
+ * check-in time go out as text, then the tappable location so their maps app
+ * opens straight to it — the same pin the "Where are you?" button sends. Both
+ * are best-effort: a missing address or missing coordinates simply skips that
+ * piece rather than blocking the booking confirmation that already went out.
+ */
+async function sendPostBookingHotelInfo(
+  tenant: { id: string },
+  contact: { id: string; name: string | null; phone: string; whatsappNumber: string; language: string | null },
+  lang: GuestLanguage
+): Promise<void> {
+  const profile = await prisma.hotelProfile.findUnique({
+    where: { tenantId: tenant.id },
+    select: { name: true, address: true, checkInTime: true, lat: true, lng: true },
+  });
+  if (!profile) return;
+
+  if (profile.address?.trim()) {
+    await sendAndPersist(
+      tenant,
+      contact,
+      { type: "text", text: t(lang).bookingHotelInfo(profile.address.trim(), profile.checkInTime?.trim() ?? "") },
+      "Failed to send post-booking hotel info"
+    );
+  }
+
+  if (profile.lat != null && profile.lng != null) {
+    await sendAndPersist(
+      tenant,
+      contact,
+      { type: "location", latitude: profile.lat, longitude: profile.lng, name: profile.name, address: profile.address ?? undefined },
+      "Failed to send post-booking location"
+    );
+  }
 }
 
 /**
@@ -505,6 +545,7 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
       toShortCircuitInteractive(t(lang).bookingRequestReceived(fallbackBooking.referenceCode), postBookingPrompt(lang)),
       "Failed to send booking confirmation"
     );
+    await sendPostBookingHotelInfo(tenant, contact, lang);
     return;
   }
 
