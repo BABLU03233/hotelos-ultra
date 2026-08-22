@@ -592,7 +592,11 @@ export const SCENARIOS: Scenario[] = [
           sentSomething,
           matches("mentions the receptionist / a person", /receptionist|team|reception/i),
           matches("promises a better group price", /discount|best price|better/i),
-          offersButtons("offers a Call now button", ["call_us"]),
+          matches("includes the number inline to tap-to-dial", /98765 ?43210/),
+          {
+            label: "no reply-button — a live chat can't carry a call button, the number is inline",
+            test: (s2) => !idsOf(s2).some((id) => id === "call_us"),
+          },
           notMatches("does not ask a room-count question", /how many rooms/i),
           {
             label: "does not continue the funnel with a room list",
@@ -605,25 +609,6 @@ export const SCENARIOS: Scenario[] = [
         // must get no automated reply.
         say: "actually we might be 8 people",
         checks: [{ label: "assistant stays silent — a person has it", test: (s2) => s2.length === 0 }],
-      },
-    ],
-  },
-  {
-    id: "call-now-works-after-handover",
-    area: "handover",
-    title: "The Call now button still gives the number after the assistant has paused",
-    because:
-      "The group handover pauses the assistant for a person, and the Call now button fires after that. If the call handler were gated on the pause it would silently do nothing — so tapping it must still return the hotel's number.",
-    turns: [
-      { tap: { id: "lang_en", label: "English" } },
-      { tap: { id: "greet_book", label: "I want to book a room" } },
-      { tap: { id: "guests_group", label: "Group / corporate" } },
-      {
-        tap: { id: "call_us", label: "Call now" },
-        checks: [
-          sentSomething,
-          matches("returns the hotel's number to tap-to-dial", /91[0-9 ]{6,}/),
-        ],
       },
     ],
   },

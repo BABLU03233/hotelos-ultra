@@ -254,8 +254,12 @@ interface Strings {
    * better-than-regular price. Short and precise on purpose.
    */
   groupHandoverDirect: string;
-  /** "Call now" reply-button label — dials the hotel's own number. */
-  callNowButton: string;
+  /**
+   * The tap-to-call line appended to the group handover. The number renders as
+   * a tappable link that opens the dialer — a live-chat message can't carry a
+   * native call button, so an inline number is the closest WhatsApp allows.
+   */
+  groupCallCta: (phone: string) => string;
   /**
    * A stated party size bigger than any single room here holds.
    *
@@ -382,7 +386,7 @@ Check-in ${checkInTime ? `from ${checkInTime}` : "as usual"}, check-out ${checkO
   groupHandover: (rooms) => `Thanks! For ${rooms}, our team handles the rates and blocks the rooms personally — they'll message you here shortly. If you can share your dates and company name meanwhile, that speeds things up 😊`,
   groupHandoverDirect:
     "That's great! 🎉 Group & corporate bookings get a special discounted rate, better than our regular ones. I'm connecting you to our receptionist now for availability and your best price 😊",
-  callNowButton: "📞 Call now",
+  groupCallCta: (phone) => `📞 Tap to call reception now: ${phone}`,
   partyTooLargeHandover: (guests, maxCapacity) => `For ${guests} of you our rooms (up to ${maxCapacity} each) won't all fit in one — let me get our team to work out the best combination for you, they'll message you here shortly 😊`,
   locationRow: "Where are you?",
   callRow: "Call us",
@@ -501,8 +505,8 @@ const HI: Strings = {
   rooms10plus: "10 से ज़्यादा",
   groupHandover: (rooms) => `धन्यवाद! ${rooms} के लिए हमारी टीम खुद रेट तय करके कमरे ब्लॉक करती है — वे जल्द ही यहीं मैसेज करेंगे. इस बीच अपनी तारीख़ें और कंपनी का नाम बता दें तो और तेज़ी होगी 😊`,
   groupHandoverDirect:
-    "Bahut badhiya! 🎉 Group aur corporate booking par regular se behtar special discounted rate milta hai. Main aapko abhi receptionist se connect kar rahi hoon — availability aur best price ke liye 😊",
-  callNowButton: "📞 Call करें",
+    "बहुत बढ़िया! 🎉 Group & corporate booking पर regular से better special discount मिलता है. मैं आपको अभी हमारे receptionist से connect कर रही हूँ — वो availability और best price बता देंगे 😊",
+  groupCallCta: (phone) => `📞 अभी call करें: ${phone}`,
   partyTooLargeHandover: (guests, maxCapacity) => `आप ${guests} लोगों के लिए हमारे कमरे (हर एक में ${maxCapacity} तक) अकेले पूरे नहीं पड़ेंगे — हमारी टीम आपके लिए सही व्यवस्था कर देगी, वे जल्द ही यहीं मैसेज करेंगे 😊`,
   locationRow: "हम कहाँ हैं?",
   callRow: "हमें कॉल करें",
@@ -621,8 +625,8 @@ const TE: Strings = {
   rooms10plus: "10 కంటే ఎక్కువ",
   groupHandover: (rooms) => `ధన్యవాదాలు! ${rooms} కోసం మా టీమ్ స్వయంగా రేట్లు నిర్ణయించి రూమ్‌లు బ్లాక్ చేస్తుంది — వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు. ఈలోపు మీ తేదీలు, కంపెనీ పేరు చెబితే వేగంగా ఉంటుంది 😊`,
   groupHandoverDirect:
-    "Chala bagundi! 🎉 Group & corporate booking ki regular kanna better special discounted rate untundi. Ippude receptionist ki connect chestunna — availability, best price kosam 😊",
-  callNowButton: "📞 Call cheyandi",
+    "చాలా బాగుంది! 🎉 Group & corporate booking కి మామూలు కంటే మంచి special discount ఉంటది. మిమ్మల్ని ఇప్పుడే మా receptionist కి connect చేస్తున్నా — వాళ్ళు availability, best price చెప్తరు 😊",
+  groupCallCta: (phone) => `📞 ఇప్పుడే call చేయండి: ${phone}`,
   partyTooLargeHandover: (guests, maxCapacity) => `మీరు ${guests} మంది కోసం మా రూమ్‌లు (ఒక్కోటి ${maxCapacity} వరకు) సరిపోకపోవచ్చు — మా టీమ్ మీకు సరైన ఏర్పాటు చేస్తుంది, వాళ్ళు త్వరలో ఇక్కడే మెసేజ్ చేస్తారు 😊`,
   locationRow: "మీరు ఎక్కడ ఉన్నారు?",
   callRow: "మాకు కాల్ చేయండి",

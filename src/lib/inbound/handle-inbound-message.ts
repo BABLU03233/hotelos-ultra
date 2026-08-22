@@ -6,7 +6,6 @@ import {
   CALL_US_BUTTON_ID,
   GROUP_BOOKING_BUTTON_ID,
   SHOW_LOCATION_BUTTON_ID,
-  callNowPrompt,
   GUEST_COUNT_BUTTON_VALUES,
   InteractivePrompt,
   ROOM_BOOK_BUTTON_ID,
@@ -725,10 +724,9 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // accept http(s), so a tel: link there is silently dropped.
   if (msg.interactiveId === CALL_US_BUTTON_ID) {
     // Deliberately NOT gated on aiPaused. Handing a guest the hotel's own
-    // number is always safe — nothing is negotiated or decided — and it is
-    // exactly what the group/corporate handover offers as its "Call now"
-    // button, which fires AFTER the assistant has already paused for a
-    // person. Gating it there would make that button silently do nothing.
+    // number is always safe — nothing is negotiated or decided — so even a
+    // guest whose chat a person has already taken over can tap "Call us" (from
+    // the FAQ list) and still get the number, rather than silence.
     const profile = await prisma.hotelProfile.findUnique({
       where: { tenantId: tenant.id },
       select: { contactPhone: true },
@@ -747,8 +745,8 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   // to be held together, and there is usually an invoice — none of which the
   // assistant may decide. It used to ask "how many rooms?" first; that step is
   // gone. The receptionist gathers the details, and skipping it gets the guest
-  // to a real person — and a better-than-regular price — in one tap instead of
-  // three. A "Call now" button rides along when there's a number to give.
+  // to a real person — and a better-than-regular price. The number rides along
+  // inline so the guest can dial in one tap.
   if (msg.interactiveId === GROUP_BOOKING_BUTTON_ID) {
     if (contact.aiPaused) return;
 
@@ -759,14 +757,17 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
     });
     const phone = profile?.contactPhone?.trim();
 
+    // One plain-text message, with the number written into it. WhatsApp turns
+    // a phone number in message text into a green, tappable link that opens
+    // the dialer directly — that IS the tap-to-call. A live chat message
+    // cannot carry a native "Call" button (only http/https CTA buttons exist
+    // here, and a tel: link inside one is silently dropped), and a
+    // reply-button that just texts the number back is exactly the extra
+    // "here's the number" reply this removes.
     await sendAndPersist(
       tenant,
       contact,
-      // The Call now button only when there's a number behind it — a button
-      // that then has no number is worse than no button.
-      phone
-        ? toShortCircuitInteractive(s.groupHandoverDirect, callNowPrompt(lang))
-        : { type: "text", text: s.groupHandoverDirect },
+      { type: "text", text: phone ? `${s.groupHandoverDirect}\n\n${s.groupCallCta(phone)}` : s.groupHandoverDirect },
       "Failed to send group handover"
     );
 
