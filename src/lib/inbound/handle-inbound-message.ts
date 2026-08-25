@@ -55,6 +55,11 @@ import { uploadObject } from "@/lib/storage/s3";
 
 const OPT_OUT_CONFIRMATION = "You're unsubscribed from promotional messages and won't get any more offers or reminders. Message us anytime if you still need help with a booking.";
 
+// Every "start booking" quick-reply label our own template starters use (see
+// wa-meta-template-starters.ts) — lowercased for a case-insensitive match
+// against the button text a guest actually tapped.
+const CAMPAIGN_BOOKING_CTA_TEXTS = new Set(["book now", "check dates", "yes, hold a room", "i'm interested"]);
+
 /**
  * The tenant's rooms, minus any already booked for the dates this guest has
  * settled on. Both room lists the guest can be shown go through here, for
@@ -471,6 +476,45 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   if (optingOut) {
     await sendAndPersist(tenant, contact, { type: "text", text: OPT_OUT_CONFIRMATION }, "Failed to send opt-out confirmation");
     return;
+  }
+
+  // A promotional campaign's "Book now" (or "Check dates" / "Yes, hold a
+  // room" / "I'm interested") quick-reply click — the same highest-intent
+  // signal as GREET_MENU's own "Book a room" tap below, just arriving from a
+  // broadcast instead of the AI's own greeting. Routed through the identical
+  // fast path (native booking Flow when configured) so a cold lead's first
+  // reply ever gets a real room/date picker instead of free text an LLM has
+  // to guess the intent of. Matched on the button's visible text, not
+  // msg.interactiveId — Meta defaults a template quick-reply's payload to its
+  // label when none is set (see wa-meta-template-starters.ts, which sets
+  // none), but the label is the stable, documented part of that contract.
+  // A custom template built with different wording just falls through to the
+  // AI queue below like any other message, which still handles it.
+  if (msg.type === "button" && msg.buttonText && CAMPAIGN_BOOKING_CTA_TEXTS.has(msg.buttonText.trim().toLowerCase())) {
+    if (contact.aiPaused) return;
+
+    const profile = await prisma.hotelProfile.findUnique({ where: { tenantId: tenant.id } });
+    if (profile?.whatsappBookingFlowId) {
+      try {
+        await sendAndPersist(
+          tenant,
+          contact,
+          {
+            type: "flow",
+            body: "Let's get you booked — pick a room and your dates:",
+            flowId: profile.whatsappBookingFlowId,
+            flowCta: "Book now",
+            screen: "BOOKING",
+          },
+          "Failed to send booking flow"
+        );
+        return;
+      } catch (err) {
+        console.error(`Booking flow send failed for tenant ${tenant.id}, contact ${contact.id} — falling back to normal flow:`, err);
+      }
+    }
+    // No Flow configured for this tenant, or the send failed — fall through
+    // to the normal AI queue below, same as GREET_MENU's "Book a room" tap.
   }
 
   // "Confirm booking" is a fixed, code-owned button id, never inferred from

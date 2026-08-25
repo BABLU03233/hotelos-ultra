@@ -3,8 +3,8 @@ import type { SentMessage } from "./harness";
 export interface Turn {
   /** Typed message. An empty string stands for an attachment with no caption. */
   say?: string;
-  /** Tapped button or list row. */
-  tap?: { id: string; label: string };
+  /** Tapped button or list row. `kind: "button"` simulates a template quick-reply (Meta type "button") instead of the app's own interactive message — default is "interactive". */
+  tap?: { id: string; label: string; kind?: "button" | "interactive" };
   /** What the stubbed model returns for this turn, if the AI path is reached. */
   ai?: string;
   /** Age the whole conversation backwards before this turn, in hours. */
@@ -115,6 +115,26 @@ export const SCENARIOS: Scenario[] = [
       {
         tap: { id: "confirm_booking", label: "Confirm booking" },
         checks: [matches("booking reference issued", /[A-Z]{3}-\d{4}/)],
+      },
+    ],
+  },
+
+  /* ===== CAMPAIGNS ===== */
+  {
+    id: "campaign-book-now-tap-starts-booking",
+    area: "Campaigns",
+    title: "Tapping \"Book now\" on a promotional template starts the booking flow",
+    because:
+      "A cold lead's first-ever message can be a template quick-reply tap, not typed text — Meta sends this as " +
+      'type "button" (interactiveId defaults to the button\'s own label, e.g. "Book now"), distinct from the ' +
+      'app\'s own type "interactive" button replies. Before this the tap fell through every known interactiveId ' +
+      "check as an unrecognized id and landed in the AI queue as bare text, hoping the model inferred booking " +
+      "intent from an unexplained \"Book now\" with no context. It should get the same guaranteed room/date " +
+      "flow as tapping the AI's own \"Book a room\" menu button.",
+    turns: [
+      {
+        tap: { id: "Book now", label: "Book now", kind: "button" },
+        checks: [offersButtons("guest count asked, same as GREET_MENU's own Book a room tap", ["guests_1", "guests_2", "guests_3plus"])],
       },
     ],
   },

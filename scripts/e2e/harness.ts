@@ -151,7 +151,10 @@ export function assertLocalDatabase() {
 let seq = 0;
 
 /** Builds a webhook-shaped inbound message: typed text, or a button/row tap. */
-export function inbound(waId: string, turn: { say?: string; tap?: { id: string; label: string } }): InboundMessage {
+export function inbound(
+  waId: string,
+  turn: { say?: string; tap?: { id: string; label: string; kind?: "button" | "interactive" } }
+): InboundMessage {
   seq++;
   const isTap = Boolean(turn.tap);
   return {
@@ -160,7 +163,7 @@ export function inbound(waId: string, turn: { say?: string; tap?: { id: string; 
     contactName: "E2E Guest",
     whatsappMessageId: `wamid.E2E.${waId}.${seq}.${Date.now()}`,
     timestamp: String(Math.floor(Date.now() / 1000)),
-    type: isTap ? "interactive" : "text",
+    type: isTap ? (turn.tap!.kind ?? "interactive") : "text",
     text: isTap ? null : (turn.say ?? ""),
     buttonText: isTap ? turn.tap!.label : null,
     interactiveId: isTap ? turn.tap!.id : null,
