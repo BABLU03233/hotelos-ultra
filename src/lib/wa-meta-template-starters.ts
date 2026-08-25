@@ -53,6 +53,27 @@ export const WA_META_TEMPLATE_STARTERS: {
     },
   },
   {
+    id: "weekend-20-off-ready",
+    title: "Weekend 20% off — all rooms",
+    blurb: "Nothing to fill in. Every room, this weekend, 20% off.",
+    readyToUse: true,
+    template: {
+      category: "MARKETING",
+      header: { type: "text", text: "Weekend offer — 20% off all rooms" },
+      bodyText:
+        "Hi {{1}}, this is {{2}}. Enjoy 20% off every room this weekend — book Friday to Sunday and save on your stay. Reply BOOK and we'll hold a room for you.",
+      bodyVariableSlots: [
+        { source: "guest_name", label: "" },
+        { source: "hotel_name", label: "" },
+      ],
+      footerText: "Reply STOP anytime to opt out",
+      buttons: [
+        { type: "QUICK_REPLY", text: "Book now" },
+        { type: "QUICK_REPLY", text: "Stop promos" },
+      ],
+    },
+  },
+  {
     id: "first-stay-ready",
     title: "First stay — 15% off",
     blurb: "Introduces the hotel by name. Best for cold contacts.",
