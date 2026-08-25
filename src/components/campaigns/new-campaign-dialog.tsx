@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ImportContactsDialog } from "@/components/campaigns/import-contacts-dialog";
 import { MetaTemplatePicker } from "@/components/templates/meta-template-picker";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { CopyCheck } from "@/components/campaigns/copy-check";
@@ -114,7 +115,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   const [search, setSearch] = React.useState("");
   const [showPacing, setShowPacing] = React.useState(false);
 
-  const { data } = useFetch<{ contacts: Contact[] }>(open ? "/api/contacts" : null);
+  const { data, reload: reloadContacts } = useFetch<{ contacts: Contact[] }>(open ? "/api/contacts" : null);
   const visibleContacts =
     data?.contacts.filter(
       (c) =>
@@ -171,6 +172,15 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       for (const c of selectableContacts) next.add(c.id);
       return next;
     });
+  }
+
+  // Newly imported numbers land in the contact list with no way to reach
+  // this dialog's selection state on their own — merge their ids straight
+  // into what's already picked, and refetch so they show up if the owner
+  // scrolls the list, instead of leaving them selected-but-invisible.
+  function onContactsImported({ contactIds }: { contactIds: string[] }) {
+    setSelectedIds((prev) => new Set([...prev, ...contactIds]));
+    reloadContacts();
   }
 
   function toggle(id: string) {
@@ -372,16 +382,21 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
             <div className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between gap-2">
                 <Label>{selectedIds.size} selected</Label>
-                <button
-                  type="button"
-                  onClick={selectSegment}
-                  disabled={selectableContacts.length === 0}
-                  className="text-xs font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
-                >
-                  {search.trim()
-                    ? `Select all ${selectableContacts.length} matching`
-                    : `Select all ${segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase() + " "}(${selectableContacts.length})`}
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Not on the contact list yet? Import them without leaving
+                      this broadcast — they land pre-selected below. */}
+                  <ImportContactsDialog onImported={onContactsImported} allowSendNow={false} />
+                  <button
+                    type="button"
+                    onClick={selectSegment}
+                    disabled={selectableContacts.length === 0}
+                    className="text-xs font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    {search.trim()
+                      ? `Select all ${selectableContacts.length} matching`
+                      : `Select all ${segment === "ALL" ? "" : SEGMENT_FILTERS.find((s) => s.key === segment)?.label.toLowerCase() + " "}(${selectableContacts.length})`}
+                  </button>
+                </div>
               </div>
 
               <div className="relative">

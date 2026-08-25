@@ -56,7 +56,7 @@ export const POST = apiRoute(async (req: NextRequest) => {
   }
 
   if (!rows.length) {
-    return NextResponse.json({ imported: 0, skipped: 0, errors, corrected, campaignId: null });
+    return NextResponse.json({ imported: 0, skipped: 0, errors, corrected, campaignId: null, contactIds: [] });
   }
 
   const phones = rows.map((r) => r.phone);
@@ -109,5 +109,5 @@ export const POST = apiRoute(async (req: NextRequest) => {
     campaignId = campaign.id;
   }
 
-  return NextResponse.json({ imported, skipped, errors, corrected, campaignId }, { status: 201 });
+  return NextResponse.json({ imported, skipped, errors, corrected, campaignId, contactIds }, { status: 201 });
 });

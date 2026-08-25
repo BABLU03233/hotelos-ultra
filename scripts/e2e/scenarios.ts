@@ -61,7 +61,9 @@ const NOT_CANNED: Check = {
 
 const NOT_ESCALATED: Check = {
   label: "not handed off to staff",
-  test: (s) => !/let me get one of our team/i.test(bodyOf(s)),
+  // Matches any holding-message variant — see src/lib/ai/holding-message.ts —
+  // not just the original single fixed string.
+  test: (s) => !/one of our team/i.test(bodyOf(s)),
 };
 
 const NO_RAW_MARKER: Check = {

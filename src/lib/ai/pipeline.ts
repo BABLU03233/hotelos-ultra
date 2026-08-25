@@ -8,6 +8,7 @@ import { guestDateLooksPast } from "./date-safety";
 import { createFallbackProvider } from "./fallback-provider";
 import { createGeminiProvider, geminiProvider } from "./gemini-provider";
 import { createGroqProvider, groqProvider } from "./groq-provider";
+import { randomHoldingMessage } from "./holding-message";
 import {
   extractInteractivePrompt,
   hasStatedGuestCount,
@@ -652,7 +653,7 @@ export async function generateReply(
   const escalation = findEscalation(trimmed);
   if (escalation) {
     return {
-      reply: "Thanks for your message — let me get one of our team to help with that, they'll be with you shortly!",
+      reply: randomHoldingMessage(),
       imageUrls: [],
       shouldEscalate: true,
       escalationReason: escalation.reason,

@@ -1,3 +1,4 @@
+import { randomHoldingMessage } from "@/lib/ai/holding-message";
 import { looksLikeObviousLanguage, readyToOfferRooms, resolveDeterministicReply } from "@/lib/ai/interactive-prompts";
 import { generateReply, summarizeConversation } from "@/lib/ai/pipeline";
 import { ChatMessage } from "@/lib/ai/provider";
@@ -402,7 +403,7 @@ export async function processMessageJob(job: ProcessMessageJob): Promise<void> {
       // a normal reply, so the guest always gets *something* even in the
       // worst-case total-outage scenario.
       console.error(`generateReply failed for tenant ${tenantId}, contact ${contactId}:`, err);
-      const holdingText = "Thanks for your message — let me get one of our team to help with that, they'll be with you shortly!";
+      const holdingText = randomHoldingMessage();
       try {
         const creds = await getWhatsAppCredentials(tenantId);
         if (creds) {

@@ -26,9 +26,22 @@ interface ImportResponse {
   errors: string[];
   corrected: string[];
   campaignId: string | null;
+  contactIds: string[];
 }
 
-export function ImportContactsDialog({ onImported }: { onImported: () => void }) {
+interface ImportContactsDialogProps {
+  onImported: (result: { contactIds: string[] }) => void;
+  /**
+   * Hides the "send a re-engagement message now" toggle. Used when this
+   * dialog is embedded inside a broadcast that's already mid-compose (the
+   * New broadcast wizard's Who step) — that flow already owns sending, so a
+   * second, independent send-trigger here would either be redundant or,
+   * worse, fire a second campaign nobody asked for.
+   */
+  allowSendNow?: boolean;
+}
+
+export function ImportContactsDialog({ onImported, allowSendNow = true }: ImportContactsDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [mode, setMode] = React.useState<"file" | "manual">("file");
   const [file, setFile] = React.useState<File | null>(null);
@@ -77,7 +90,7 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
 
       setOpen(false);
       reset();
-      onImported();
+      onImported({ contactIds: result.contactIds });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -86,7 +99,7 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
   }
 
   const canSubmit =
-    (mode === "file" ? !!file : manualText.trim().length > 0) && (!sendNow || !!metaTemplateId);
+    (mode === "file" ? !!file : manualText.trim().length > 0) && (!allowSendNow || !sendNow || !!metaTemplateId);
 
   return (
     <Dialog open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
@@ -132,28 +145,35 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
             </TabsContent>
           </Tabs>
 
-          <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Send a re-engagement message now</p>
-                <p className="text-xs text-muted-foreground">Uses an approved WhatsApp template — required for messaging numbers that haven&apos;t messaged you first.</p>
+          {allowSendNow ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Send a re-engagement message now</p>
+                  <p className="text-xs text-muted-foreground">Uses an approved WhatsApp template — required for messaging numbers that haven&apos;t messaged you first.</p>
+                </div>
+                <Switch checked={sendNow} onCheckedChange={setSendNow} />
               </div>
-              <Switch checked={sendNow} onCheckedChange={setSendNow} />
+              {sendNow && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Meta-approved template</Label>
+                  <MetaTemplatePicker
+                    metaTemplateId={metaTemplateId}
+                    templateVariableValues={templateVariableValues}
+                    onChange={(next) => {
+                      setMetaTemplateId(next.metaTemplateId);
+                      setTemplateVariableValues(next.templateVariableValues);
+                    }}
+                  />
+                </div>
+              )}
             </div>
-            {sendNow && (
-              <div className="flex flex-col gap-1.5">
-                <Label>Meta-approved template</Label>
-                <MetaTemplatePicker
-                  metaTemplateId={metaTemplateId}
-                  templateVariableValues={templateVariableValues}
-                  onChange={(next) => {
-                    setMetaTemplateId(next.metaTemplateId);
-                    setTemplateVariableValues(next.templateVariableValues);
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              These numbers are added to your contacts and selected below — pick your template and send timing in the
+              next steps of this broadcast.
+            </p>
+          )}
         </div>
 
         <DialogFooter>
