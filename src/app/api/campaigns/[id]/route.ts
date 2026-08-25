@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { ApiError, apiRoute, notFound } from "@/lib/api-error";
 import { requireTenantDb } from "@/lib/auth/require-session";
+import { deleteCampaign } from "@/lib/campaigns/delete";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -163,4 +164,20 @@ export const PATCH = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
     },
   });
   return NextResponse.json({ campaign });
+});
+
+/**
+ * Remove a campaign that never sent — cleaning up a duplicate made by
+ * mistake, an abandoned draft, or one still stuck in review the owner has
+ * decided against. Blocked once sentAt is set for the same reason PATCH is:
+ * a sent campaign's recipient rows are the delivery record of what actually
+ * happened, not something to make disappear. Cascades to its
+ * CampaignRecipient rows (see prisma/schema.prisma's onDelete: Cascade).
+ */
+export const DELETE = apiRoute(async (req: NextRequest, ctx: RouteParams) => {
+  const { db } = requireTenantDb(req);
+  const { id } = await ctx.params;
+
+  await deleteCampaign(db, id);
+  return NextResponse.json({ ok: true });
 });

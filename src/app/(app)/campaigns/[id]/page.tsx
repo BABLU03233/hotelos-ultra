@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
 import { EditCampaignDialog } from "@/components/campaigns/edit-campaign-dialog";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 import { RecipientTable } from "@/components/campaigns/recipient-table";
@@ -142,6 +143,16 @@ export default function CampaignDetailPage() {
                 that copy was reviewed as written — the server refuses it too. */}
             {!campaign.sentAt && campaign.approval !== "APPROVED" && (
               <EditCampaignDialog campaign={campaign} onSaved={reload} />
+            )}
+            {/* The other half of "edit or remove" — a duplicate made by
+                mistake, or a submission the owner changed their mind about,
+                previously had no way off the list except waiting for a
+                reviewer to reject it. Broader than Edit's gate above:
+                deleting an already-APPROVED-but-unsent campaign is fine
+                (nothing has gone out either way), only editing reviewed
+                copy afterwards is the thing that's blocked. */}
+            {!campaign.sentAt && (
+              <DeleteCampaignButton campaignId={campaign.id} campaignName={campaign.name} onDeleted={() => router.push("/campaigns")} />
             )}
             {/* Disabled rather than hidden while a campaign waits for review.
                 A vanished button reads as a bug; a disabled one next to the

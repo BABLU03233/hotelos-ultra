@@ -5,6 +5,7 @@ import { Megaphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
 import { ImportContactsDialog } from "@/components/campaigns/import-contacts-dialog";
 import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 import { Reveal } from "@/components/motion/reveal";
@@ -54,10 +55,10 @@ export default function CampaignsPage() {
           <div className="flex flex-col gap-3">
             {data?.campaigns.map((c, i) => (
               <StaggerItem key={c.id} index={i}>
-                <Link href={`/campaigns/${c.id}`}>
-                  <Card className="transition-shadow hover:shadow-md">
-                    <CardContent className="flex items-center justify-between">
-                      <div>
+                <Card className="transition-shadow hover:shadow-md">
+                  <CardContent className="flex items-center justify-between gap-2">
+                    <Link href={`/campaigns/${c.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="text-sm font-medium">{c.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {c.type} · {c._count?.recipients ?? 0} recipients · {formatDate(c.createdAt)}
@@ -66,14 +67,18 @@ export default function CampaignsPage() {
                       {(() => {
                         const status = campaignStatus(c, c.delivery);
                         return (
-                          <span className={cn("text-xs font-medium", campaignStatusClass(status.tone))}>
+                          <span className={cn("shrink-0 text-xs font-medium", campaignStatusClass(status.tone))}>
                             {status.label}
                           </span>
                         );
                       })()}
-                    </CardContent>
-                  </Card>
-                </Link>
+                    </Link>
+                    {/* Sent campaigns keep their delivery record — only a
+                        broadcast still stuck in review, rejected, or never
+                        submitted can be cleaned up. */}
+                    {!c.sentAt && <DeleteCampaignButton campaignId={c.id} campaignName={c.name} onDeleted={reload} />}
+                  </CardContent>
+                </Card>
               </StaggerItem>
             ))}
           </div>

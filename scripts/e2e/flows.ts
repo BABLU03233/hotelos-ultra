@@ -111,6 +111,85 @@ export const FLOWS: Flow[] = [
     },
   },
   {
+    id: "campaign-delete-guards-and-syncs",
+    area: "campaigns",
+    title: "Deleting a campaign is blocked once sent, tenant-isolated, and never leaves a stale row anywhere",
+    because:
+      "\"Send again\" and duplicate/import both leave abandoned or mistaken campaigns behind with no cleanup path. " +
+      "Delete has to (1) actually remove a real DB row rather than just hide it, so it can never show up stale in " +
+      "the platform admin's cross-tenant review queue — which reads straight from the same table — and (2) never " +
+      "let one tenant's request resolve against another tenant's row, since the only thing gating that is the " +
+      "tenant-scoped Prisma client, not anything route-level.",
+    async run({ prisma, tenantId }) {
+      const { deleteCampaign } = await import("@/lib/campaigns/delete");
+      const { tenantDb } = await import("@/lib/tenant");
+      const { ApiError } = await import("@/lib/api-error");
+      const checks: FlowCheck[] = [];
+      const db = tenantDb(tenantId);
+
+      // A sent campaign is refused, and the row (and its recipient) survive.
+      const sent = await seedCampaign(prisma, tenantId, { approval: "APPROVED", sentAt: new Date() });
+      let sentRefused = false;
+      let sentRefusalIsClientError = false;
+      try {
+        await deleteCampaign(db, sent.id);
+      } catch (err) {
+        sentRefused = true;
+        sentRefusalIsClientError = err instanceof ApiError && err.status === 400;
+      }
+      checks.push({ label: "a sent campaign is refused", passed: sentRefused });
+      checks.push({ label: "the refusal is a 400 ApiError, not a 500", passed: sentRefusalIsClientError });
+      checks.push({
+        label: "the sent campaign's row still exists after the refused delete",
+        passed: (await prisma.campaign.findUnique({ where: { id: sent.id } })) !== null,
+      });
+
+      // An unsent campaign actually disappears — not soft-deleted, not
+      // flagged — a real row removal, cascading to its recipient(s).
+      const pending = await seedCampaign(prisma, tenantId);
+      const recipientCountBefore = await prisma.campaignRecipient.count({ where: { campaignId: pending.id } });
+      await deleteCampaign(db, pending.id);
+      checks.push({ label: "seeded with at least one recipient to prove the cascade means something", passed: recipientCountBefore > 0 });
+      checks.push({
+        label: "the campaign row is actually gone, not just hidden",
+        passed: (await prisma.campaign.findUnique({ where: { id: pending.id } })) === null,
+      });
+      checks.push({
+        label: "its recipient row cascaded away too — no orphan left behind",
+        passed: (await prisma.campaignRecipient.count({ where: { campaignId: pending.id } })) === 0,
+      });
+
+      // The platform admin's review queue (src/app/api/admin/campaigns/route.ts)
+      // queries prisma.campaign.findMany({ where: { approval } }) directly —
+      // no cache, no separate index to fall out of sync. Proving the row is
+      // gone from that exact query shape is what "won't show up stale for
+      // the admin" actually means, rather than trusting it by inference.
+      const stillInAdminQueue = await prisma.campaign.findMany({ where: { approval: "PENDING_REVIEW", id: pending.id } });
+      checks.push({ label: "gone from the admin review queue's own query, not just the tenant's view", passed: stillInAdminQueue.length === 0 });
+
+      // Tenant isolation: a real row exists, but a DIFFERENT tenant's
+      // scoped client resolves it as not-found rather than deleting across
+      // tenants — this is the only thing standing between the route and a
+      // cross-tenant delete, since the route itself does no ownership check
+      // beyond handing the id to this tenant-scoped db.
+      const otherTenantsCampaign = await seedCampaign(prisma, tenantId);
+      const foreignDb = tenantDb("e2e-unrelated-tenant-id");
+      let crossTenantRefused = false;
+      try {
+        await deleteCampaign(foreignDb, otherTenantsCampaign.id);
+      } catch {
+        crossTenantRefused = true;
+      }
+      checks.push({ label: "a different tenant's scoped client can't delete this campaign", passed: crossTenantRefused });
+      checks.push({
+        label: "the campaign survives the attempted cross-tenant delete",
+        passed: (await prisma.campaign.findUnique({ where: { id: otherTenantsCampaign.id } })) !== null,
+      });
+
+      return checks;
+    },
+  },
+  {
     id: "campaign-scheduled-sweep-respects-approval",
     area: "campaigns",
     title: "The scheduled-send sweep skips unapproved campaigns",
