@@ -1,4 +1,4 @@
-import { MessageStatus, MessageType } from "@/generated/prisma/enums";
+import { CampaignRecipientStatus, MessageStatus, MessageType } from "@/generated/prisma/enums";
 import {
   CONFIRM_BOOKING_BUTTON_ID,
   GREET_QUESTION_BUTTON_ID,
@@ -1410,7 +1410,9 @@ export async function handleInboundMessage(msg: InboundMessage): Promise<void> {
   );
 }
 
-function mapStatus(status: StatusUpdate["status"]): MessageStatus {
+type DeliveryStatus = "SENT" | "DELIVERED" | "READ" | "FAILED";
+
+function mapStatus(status: StatusUpdate["status"]): DeliveryStatus {
   switch (status) {
     case "sent":
       return "SENT";
@@ -1423,18 +1425,110 @@ function mapStatus(status: StatusUpdate["status"]): MessageStatus {
   }
 }
 
+// FAILED shares READ's rank because Meta's documented progression does not
+// include READ -> FAILED. The explicit terminal checks below make that rule
+// clear while still allowing SENT/DELIVERED -> FAILED.
+function statusRank(status: DeliveryStatus): number {
+  return { SENT: 1, DELIVERED: 2, READ: 3, FAILED: 3 }[status];
+}
+
+function callbackDate(timestamp: string): Date | null {
+  const seconds = Number(timestamp);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  const date = new Date(seconds * 1000);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function canApplyMessageStatus(current: MessageStatus, incoming: DeliveryStatus, at: Date | null, persistedAt: Date | null): boolean {
+  if (!["SENT", "DELIVERED", "READ", "FAILED"].includes(current)) return false;
+  if (current === "FAILED" && incoming !== "FAILED") return false;
+  if (current === "READ" && incoming === "FAILED") return false;
+
+  const currentDelivery = current as DeliveryStatus;
+  const currentRank = statusRank(currentDelivery);
+  const incomingRank = statusRank(incoming);
+  if (incomingRank < currentRank) return false;
+  if (incomingRank > currentRank) return true;
+
+  // A timestamp-less callback can still establish the same status once. For
+  // repeated timestamped callbacks, only the newest event wins.
+  if (!at || !persistedAt) return current !== incoming || !persistedAt;
+  return at.getTime() > persistedAt.getTime();
+}
+
+function canApplyRecipientStatus(
+  current: CampaignRecipientStatus,
+  incoming: DeliveryStatus,
+  at: Date | null,
+  persistedAt: Date | null
+): boolean {
+  // A guest reply, booking, explicit interest, or opt-out cancellation is a
+  // newer business outcome than any delivery receipt. Never downgrade it.
+  if (["REPLIED", "INTERESTED", "BOOKED", "CANCELLED"].includes(current)) return false;
+  if (current === "FAILED" && incoming !== "FAILED") return false;
+  if (current === "READ" && incoming === "FAILED") return false;
+
+  const currentDelivery = current === "PENDING" ? "SENT" : (current as DeliveryStatus);
+  const currentRank = current === "PENDING" ? 0 : statusRank(currentDelivery);
+  const incomingRank = statusRank(incoming);
+  if (incomingRank < currentRank) return false;
+  if (incomingRank > currentRank) return true;
+  if (!at || !persistedAt) return currentDelivery !== incoming || !persistedAt;
+  return at.getTime() > persistedAt.getTime();
+}
+
 /** Delivery/read receipts for messages we sent. */
 export async function handleStatusUpdate(status: StatusUpdate): Promise<void> {
   if (!status.whatsappMessageId) return;
-  await prisma.message.updateMany({
-    where: { whatsappMessageId: status.whatsappMessageId },
-    data: {
-      status: mapStatus(status.status),
-      // Only written on failure, and only when Meta actually said why — a
-      // later delivered/read update for the same message must not wipe a
-      // reason, and a failure with no errors[] must not blank an existing one.
-      ...(status.status === "failed" && status.errorCode !== null ? { errorCode: status.errorCode } : {}),
-      ...(status.status === "failed" && status.errorTitle ? { errorTitle: status.errorTitle } : {}),
-    },
+
+  const incoming = mapStatus(status.status);
+  const at = callbackDate(status.timestamp);
+  const failureReason =
+    status.errorTitle?.trim() ||
+    (status.errorCode !== null ? `WhatsApp rejected this message (error ${status.errorCode}).` : "WhatsApp rejected this message.");
+
+  await prisma.$transaction(async (tx) => {
+    const message = await tx.message.findUnique({
+      where: { whatsappMessageId: status.whatsappMessageId },
+      include: {
+        campaignRecipient: {
+          include: { campaign: { select: { tenantId: true } } },
+        },
+      },
+    });
+    // Meta can retry a callback after the local message was removed, or send
+    // an event for a different app. A valid, unknown wamid is a safe no-op.
+    if (!message) return;
+
+    const recipient = message.campaignRecipient;
+    const campaignRelationIsValid =
+      recipient &&
+      recipient.campaign.tenantId === message.tenantId &&
+      recipient.contactId === message.contactId;
+    const updateMessage = canApplyMessageStatus(message.status, incoming, at, message.whatsappStatusAt);
+    const updateRecipient = campaignRelationIsValid
+      ? canApplyRecipientStatus(recipient.status, incoming, at, message.whatsappStatusAt)
+      : false;
+
+    if (!updateMessage && !updateRecipient) return;
+
+    await tx.message.update({
+      where: { id: message.id },
+      data: {
+        ...(updateMessage ? { status: incoming, ...(at ? { whatsappStatusAt: at } : {}) } : {}),
+        ...(incoming === "FAILED" && status.errorCode !== null ? { errorCode: status.errorCode } : {}),
+        ...(incoming === "FAILED" && status.errorTitle ? { errorTitle: status.errorTitle } : {}),
+      },
+    });
+
+    if (updateRecipient && recipient) {
+      await tx.campaignRecipient.update({
+        where: { id: recipient.id },
+        data: {
+          status: incoming,
+          ...(incoming === "FAILED" && !recipient.failureReason ? { failureReason } : {}),
+        },
+      });
+    }
   });
 }

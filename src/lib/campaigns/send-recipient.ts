@@ -73,6 +73,7 @@ export async function sendCampaignToRecipient(campaignRecipientId: string): Prom
           content: campaign.body ?? `[template: ${campaign.metaTemplate?.name ?? campaign.templateName}]`,
           mediaUrl: campaign.mediaUrl,
           whatsappMessageId,
+          campaignRecipientId: recipient.id,
           status: "SENT",
         },
       }),

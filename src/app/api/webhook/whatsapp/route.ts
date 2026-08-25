@@ -40,8 +40,16 @@ export const POST = apiRoute(async (req: NextRequest) => {
   const { messages, statuses } = parseWebhookPayload(payload);
 
   const results = await Promise.allSettled([...messages.map(handleInboundMessage), ...statuses.map(handleStatusUpdate)]);
-  for (const result of results) {
-    if (result.status === "rejected") console.error("Webhook event handling failed:", result.reason);
+  const rejected = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  for (const result of rejected) {
+    console.error("Webhook event handling failed:", result.reason);
+  }
+
+  // Process every event in the batch, but do not acknowledge the batch when
+  // any durable handler failed. Meta retries a non-2xx response, and the
+  // status handler is idempotent so the retry is safe.
+  if (rejected.length) {
+    throw new Error(`Failed to persist ${rejected.length} WhatsApp webhook event${rejected.length === 1 ? "" : "s"}`);
   }
 
   return NextResponse.json({ received: true });

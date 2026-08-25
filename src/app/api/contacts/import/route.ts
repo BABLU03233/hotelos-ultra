@@ -31,6 +31,7 @@ export const POST = apiRoute(async (req: NextRequest) => {
 
   let rows: ImportRow[];
   let errors: string[];
+  let corrected: string[];
 
   if (file instanceof File) {
     const name = file.name.toLowerCase();
@@ -39,21 +40,23 @@ export const POST = apiRoute(async (req: NextRequest) => {
       const result = await parseImportWorkbook(buffer).catch(() => ({
         rows: [] as ImportRow[],
         errors: ["Couldn't read this file — make sure it's a valid .xlsx or .xls spreadsheet."],
+        corrected: [] as string[],
       }));
       rows = result.rows;
       errors = result.errors;
+      corrected = result.corrected;
     } else {
       const text = await file.text();
-      ({ rows, errors } = parseImportCsv(text));
+      ({ rows, errors, corrected } = parseImportCsv(text));
     }
   } else if (typeof manualText === "string" && manualText.trim()) {
-    ({ rows, errors } = parseManualEntries(manualText));
+    ({ rows, errors, corrected } = parseManualEntries(manualText));
   } else {
     throw new ApiError(400, "Provide a file (.csv/.xlsx/.xls) or paste numbers manually");
   }
 
   if (!rows.length) {
-    return NextResponse.json({ imported: 0, skipped: 0, errors, campaignId: null });
+    return NextResponse.json({ imported: 0, skipped: 0, errors, corrected, campaignId: null });
   }
 
   const phones = rows.map((r) => r.phone);
@@ -106,5 +109,5 @@ export const POST = apiRoute(async (req: NextRequest) => {
     campaignId = campaign.id;
   }
 
-  return NextResponse.json({ imported, skipped, errors, campaignId }, { status: 201 });
+  return NextResponse.json({ imported, skipped, errors, corrected, campaignId }, { status: 201 });
 });

@@ -580,15 +580,22 @@ model Message {
   interactiveId     String?
   // WhatsApp's wamid — unique across the whole platform, used to dedupe
   // webhook retries idempotently. Nullable (draft/failed-before-send rows).
-  whatsappMessageId String?          @unique
-  status            MessageStatus    @default(SENT)
+  whatsappMessageId   String?          @unique
+  // Directly ties a campaign send to the exact recipient row. Nullable for
+  // manual, AI, and follow-up messages that are not campaign sends.
+  campaignRecipientId String?          @unique
+  // Meta status callback timestamp, converted from Unix seconds. Used to
+  // reject an older same-rank callback arriving after a newer one.
+  whatsappStatusAt    DateTime?
+  status              MessageStatus    @default(SENT)
   // Set only for OUT messages a staff member typed manually (vs. Anushka) —
   // lets the CRM show "replied by Priya".
   senderUserId      String?
   createdAt         DateTime         @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact           Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  campaignRecipient CampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, contactId, createdAt])
 }
@@ -748,6 +755,7 @@ model CampaignRecipient {
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  message  Message?
 
   @@unique([campaignId, contactId])
   @@index([campaignId, status])

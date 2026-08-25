@@ -9,15 +9,39 @@ export interface ImportRow {
 export interface ImportResult {
   rows: ImportRow[];
   errors: string[];
+  // Rows WhatsApp would otherwise have silently dropped at send time — a bare
+  // 10-digit Indian mobile got its country code filled in. Surfaced so an
+  // owner pasting their own number (nobody types their own country code)
+  // sees it happened, instead of finding out when that one message never
+  // arrives. See [[hotelos-whatsapp-bulk-send-country-code]] in memory.
+  corrected: string[];
 }
 
 const PHONE_HEADERS = ["phone", "number", "mobile", "whatsapp", "whatsapp number", "phone number"];
 const NAME_HEADERS = ["name", "guest name", "contact name"];
 
-/** Digits only (matches the waId/whatsappNumber format already used everywhere else — no leading '+'). */
-export function normalizePhone(raw: string): string | null {
+// Every hotel on this platform is Indian (₹ pricing, IVR-style booking codes
+// throughout) — a bare 10-digit number starting 6-9 is always a local mobile
+// missing its country code, never a foreign number that happens to be the
+// same length. Revisit this the day the platform serves a hotel outside India.
+const INDIA_COUNTRY_CODE = "91";
+const INDIA_MOBILE_PATTERN = /^[6-9]\d{9}$/;
+
+/**
+ * Digits only (matches the waId/whatsappNumber format already used
+ * everywhere else — no leading '+'), with the country code filled in for a
+ * bare Indian mobile number. WhatsApp's Cloud API requires the full
+ * E.164 digits and does not infer a country code — send it a 10-digit
+ * number and it just fails for that one recipient, with everything else in
+ * the same broadcast going out fine.
+ */
+export function normalizePhone(raw: string): { phone: string; corrected: boolean } | null {
   const digits = raw.trim().replace(/\D/g, "");
-  return digits.length >= 8 ? digits : null;
+  if (INDIA_MOBILE_PATTERN.test(digits)) return { phone: INDIA_COUNTRY_CODE + digits, corrected: true };
+  // Upper bound matches E.164's real max (country code + subscriber number);
+  // without it a pasted non-phone string of any length "validated" as a number.
+  if (digits.length >= 8 && digits.length <= 15) return { phone: digits, corrected: false };
+  return null;
 }
 
 function buildRows(
@@ -25,21 +49,24 @@ function buildRows(
   rowLabel: (i: number) => string
 ): ImportResult {
   const errors: string[] = [];
+  const corrected: string[] = [];
   const rows: ImportRow[] = [];
   const seen = new Set<string>();
 
   records.forEach(({ name, rawPhone }, i) => {
-    const phone = normalizePhone(rawPhone);
-    if (!phone) {
+    const result = normalizePhone(rawPhone);
+    if (!result) {
       errors.push(`${rowLabel(i)}: invalid phone number "${rawPhone}"`);
       return;
     }
+    const { phone } = result;
     if (seen.has(phone)) return; // silent dedupe within the same file/paste
     seen.add(phone);
+    if (result.corrected) corrected.push(`${rowLabel(i)}: ${rawPhone.trim()} → +${phone} (added the missing country code)`);
     rows.push({ name, phone });
   });
 
-  return { rows, errors };
+  return { rows, errors, corrected };
 }
 
 /** Parses an uploaded .csv file. Expects a header row with a phone/number/mobile/whatsapp column. */
@@ -50,7 +77,7 @@ export function parseImportCsv(csvText: string): ImportResult {
   const nameKey = fields.find((f) => NAME_HEADERS.includes(f.toLowerCase().trim()));
 
   if (!phoneKey) {
-    return { rows: [], errors: ["No phone/number/mobile/whatsapp column found in the file's header row."] };
+    return { rows: [], errors: ["No phone/number/mobile/whatsapp column found in the file's header row."], corrected: [] };
   }
 
   return buildRows(
@@ -72,7 +99,7 @@ export async function parseImportWorkbook(buffer: Buffer): Promise<ImportResult>
   // naming a Buffer type ourselves.
   await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   const sheet = workbook.worksheets[0];
-  if (!sheet) return { rows: [], errors: ["The uploaded file has no sheets."] };
+  if (!sheet) return { rows: [], errors: ["The uploaded file has no sheets."], corrected: [] };
 
   const headerRow = sheet.getRow(1).values as unknown[];
   const headers = headerRow.map((h) => String(h ?? "").toLowerCase().trim());
@@ -80,7 +107,7 @@ export async function parseImportWorkbook(buffer: Buffer): Promise<ImportResult>
   const nameIdx = headers.findIndex((h) => NAME_HEADERS.includes(h));
 
   if (phoneIdx === -1) {
-    return { rows: [], errors: ["No phone/number/mobile/whatsapp column found in the sheet's header row."] };
+    return { rows: [], errors: ["No phone/number/mobile/whatsapp column found in the sheet's header row."], corrected: [] };
   }
 
   const records: { name: string | null; rawPhone: string }[] = [];

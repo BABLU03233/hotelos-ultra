@@ -24,6 +24,7 @@ interface ImportResponse {
   imported: number;
   skipped: number;
   errors: string[];
+  corrected: string[];
   campaignId: string | null;
 }
 
@@ -65,6 +66,11 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
       if (result.skipped) parts.push(`${result.skipped} already existed`);
       if (result.campaignId) parts.push(`${result.imported + result.skipped} messages queued`);
       toast.success(parts.join(" · "));
+      if (result.corrected.length) {
+        toast.info(
+          `${result.corrected.length} number${result.corrected.length > 1 ? "s" : ""} had no country code — added +91 automatically: ${result.corrected.slice(0, 3).join("; ")}`
+        );
+      }
       if (result.errors.length) {
         toast.warning(`${result.errors.length} row${result.errors.length > 1 ? "s" : ""} skipped: ${result.errors.slice(0, 3).join("; ")}`);
       }
@@ -119,7 +125,9 @@ export function ImportContactsDialog({ onImported }: { onImported: () => void })
                   placeholder={"Ananya, 9198765 43210\n9123456789"}
                   className="min-h-28"
                 />
-                <p className="text-xs text-muted-foreground">&quot;Name, Phone&quot; or just a phone number, one per line.</p>
+                <p className="text-xs text-muted-foreground">
+                  &quot;Name, Phone&quot; or just a phone number, one per line. Missing the +91? We&apos;ll add it.
+                </p>
               </div>
             </TabsContent>
           </Tabs>
