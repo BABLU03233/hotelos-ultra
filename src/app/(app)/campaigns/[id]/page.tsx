@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditCampaignDialog } from "@/components/campaigns/edit-campaign-dialog";
+import { NewCampaignDialog } from "@/components/campaigns/new-campaign-dialog";
 import { RecipientTable } from "@/components/campaigns/recipient-table";
 import { Reveal } from "@/components/motion/reveal";
 import { formatDateTime } from "@/lib/format";
@@ -50,18 +51,19 @@ export default function CampaignDetailPage() {
   }
 
   /**
-   * Run this promotion again.
+   * Retry exactly the recipients who failed — always a copy, never a re-send
+   * of this row, since the recipient records are the delivery history of
+   * what actually happened and the copy has to go back through review.
    *
-   * Always a copy, never a re-send of this row: the recipient records are the
-   * delivery history of what actually happened, and the copy has to go back
-   * through review — otherwise "send again" would be a way to put unreviewed
-   * copy in front of guests.
+   * "Send again" to the same list (or a freshly chosen one) is a different
+   * button below, using NewCampaignDialog's own picker instead of this
+   * endpoint — see its prefill comment for why.
    */
-  async function duplicate(which: "same" | "failed") {
+  async function retryFailed() {
     try {
       const { campaign: copy } = await apiFetch<{ campaign: Campaign }>(`/api/campaigns/${params.id}/duplicate`, {
         method: "POST",
-        body: JSON.stringify({ recipients: which }),
+        body: JSON.stringify({ recipients: "failed" }),
       });
       toast.success("Copy created and sent for approval — open it to edit before it's reviewed.");
       router.push(`/campaigns/${copy.id}`);
@@ -159,14 +161,33 @@ export default function CampaignDetailPage() {
             {/* Running the same promotion again is a normal thing to want, and
                 until now the only route was retyping the whole campaign. */}
             {campaign.sentAt && report.failed > 0 && (
-              <Button variant="outline" onClick={() => duplicate("failed")}>
+              <Button variant="outline" onClick={retryFailed}>
                 Retry the {report.failed} that failed
               </Button>
             )}
+            {/* Opens the same wizard used to build any campaign, with the
+                message already filled in from this one and landed straight
+                on Who — the recipient list was fixed on "Send again" before,
+                which meant reaching new people with the same offer required
+                retyping the whole thing from scratch. */}
             {campaign.sentAt && (
-              <Button variant="outline" onClick={() => duplicate("same")}>
-                <Copy className="size-4" /> Send again
-              </Button>
+              <NewCampaignDialog
+                onCreated={(created) => router.push(`/campaigns/${created.id}`)}
+                initialStep={2}
+                prefill={{
+                  name: campaign.name,
+                  messageType: campaign.messageType,
+                  body: campaign.body,
+                  mediaUrl: campaign.mediaUrl,
+                  metaTemplateId: campaign.metaTemplateId,
+                  templateVariableValues: campaign.templateVariableValues,
+                }}
+                trigger={
+                  <Button variant="outline">
+                    <Copy className="size-4" /> Send again
+                  </Button>
+                }
+              />
             )}
           </div>
         </div>

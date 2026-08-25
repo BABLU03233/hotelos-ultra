@@ -102,6 +102,12 @@ export const POST = apiRoute(async (req: NextRequest) => {
         templateName,
         metaTemplateId,
         templateVariableValues,
+        // Spaced by default, not all-at-once — see the same reasoning in
+        // new-campaign-dialog.tsx. This path in particular is always cold
+        // numbers by definition (that's the whole point of an import), the
+        // exact case Meta's anti-spam system watches most closely.
+        sendPacing: "SPACED",
+        sendIntervalSeconds: 60,
         recipients: { createMany: { data: contactIds.map((contactId) => ({ contactId })) } },
       },
     });

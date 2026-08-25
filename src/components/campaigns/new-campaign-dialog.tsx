@@ -35,7 +35,7 @@ import { reachabilityWarning, unreachableForFreeForm } from "@/lib/campaigns/rea
 import { matchesSearch } from "@/lib/contacts/search";
 import { slugify } from "@/lib/slugify";
 import { cn } from "@/lib/utils";
-import { CampaignMessageType, CampaignSendPacing, Contact, LeadSource, LeadStatus } from "@/types";
+import { Campaign, CampaignMessageType, CampaignSendPacing, Contact, LeadSource, LeadStatus } from "@/types";
 
 type IntervalUnit = "seconds" | "minutes" | "hours";
 
@@ -94,16 +94,50 @@ const STEPS = [
   { n: 3, label: "When" },
 ];
 
-export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
+/** The message half of a campaign, reusable as a starting point for a new one. */
+export interface CampaignMessagePrefill {
+  name: string;
+  messageType: CampaignMessageType;
+  body: string | null;
+  mediaUrl: string | null;
+  metaTemplateId: string | null;
+  templateVariableValues: Record<string, string> | null;
+}
+
+interface NewCampaignDialogProps {
+  onCreated: (campaign: Campaign) => void;
+  /** Starts the compose step already filled in — e.g. "Send again" on a past
+   * campaign, where the message is settled and only the recipients change. */
+  prefill?: CampaignMessagePrefill;
+  /** Replaces the default "New campaign" button — e.g. a "Send again" label
+   * on a campaign's own detail page, reusing this same dialog and picker. */
+  trigger?: React.ReactElement;
+  /** Opens straight to a later step — paired with `prefill`, so re-sending
+   * an already-written promotion goes straight to picking who gets it. */
+  initialStep?: 1 | 2 | 3;
+}
+
+export function NewCampaignDialog({ onCreated, prefill, trigger, initialStep = 1 }: NewCampaignDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const [step, setStep] = React.useState(1);
-  const [name, setName] = React.useState("");
-  const [messageType, setMessageType] = React.useState<CampaignMessageType>("TEXT");
-  const [body, setBody] = React.useState("");
-  const [mediaUrl, setMediaUrl] = React.useState("");
-  const [metaTemplateId, setMetaTemplateId] = React.useState<string | null>(null);
-  const [templateVariableValues, setTemplateVariableValues] = React.useState<Record<string, string>>({});
-  const [sendPacing, setSendPacing] = React.useState<CampaignSendPacing>("ALL_AT_ONCE");
+  const [step, setStep] = React.useState<number>(initialStep);
+  const [name, setName] = React.useState(prefill?.name ?? "");
+  const [messageType, setMessageType] = React.useState<CampaignMessageType>(prefill?.messageType ?? "TEXT");
+  const [body, setBody] = React.useState(prefill?.body ?? "");
+  const [mediaUrl, setMediaUrl] = React.useState(prefill?.mediaUrl ?? "");
+  const [metaTemplateId, setMetaTemplateId] = React.useState<string | null>(prefill?.metaTemplateId ?? null);
+  const [templateVariableValues, setTemplateVariableValues] = React.useState<Record<string, string>>(
+    prefill?.templateVariableValues ?? {}
+  );
+  // SPACED by default, not ALL_AT_ONCE: a burst of marketing messages to
+  // numbers that have never messaged the hotel is exactly the pattern
+  // Meta's anti-spam system is most suspicious of — reported live as several
+  // recipients in one all-at-once batch coming back "Failed — In order to
+  // maintain a healthy ecosystem engagement..." (Meta error 131049), a
+  // rejection the app cannot override. Pacing doesn't guarantee delivery to
+  // a specific number Meta has already flagged, but it's the one lever that
+  // measurably helps a whole batch's delivery rate and protects the
+  // sending number's own quality rating for every campaign after this one.
+  const [sendPacing, setSendPacing] = React.useState<CampaignSendPacing>("SPACED");
   const [intervalValue, setIntervalValue] = React.useState(1);
   const [intervalUnit, setIntervalUnit] = React.useState<IntervalUnit>("minutes");
   const [sendTiming, setSendTiming] = React.useState<"now" | "scheduled">("now");
@@ -198,7 +232,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
   async function submit() {
     setSubmitting(true);
     try {
-      await apiFetch("/api/campaigns", {
+      const { campaign } = await apiFetch<{ campaign: Campaign }>("/api/campaigns", {
         method: "POST",
         body: JSON.stringify({
           name,
@@ -215,13 +249,14 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
         }),
       });
       setOpen(false);
-      setStep(1);
-      setName("");
-      setBody("");
-      setMediaUrl("");
-      setMetaTemplateId(null);
-      setTemplateVariableValues({});
-      setSendPacing("ALL_AT_ONCE");
+      setStep(initialStep);
+      setName(prefill?.name ?? "");
+      setMessageType(prefill?.messageType ?? "TEXT");
+      setBody(prefill?.body ?? "");
+      setMediaUrl(prefill?.mediaUrl ?? "");
+      setMetaTemplateId(prefill?.metaTemplateId ?? null);
+      setTemplateVariableValues(prefill?.templateVariableValues ?? {});
+      setSendPacing("SPACED");
       setIntervalValue(1);
       setIntervalUnit("minutes");
       setSendTiming("now");
@@ -234,7 +269,7 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       // broadcast is on its way and only finds out days later that it never
       // went out.
       toast.success("Sent for approval — we review every broadcast before it reaches guests.");
-      onCreated();
+      onCreated(campaign);
     } catch (err) {
       // The dialog deliberately stays open so the owner does not lose a
       // campaign they just spent minutes composing — but it has to say why,
@@ -257,14 +292,16 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setStep(1);
+        if (!next) setStep(initialStep);
       }}
     >
       <DialogTrigger
         render={
-          <Button>
-            <Plus /> New campaign
-          </Button>
+          trigger ?? (
+            <Button>
+              <Plus /> New campaign
+            </Button>
+          )
         }
       />
       {/*
@@ -528,18 +565,21 @@ export function NewCampaignDialog({ onCreated }: { onCreated: () => void }) {
                 )}
               </div>
 
-              {/* Pacing is folded away. It defaults to "all at once", which is
-                  right for every list this product currently sends to, and an
-                  extra pair of choices on screen was part of what made this
-                  dialog feel like work. */}
+              {/* Pacing is folded away, but the choice itself defaults to
+                  spaced out rather than all-at-once — a burst of marketing
+                  messages to cold numbers is what Meta's anti-spam system is
+                  most suspicious of. An extra pair of choices on screen was
+                  part of what made this dialog feel like work, so the
+                  sensible default stays collapsed, just visible in the
+                  summary line below. */}
               <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Sending speed</p>
                     <p className="text-[11px] text-muted-foreground">
                       {sendPacing === "ALL_AT_ONCE"
-                        ? "All at once — the usual choice."
-                        : `One every ${intervalValue} ${intervalUnit}.`}
+                        ? "All at once — faster, but a burst pattern Meta's spam filters watch for."
+                        : `One every ${intervalValue} ${intervalUnit} — recommended for cold numbers.`}
                     </p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => setShowPacing((v) => !v)}>
